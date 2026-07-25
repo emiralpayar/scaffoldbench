@@ -18,7 +18,6 @@ export function SyntheticBanner({ manifest }: { manifest: RunSetManifest | null 
         Every number on this page was fabricated by{' '}
         <span className="font-mono text-[12.5px]">scripts/generate-demo-data.ts</span> so the
         interface can be reviewed without spending anything. Do not quote it.
-        {manifest.notes ? ` ${manifest.notes}` : ''}
       </p>
     </div>
   );

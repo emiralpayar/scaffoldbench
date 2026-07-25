@@ -55,11 +55,7 @@ export default async function RunPage({ params }: Params) {
     <>
       <SyntheticBanner manifest={data.manifest} />
 
-      <PageHeader
-        eyebrow="Run"
-        title={record.runId}
-        aside={<RunHeadline record={record} />}
-      />
+      <PageHeader eyebrow="Run" title={record.runId} mono aside={<RunHeadline record={record} />} />
 
       <nav className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
         <Link

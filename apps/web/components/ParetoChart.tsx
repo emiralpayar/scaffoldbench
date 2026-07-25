@@ -153,9 +153,9 @@ export function ParetoChart({ model }: { model: ParetoModel }) {
               isAnimationActive={false}
             >
               <LabelList
-                dataKey="label"
+                dataKey="shortLabel"
                 position="top"
-                offset={10}
+                offset={12}
                 fill="var(--muted)"
                 fontSize={11}
               />
@@ -170,9 +170,9 @@ export function ParetoChart({ model }: { model: ParetoModel }) {
               isAnimationActive={false}
             >
               <LabelList
-                dataKey="label"
+                dataKey="shortLabel"
                 position="top"
-                offset={10}
+                offset={12}
                 fill="var(--ink)"
                 fontSize={11}
               />
@@ -216,6 +216,7 @@ function ParetoTooltip({ active, payload }: TooltipProps<number, string>) {
   return (
     <div className="rounded-[3px] border border-rule bg-surface px-3 py-2 shadow-sm">
       <p className="text-[12px] font-medium text-ink">{point.label}</p>
+      <p className="num text-[10px] text-muted">{point.strategyId}</p>
       <dl className="num mt-1.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-[11px]">
         <dt className="text-muted">score</dt>
         <dd className="text-ink">

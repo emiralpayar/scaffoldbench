@@ -5,17 +5,26 @@ export function PageHeader({
   title,
   lede,
   aside,
+  /** Identifiers read better in the data face than in the prose one. */
+  mono = false,
 }: {
   eyebrow: string;
   title: string;
   lede?: string;
   aside?: ReactNode;
+  mono?: boolean;
 }) {
   return (
     <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-5">
       <div className="max-w-2xl">
         <p className="eyebrow">{eyebrow}</p>
-        <h1 className="mt-1 font-serif text-[30px] leading-[1.15] tracking-[-0.01em] text-ink">
+        <h1
+          className={
+            mono
+              ? 'mt-1 break-all font-mono text-[19px] leading-tight text-ink'
+              : 'mt-1 font-serif text-[30px] leading-[1.15] tracking-[-0.01em] text-ink'
+          }
+        >
           {title}
         </h1>
         {lede ? <p className="prose-serif mt-2">{lede}</p> : null}

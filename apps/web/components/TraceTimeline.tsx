@@ -90,7 +90,7 @@ function TraceRow({ event, result }: { event: TraceEvent; result?: TraceEvent })
   const failed = !!event.isError || event.kind === 'error' || event.kind === 'tool_denied';
 
   return (
-    <div className="grid grid-cols-[3.4rem_5rem_minmax(0,1fr)] items-baseline gap-2">
+    <div className="grid grid-cols-[3.4rem_6.2rem_minmax(0,1fr)] items-baseline gap-2">
       <span className="num text-[11px] text-muted">{formatDuration(event.tMs)}</span>
       <span className={`eyebrow truncate ${failed ? '!text-bad' : ''}`}>
         {KIND_LABEL[event.kind] ?? event.kind}

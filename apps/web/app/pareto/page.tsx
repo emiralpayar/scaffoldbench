@@ -84,7 +84,10 @@ export default async function ParetoPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.strategyId} className="border-b border-rule/70 last:border-0">
-                  <td className="px-3 py-2 text-ink">{row.label}</td>
+                  <td className="px-3 py-2 text-ink">
+                    {row.label}
+                    <span className="num ml-2 text-[11px] text-muted">{row.strategyId}</span>
+                  </td>
                   <td className="px-3 py-2">
                     {row.onFrontier ? (
                       <Tag tone="accent">◆ frontier</Tag>

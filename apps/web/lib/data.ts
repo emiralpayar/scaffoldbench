@@ -251,6 +251,8 @@ export function buildLeaderboardRows(
 export interface ParetoPoint {
   strategyId: string;
   label: string;
+  /** The id, used for the in-chart direct label: it never wraps onto a second line. */
+  shortLabel: string;
   cost: number;
   score: number;
   ciLow: number;
@@ -278,6 +280,7 @@ export function buildParetoModel(rows: readonly LeaderboardRow[]): ParetoModel {
   const points: ParetoPoint[] = rows.map((row) => ({
     strategyId: row.strategyId,
     label: row.label,
+    shortLabel: row.strategyId,
     cost: row.costUsd.mean,
     score: row.score.mean,
     ciLow: row.score.ciLow,
