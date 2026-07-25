@@ -347,6 +347,14 @@ export interface RunSetManifest {
   durationMs: number;
   maxCostUsdPerRun: number;
   notes?: string;
+  /**
+   * True for fabricated run sets used to develop the site.
+   *
+   * Nothing in the pipeline sets this — only `scripts/generate-demo-data.ts`
+   * does. The site renders an unmissable banner when it sees it, so synthetic
+   * data can never be mistaken for a measurement.
+   */
+  synthetic?: boolean;
 }
 
 /** Static metadata about a strategy, written alongside results for the site. */

@@ -1,0 +1,58 @@
+{
+  "runId": "plan-execute__airline-medium__r2",
+  "runSetId": "demo-synthetic",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook a passenger after a cancellation",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "plan-execute",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T12:02:00.000Z",
+  "finishedAt": "2026-07-25T12:02:30.000Z",
+  "latencyMs": 12876,
+  "score": 0,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "state",
+      "label": "[synthetic] Final state is correct",
+      "weight": 2,
+      "earned": 0
+    },
+    {
+      "id": "side-effects",
+      "label": "[synthetic] No unintended changes",
+      "weight": 1,
+      "earned": 0
+    }
+  ],
+  "penalties": [
+    {
+      "id": "policy",
+      "label": "[synthetic] Acted before consulting the policy",
+      "kind": "policy_violation",
+      "multiplier": 0
+    }
+  ],
+  "failureMode": "policy_violation",
+  "scoreMetadata": {
+    "toolCalls": 6
+  },
+  "costUsd": 0.035964,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 25200,
+    "outputTokens": 1960,
+    "cacheReadInputTokens": 58800,
+    "cacheCreationInputTokens": 3200
+  },
+  "turns": 9,
+  "toolCalls": 9,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [],
+  "finalText": "[synthetic] Plan then execute answer for airline-medium."
+}

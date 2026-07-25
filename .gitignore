@@ -11,6 +11,10 @@ out/
 # Scratch working directories created per benchmark run.
 .arena-scratch/
 
-# Traces are large; keep them out of git by default. Summary JSON in
-# results/<runSet>/runs/ is committed, traces are opt-in via ARENA_COMMIT_TRACES.
-results/**/traces/
+# Traces are large; keep them out of git by default. The run summaries in
+# results/<runSet>/runs/ are committed, which is everything the leaderboard
+# needs. Commit a trace deliberately when it illustrates something.
+results/*/traces/
+# The synthetic demo set is the exception: its traces are what let someone
+# review the trace viewer without running a benchmark.
+!results/demo-synthetic/traces/
