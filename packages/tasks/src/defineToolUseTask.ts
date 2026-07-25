@@ -82,7 +82,7 @@ export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
     createEnvironment(): TaskEnvironment {
       const world = spec.createWorld();
       const journal: ToolCall[] = [];
-      const { server, serverName, allowedTools } = createJournaledToolServer({
+      const { server, serverName, allowedTools, readOnlyTools } = createJournaledToolServer({
         name: spec.world,
         ...(spec.instructions ? { instructions: spec.instructions } : {}),
         journal,
@@ -92,6 +92,7 @@ export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
       return {
         mcpServers: { [serverName]: server },
         allowedTools,
+        readOnlyTools,
         state: world,
         journal,
       };
