@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@arena/core": ["packages/core/src/index.ts"],
+      "@arena/core/*": ["packages/core/src/*"],
+      "@arena/strategies": ["packages/strategies/src/index.ts"],
+      "@arena/strategies/*": ["packages/strategies/src/*"],
+      "@arena/tasks": ["packages/tasks/src/index.ts"],
+      "@arena/tasks/*": ["packages/tasks/src/*"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "apps/cli/src/**/*.ts"],
+  "exclude": ["node_modules", "apps/web/.next", "**/dist"]
+}
