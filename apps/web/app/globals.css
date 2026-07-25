@@ -162,7 +162,25 @@ body {
  * primary encoding and the wash is the secondary one.
  */
 .heat {
-  background-color: color-mix(in oklab, var(--heat-1) calc(var(--t, 0) * 100%), var(--heat-0));
+  position: relative;
+  isolation: isolate;
+  background-color: var(--heat-0);
+}
+
+/*
+ * The wash is a separate layer at `opacity: var(--t)` rather than a
+ * `color-mix()`, because a minifier that cannot evaluate the mix rewrites it to
+ * the solid endpoint and paints every cell as if it scored 1.0. Two layers
+ * cannot be misread that way.
+ */
+.heat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: var(--heat-1);
+  opacity: var(--t, 0);
 }
 
 /* --- disclosure ---------------------------------------------------------- */

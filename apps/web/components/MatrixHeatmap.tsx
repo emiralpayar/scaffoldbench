@@ -48,11 +48,11 @@ export function MatrixHeatmap({ matrix }: { matrix: MatrixModel }) {
                   key={task.id}
                   scope="col"
                   title={task.title}
-                  className="min-w-[4.4rem] px-1 py-2 align-bottom font-normal"
+                  className="min-w-[4.6rem] px-1 py-2 align-bottom font-normal"
                 >
                   <Link href={`/tasks/${task.id}`} className="block hover:text-accent">
                     <span className="block text-[11px] leading-tight text-ink-2">{task.world}</span>
-                    <span className="eyebrow block">{task.difficulty.slice(0, 4)}</span>
+                    <span className="eyebrow block !tracking-[0.06em]">{task.difficulty}</span>
                   </Link>
                 </th>
               ))}
@@ -95,7 +95,7 @@ export function MatrixHeatmap({ matrix }: { matrix: MatrixModel }) {
                         href={`/tasks/${task.id}`}
                         style={heat(cell.meanScore)}
                         title={`${strategy.label} · ${task.title}\nmean score ${formatScore(cell.meanScore)} over ${cell.runs} runs · pass ${formatPercent(cell.passRate)}`}
-                        className="heat num flex h-8 items-center justify-center rounded-[2px] text-ink transition-shadow hover:shadow-[inset_0_0_0_2px_var(--accent)]"
+                        className="heat num flex h-8 items-center justify-center rounded-[2px] text-ink hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-accent"
                       >
                         {cell.meanScore.toFixed(2)}
                       </Link>

@@ -21,7 +21,7 @@ export function ScoreBreakdown({ breakdown }: { breakdown: readonly ScoreItem[] 
         const passed = item.earned >= FULL_CREDIT;
         return (
           <li key={item.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 first:pt-0">
-            <Verdict ok={passed}>{passed ? 'pass' : item.earned > 0 ? 'partial' : 'fail'}</Verdict>
+            <Verdict state={passed ? 'pass' : item.earned > 0 ? 'partial' : 'fail'} />
             <span className="min-w-0 flex-1 text-[13px] text-ink">{item.label}</span>
             <MiniBar value={item.earned} tone={passed ? 'accent' : 'muted'} />
             <span className="num w-14 text-right text-[12px] text-ink-2">
@@ -156,7 +156,7 @@ export function RunHeadline({ record }: { record: RunRecord }) {
         <div className="eyebrow">Score</div>
         <div className="num mt-1 flex items-baseline gap-2 text-[26px] leading-none text-ink">
           {formatScore(record.score)}
-          <Verdict ok={record.passed} />
+          <Verdict state={record.passed ? 'pass' : 'fail'} />
         </div>
       </div>
       <div>

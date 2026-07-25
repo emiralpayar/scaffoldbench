@@ -7,6 +7,7 @@ const LINKS = [
   { href: '/', label: 'Leaderboard' },
   { href: '/pareto', label: 'Score vs cost' },
   { href: '/matrix', label: 'Matrix' },
+  { href: '/live', label: 'Run one live' },
 ];
 
 export function SiteNav() {

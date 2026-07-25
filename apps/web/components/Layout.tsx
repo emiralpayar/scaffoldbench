@@ -93,14 +93,23 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   );
 }
 
-/** A verdict glyph paired with its label, so state never rests on colour alone. */
-export function Verdict({ ok, children }: { ok: boolean; children?: ReactNode }) {
+export type VerdictState = 'pass' | 'partial' | 'fail';
+
+const VERDICT = {
+  pass: { glyph: '✓', className: 'text-good' },
+  partial: { glyph: '◐', className: 'text-warn' },
+  fail: { glyph: '✗', className: 'text-bad' },
+} as const;
+
+/** A glyph paired with its label, so an outcome never rests on colour alone. */
+export function Verdict({ state, children }: { state: VerdictState; children?: ReactNode }) {
+  const { glyph, className } = VERDICT[state];
   return (
-    <span className={`inline-flex items-center gap-1.5 ${ok ? 'text-good' : 'text-bad'}`}>
+    <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <span aria-hidden className="font-mono text-[12px] leading-none">
-        {ok ? '✓' : '✗'}
+        {glyph}
       </span>
-      <span className="text-[12px]">{children ?? (ok ? 'pass' : 'fail')}</span>
+      <span className="text-[12px]">{children ?? state}</span>
     </span>
   );
 }

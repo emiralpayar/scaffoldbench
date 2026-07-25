@@ -15,7 +15,7 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-import { comparisonVerdict, median, paretoFrontier } from '@arena/core';
+import { comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@arena/core';
 import type {
   Aggregate,
   CellSummary,
@@ -682,16 +682,21 @@ export function formatFailureMode(mode: string): string {
  * override lets a deployment point the site at a results tree it fetched.
  */
 export function resultsRoot(): string {
+  // An explicit override wins even when it does not exist: a deployment that
+  // points at the wrong directory should render the empty state, not quietly
+  // fall back to whatever results happen to be in the checkout.
+  const override = process.env.ARENA_RESULTS_DIR;
+  if (override) return path.resolve(override);
+
   const candidates = [
-    process.env.ARENA_RESULTS_DIR,
     path.join(process.cwd(), 'results'),
     path.join(process.cwd(), '..', '..', 'results'),
     path.join(process.cwd(), '..', 'results'),
   ];
   for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) return candidate;
+    if (existsSync(candidate)) return candidate;
   }
-  return path.join(process.cwd(), 'results');
+  return candidates[0] as string;
 }
 
 async function readJsonFile<T>(file: string): Promise<T | null> {
@@ -728,10 +733,6 @@ async function newestRunSetId(root: string): Promise<string | null> {
 }
 
 async function readRunSet(): Promise<RunSetData | null> {
-  // `summarizeRuns` is imported lazily so the pure half of this module stays
-  // importable without pulling the aggregation code into every bundle.
-  const { summarizeRuns } = await import('@arena/core');
-
   const root = resultsRoot();
   if (!existsSync(root)) return null;
 

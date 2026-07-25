@@ -106,6 +106,13 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     model: spec.model ?? ctx.model,
     effort: ctx.effort,
     systemPrompt: spec.systemPrompt ?? ctx.systemPrompt,
+    // `tools` decides what the model is even shown; `allowedTools` decides what
+    // may run. Both are pinned to the task's toolset because the harness owns
+    // the built-in surface too: without this the session loads its own agent
+    // tools (Task, Skill, Workflow, ToolSearch, the scheduling tools), which
+    // are unusable here but still occupy the prompt — and vary by host, which
+    // would make two runs of the same task incomparable.
+    tools: [...allowedTools],
     allowedTools: [...allowedTools],
     disallowedTools: [...SANDBOX_DENYLIST],
     mcpServers: { ...ctx.env.mcpServers, ...(spec.mcpServers ?? {}) },

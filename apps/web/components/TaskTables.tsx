@@ -208,7 +208,7 @@ export function RunsTable({
               <td className="num px-2 py-1.5 text-right text-ink-2">{record.repeat}</td>
               <td className="num px-2 py-1.5 text-right text-ink">{formatScore(record.score)}</td>
               <td className="px-2 py-1.5">
-                <Verdict ok={record.passed}>
+                <Verdict state={record.passed ? 'pass' : 'fail'}>
                   {record.passed ? 'pass' : formatFailureMode(record.failureMode)}
                 </Verdict>
               </td>
