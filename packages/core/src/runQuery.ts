@@ -92,6 +92,10 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const onParentAbort = () => controller.abort();
   ctx.signal.addEventListener('abort', onParentAbort, { once: true });
 
+  // Where this call's events begin, so a truncated turn can be salvaged from
+  // them below.
+  const traceStart = ctx.trace.events.length;
+
   let deniedToolCalls = 0;
   let toolCalls = 0;
   let text = '';
@@ -194,6 +198,25 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     ctx.signal.removeEventListener('abort', onParentAbort);
   }
 
+  // A turn that runs out of turns or budget returns an error result with no
+  // text, which would throw away everything the agent actually produced — on a
+  // research task that can mean a dozen real page fetches scoring zero for want
+  // of a final message. The work is still in the transcript, so recover it.
+  // A truncated run is a valid data point; a silently empty one is not.
+  if (text.trim() === '') {
+    const salvaged = lastAssistantText(ctx, traceStart);
+    if (salvaged) {
+      text = salvaged;
+      ctx.trace.append({
+        phase: spec.phase,
+        depth,
+        agent: spec.agentLabel,
+        kind: 'note',
+        text: 'Turn ended without a final message; recovered the last assistant text.',
+      });
+    }
+  }
+
   ctx.budget.charge({
     costUsd,
     turns,
@@ -231,6 +254,17 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
  * normalizer has already stored, so this avoids threading a second accumulator
  * through the streaming loop.
  */
+/** The last thing the agent said during this call, used when the turn was cut short. */
+function lastAssistantText(ctx: RunContext, fromIndex: number): string | undefined {
+  for (let i = ctx.trace.events.length - 1; i >= fromIndex; i--) {
+    const event = ctx.trace.events[i];
+    if (event?.kind === 'assistant_text' && event.text && event.text.trim() !== '') {
+      return event.text;
+    }
+  }
+  return undefined;
+}
+
 function lastUsage(ctx: RunContext) {
   for (let i = ctx.trace.events.length - 1; i >= 0; i--) {
     const event = ctx.trace.events[i];

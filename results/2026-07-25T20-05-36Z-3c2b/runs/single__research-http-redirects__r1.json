@@ -1,0 +1,102 @@
+{
+  "runId": "single__research-http-redirects__r1",
+  "runSetId": "2026-07-25T20-05-36Z-3c2b",
+  "taskId": "research-http-redirects",
+  "taskTitle": "HTTP 301 vs 308",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:05:36.162Z",
+  "finishedAt": "2026-07-25T20:06:12.388Z",
+  "latencyMs": 36226,
+  "score": 0.0833,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "names",
+      "label": "States that 301 is \"Moved Permanently\" and 308 is \"Permanent Redirect\", and that both indicate the target resource has a new permanent URI.",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "method-preserved-308",
+      "label": "States that 308 requires the client to reuse the original request method and body when following the redirect.",
+      "weight": 1.5,
+      "earned": 0
+    },
+    {
+      "id": "method-change-301",
+      "label": "States that with 301 clients are permitted to change the request method — in practice a POST becomes a GET — which is exactly the behaviour 308 was introduced to prevent.",
+      "weight": 1.5,
+      "earned": 0
+    },
+    {
+      "id": "cacheable",
+      "label": "States that both 301 and 308 are cacheable by default (a permanent redirect may be cached even without explicit cache headers).",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "specifications",
+      "label": "States that 308 is defined in RFC 7538 and that 301 is defined in the core HTTP semantics specification (RFC 9110, previously RFC 7231 / RFC 2616).",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "source-coverage",
+      "label": "Consulted the expected sources (rfc-editor.org, developer.mozilla.org)",
+      "weight": 1.2000000000000002,
+      "earned": 0.5,
+      "detail": "Never opened: rfc-editor.org"
+    }
+  ],
+  "penalties": [],
+  "failureMode": "wrong_answer",
+  "scoreMetadata": {
+    "judgeFailures": 0,
+    "requiredSources": [
+      "rfc-editor.org",
+      "developer.mozilla.org"
+    ],
+    "missingSources": [
+      "rfc-editor.org"
+    ],
+    "citedCount": 0,
+    "verifiedCount": 0,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "fetchedUrlCount": 2
+  },
+  "costUsd": 0.064603,
+  "judgeCostUsd": 0.100805,
+  "usage": {
+    "inputTokens": 18,
+    "outputTokens": 2120,
+    "cacheReadInputTokens": 26150,
+    "cacheCreationInputTokens": 4029
+  },
+  "turns": 17,
+  "toolCalls": 16,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785009936165,
+      "durationMs": 31633,
+      "costUsd": 0.064603,
+      "turns": 17,
+      "toolCalls": 16,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "I attempted this research task but was unable to complete it. Here's what happened:\n\nI tried multiple search queries covering this topic from several angles — direct comparisons (\"HTTP 301 vs 308\", \"301 redirect vs 308 redirect\"), individual status code lookups (\"status code 301\", \"status code 308\", \"301 Moved Permanently status code\", \"308 Permanent Redirect status code\"), and specification references (\"RFC 9110 301 Moved Permanently\", \"rfc7231 section 6.4.2\") — and every single one returned \"No recorded search results... this run is in replay mode and never reaches the network.\" I also tried directly fetching the two most likely authoritative pages (MDN's status code references for 301 and 308) without going through search first, and got \"No recorded page... this run is in replay mode and never reaches the network.\"\n\n**What blocked me:** The web tools in this environment are running in a replay mode with a fixed, pre-recorded cache of query/page results, and no query or URL related to HTTP 301/308 status codes appears to have been recorded in that cache. I have no live network access — every `search` and `fetch_page` call is served from this static cache, so I cannot reach MDN, the IETF RFC repository, or any other source to verify facts about these status codes.\n\nPer the domain policy, I must not state factual claims (what 301/308 mean, cacheability, method/body handling, or their specification location) without a source I actually retrieved via `fetch_page`, and I must not cite a URL I didn't open. Since I could not successfully open or search any relevant source, I cannot produce a properly sourced, policy-compliant answer to this question right now.\n\n**What would unblock this:** Either live network access for the `search`/`fetch_page` tools, or a replay cache that includes recorded results for queries/pages about HTTP status codes 301 and 308 (e.g., MDN's `/en-US/docs/Web/HTTP/Status/301` and `/308` pages, or the relevant RFC — HTTP semantics is currently specified in RFC 9110, which obsoleted RFC 7231).\n\nIf you'd like, I can retry with different specific URLs or query phrasings you think might be in the recorded set, or you can point me to a source you'd like me to fetch directly.",
+  "traceFile": "traces/single__research-http-redirects__r1.jsonl"
+}

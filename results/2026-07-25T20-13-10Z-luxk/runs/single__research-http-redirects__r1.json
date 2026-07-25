@@ -1,0 +1,105 @@
+{
+  "runId": "single__research-http-redirects__r1",
+  "runSetId": "2026-07-25T20-13-10Z-luxk",
+  "taskId": "research-http-redirects",
+  "taskTitle": "HTTP 301 vs 308",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:13:10.107Z",
+  "finishedAt": "2026-07-25T20:14:40.038Z",
+  "latencyMs": 89931,
+  "score": 0.8611,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "names",
+      "label": "States that 301 is \"Moved Permanently\" and 308 is \"Permanent Redirect\", and that both indicate the target resource has a new permanent URI.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "301 Moved Permanently ... 308 Permanent Redirect ... indicates that the requested resource has been permanently moved to the URL given by the Location header"
+    },
+    {
+      "id": "method-preserved-308",
+      "label": "States that 308 requires the client to reuse the original request method and body when following the redirect.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "The request method and the body will not be modified by the client in the redirected request."
+    },
+    {
+      "id": "method-change-301",
+      "label": "States that with 301 clients are permitted to change the request method — in practice a POST becomes a GET — which is exactly the behaviour 308 was introduced to prevent.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "many/most clients (per the Fetch Standard) rewrite a non-GET method to GET when following a 301 ... 308 was created to remove the ambiguity of the behavior when using non-GET methods."
+    },
+    {
+      "id": "cacheable",
+      "label": "States that both 301 and 308 are cacheable by default (a permanent redirect may be cached even without explicit cache headers).",
+      "weight": 1,
+      "earned": 0,
+      "detail": "308 is not on that list. ... 308 does not appear in this default-cacheable list, meaning it is not treated as cacheable by default the way 301 is"
+    },
+    {
+      "id": "specifications",
+      "label": "States that 308 is defined in RFC 7538 and that 301 is defined in the core HTTP semantics specification (RFC 9110, previously RFC 7231 / RFC 2616).",
+      "weight": 1,
+      "earned": 1,
+      "detail": "308 was originally defined in its own dedicated RFC, RFC 7538 ... 301 was historically defined as part of the older HTTP/1.1 semantics documents (obsoleted RFC 7231, and before that RFC 2616), and is now specified in RFC 9110."
+    },
+    {
+      "id": "source-coverage",
+      "label": "Consulted the expected sources (rfc-editor.org, developer.mozilla.org)",
+      "weight": 1.2000000000000002,
+      "earned": 1,
+      "detail": "All expected sources were opened."
+    }
+  ],
+  "penalties": [],
+  "failureMode": "wrong_answer",
+  "scoreMetadata": {
+    "judgeFailures": 0,
+    "requiredSources": [
+      "rfc-editor.org",
+      "developer.mozilla.org"
+    ],
+    "missingSources": [],
+    "citedCount": 5,
+    "verifiedCount": 5,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "fetchedUrlCount": 9
+  },
+  "costUsd": 0.313684,
+  "judgeCostUsd": 0.175731,
+  "usage": {
+    "inputTokens": 20,
+    "outputTokens": 6553,
+    "cacheReadInputTokens": 125671,
+    "cacheCreationInputTokens": 29483
+  },
+  "turns": 17,
+  "toolCalls": 16,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785010390111,
+      "durationMs": 77807,
+      "costUsd": 0.3136843,
+      "turns": 17,
+      "toolCalls": 16,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "# HTTP 301 vs. 308: Moved Permanently vs. Permanent Redirect\n\n## What each status code means\n\n**301 Moved Permanently** — \"indicates that the requested resource has been permanently moved to the URL in the Location header. A browser receiving this status will automatically request the resource at the URL in the Location header, redirecting the user to the new page. Search engines receiving this response will attribute links to the original URL to the redirected resource, passing the SEO ranking to the new URL.\" (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301)\n\n**308 Permanent Redirect** — \"indicates that the requested resource has been permanently moved to the URL given by the Location header. A browser receiving this status will automatically request the resource at the URL in the Location header, redirecting the user to the new page.\" (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/308)\n\nSo both codes tell a client that a resource has moved permanently and give the new location in the `Location` header, and both cause an automatic follow-up request to that new URL. The difference between them lies entirely in how strictly the request method and body must be preserved.\n\n## How the request method and body are treated\n\nThis is the core difference, and MDN states it explicitly on both pages and in its redirections guide:\n\n- **301**: \"A browser receiving this status will automatically request the resource at the URL in the Location header... In the Fetch Standard, when a user agent receives a 301 in response to a POST request, it uses the GET method in the subsequent redirection request, as permitted by the HTTP specification.\" (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301) In other words, the HTTP spec technically requires the method to stay the same, but in practice many/most clients (per the Fetch Standard) rewrite a non-GET method to GET when following a 301, and this legacy behavior is tolerated.\n\n- **308**: \"The request method and the body will not be modified by the client in the redirected request. A 301 Moved Permanently requires the request method and the body to remain unchanged when redirection is performed, but this is incorrectly handled by older clients to use the GET method instead.\" (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/308) 308 was created specifically to remove this ambiguity: unlike 301, following a 308 must not change the method or body at all.\n\nMDN's \"Redirections in HTTP\" guide summarizes this in a table of permanent redirects:\n\n| Code | Text | Method handling |\n|---|---|---|\n| 301 | Moved Permanently | \"GET methods unchanged. Others may or may not be changed to GET.\" (with a footnote: \"The specification did not intend to allow method changes, but there are existing user agents that do change their method. 308 was created to remove the ambiguity of the behavior when using non-GET methods.\") |\n| 308 | Permanent Redirect | \"Method and body not changed.\" |\n\n(https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections)\n\nSo, practically:\n- If you redirect a **POST** with a **301**, many clients will resend the follow-up request as a **GET**, dropping the body.\n- If you redirect a **POST** with a **308**, the client must resend it as a **POST** with the same body to the new URL.\n\n## Cacheability\n\nMDN's Cacheable glossary entry states which response status codes are cacheable by default: \"The following status codes are cacheable: 200, 203, 204, 206, 300, 301, 404, 405, 410, 414, and 501.\" (https://developer.mozilla.org/en-US/docs/Glossary/Cacheable)\n\n**308 is not on that list.** So based on this source:\n- **301** is one of the status codes that is cacheable by default (subject to the usual constraints: the request method must itself be cacheable — GET or HEAD — and there must be no response headers, such as `Cache-Control`, that prohibit caching) (https://developer.mozilla.org/en-US/docs/Glossary/Cacheable).\n- **308** does not appear in this default-cacheable list, meaning it is not treated as cacheable by default the way 301 is; it would need explicit caching directives (e.g., `Cache-Control`) to be cached.\n\nThe MDN 301 page's example response even shows this in practice, with a real response header `cache-control: max-age=2592000,public` attached to a 301 redirect (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301), consistent with 301 being cacheable by default.\n\n## Where each is specified\n\nBoth MDN pages list the current governing specification as \"HTTP Semantics\" (i.e., RFC 9110), citing sections `#status.301` and `#status.308` respectively (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301; https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/308).\n\nLooking at the RFC 9110 document itself confirms this: RFC 9110, \"HTTP Semantics\" (June 2022), explicitly lists in its front matter that it **\"Obsoletes: 2818, 7230, 7231, 7232, 7233, 7235, 7538, 7615, 7694.\"** (https://www.rfc-editor.org/rfc/rfc9110.html). This tells us:\n- **301** was historically defined as part of the older HTTP/1.1 semantics documents (obsoleted RFC 7231, and before that RFC 2616), and is now specified in RFC 9110.\n- **308** was originally defined in its own dedicated RFC, **RFC 7538** (\"HTTP Status Code 308 (Permanent Redirect)\"), which RFC 9110 explicitly lists as one of the documents it obsoletes/incorporates (https://www.rfc-editor.org/rfc/rfc9110.html).\n\nSo both codes are now consolidated into the same current specification, RFC 9110 (HTTP Semantics), but 308 has a separate specification lineage (RFC 7538) reflecting that it was added later specifically to fix the method-preservation ambiguity of 301.\n\n## Summary\n\n| Aspect | 301 Moved Permanently | 308 Permanent Redirect |\n|---|---|---|\n| Meaning | Resource permanently moved to `Location` URL | Resource permanently moved to `Location` URL |\n| Method/body on redirect | Spec says method should be preserved, but many clients rewrite non-GET (e.g., POST) requests to GET, dropping the body | Method and body must not be changed by the client |\n| Cacheable by default | Yes — listed among default-cacheable status codes | No — not listed among default-cacheable status codes |\n| Current spec | RFC 9110 (HTTP Semantics), §status.301 | RFC 9110 (HTTP Semantics), §status.308 |\n| Original/legacy spec | Earlier HTTP/1.1 docs, obsoleted by RFC 9110 | RFC 7538, obsoleted/incorporated by RFC 9110 |\n\nSources relied on (all fetched directly):\n- https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301\n- https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/308\n- https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections\n- https://developer.mozilla.org/en-US/docs/Glossary/Cacheable\n- https://www.rfc-editor.org/rfc/rfc9110.html",
+  "traceFile": "traces/single__research-http-redirects__r1.jsonl"
+}

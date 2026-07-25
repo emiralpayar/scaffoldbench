@@ -20,7 +20,7 @@ const httpRedirects = defineResearchTask({
     'each is cacheable, and where each is specified.',
   difficulty: 'easy',
   tags: ['http', 'specifications', 'comparison'],
-  maxTurns: 14,
+  maxTurns: 22,
   requiredSources: ['rfc-editor.org', 'developer.mozilla.org'],
   rubric: [
     {
@@ -66,7 +66,7 @@ const scriptLoading = defineResearchTask({
     'inline scripts and type="module" scripts differ from the classic src case.',
   difficulty: 'medium',
   tags: ['html', 'browser', 'synthesis'],
-  maxTurns: 20,
+  maxTurns: 30,
   requiredSources: ['developer.mozilla.org', 'html.spec.whatwg.org', 'web.dev'],
   rubric: [
     {
@@ -118,7 +118,7 @@ const passwordHashing = defineResearchTask({
     'source actually says.',
   difficulty: 'hard',
   tags: ['security', 'standards', 'disagreement'],
-  maxTurns: 26,
+  maxTurns: 38,
   requiredSources: ['owasp.org', 'nist.gov'],
   rubric: [
     {

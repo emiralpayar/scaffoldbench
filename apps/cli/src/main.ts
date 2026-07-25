@@ -132,13 +132,26 @@ function wrap(text: string, width: number): string[] {
 // arena run
 // ---------------------------------------------------------------------------
 
+/** True when a credential was supplied explicitly rather than inherited. */
+function hasExplicitCredential(): boolean {
+  return (
+    (process.env.ANTHROPIC_API_KEY ?? '').trim() !== '' ||
+    (process.env.ANTHROPIC_AUTH_TOKEN ?? '').trim() !== ''
+  );
+}
+
 async function runCommand(args: RunArgs): Promise<number> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey.trim() === '') {
-    console.error('ANTHROPIC_API_KEY is not set, and `arena run` cannot reach the model without it.');
-    console.error('Export the key and try again. `arena tasks`, `arena strategies` and');
-    console.error('`arena report` need no key and cost nothing.');
-    return 1;
+  // Deliberately not a hard gate on ANTHROPIC_API_KEY. The SDK resolves
+  // credentials in its own order — API key, auth token, then an interactive
+  // Claude Code login on this machine — and running a local benchmark on that
+  // login is ordinary developer usage. Refusing to start without an exported
+  // key would reject a perfectly working setup. If nothing is available the
+  // first run fails with a 401 and is recorded as such, which is a clearer
+  // signal than a guess made before any request.
+  if (!hasExplicitCredential()) {
+    console.log('No ANTHROPIC_API_KEY set — falling back to this machine\'s Claude Code login.');
+    console.log('Runs are billed to that account. Export a key to bill one explicitly.');
+    console.log('');
   }
 
   let strategies;

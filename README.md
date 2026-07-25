@@ -51,6 +51,16 @@ tools of our own, `search` and `fetch_page`, backed by a content-addressed fixtu
 mode performs real requests and writes them to disk; `replay` mode — the default for CI and for
 the weekly benchmark — never touches the network. Two strategies compared on a live web are
 compared on two different webs.
+
+Replay matches on more than the exact request, and it has to. Keying strictly on the query string
+looked correct and was unusable: a recording answers only the wording that produced it, and no two
+runs word a search the same way. Replaying a *freshly recorded* research task missed on all sixteen
+of its searches and scored 0.08 — a number about fixture bookkeeping, not about the architecture.
+A miss now falls back to the closest recorded query by content-word overlap, then to the recorded
+pages themselves, so any sensible phrasing reaches sources that were captured. `fetch_page` is
+held to a stricter rule — same host, and a match on the path tail that names the page — because a
+substituted page reads to the agent as a real source, where an off-target search result is merely
+ignored. The same task then scored 1.00.
 ([`webTools.ts`](packages/tasks/src/research/webTools.ts), [`fixtureStore.ts`](packages/tasks/src/research/fixtureStore.ts))
 
 **Bootstrap confidence intervals, and an explicit `inconclusive`.** Every aggregate carries a

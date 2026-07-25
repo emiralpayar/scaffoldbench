@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { normalizeUrl, type FixtureMode, type JournaledToolSpec, type ToolReply } from '@arena/core';
-import { FixtureStore, fixtureKey } from './fixtureStore';
+import { FixtureStore, fixtureKey, similarity, tokenize } from './fixtureStore';
 
 const USER_AGENT =
   'AgentArenaBench/0.1 (agent harness benchmark; record/replay research tools; contact: benchmark operator)';
@@ -18,6 +18,117 @@ export interface SearchResult {
   url: string;
   snippet: string;
 }
+
+/** Overlap below this is too weak to be worth returning as a near match. */
+const NEAR_MATCH_THRESHOLD = 0.34;
+const NEAR_MATCH_RESULTS = 8;
+
+/**
+ * Answer a replay search that has no exact recording.
+ *
+ * Exact-key replay does not survive contact with a real agent: a recording
+ * answers only the wording that produced it, and two runs never word a search
+ * identically. Measured on a freshly recorded research task, a replay of the
+ * same task missed on every one of its sixteen searches and scored near zero —
+ * a number that says nothing about the architecture under test.
+ *
+ * So a miss falls back to the recorded corpus. First the closest recorded query
+ * by content-word overlap; failing that, the recorded *pages* whose titles and
+ * URLs match the query, assembled into results. As long as the relevant pages
+ * were captured at all, any sensible phrasing reaches them — which is the
+ * property replay actually needs.
+ */
+async function nearestRecordedResults(
+  store: FixtureStore,
+  query: string,
+): Promise<SearchResult[] | undefined> {
+  const wanted = tokenize(query);
+  if (wanted.length === 0) return undefined;
+
+  const searches = await store.all<SearchResult[]>('search');
+  let best: { score: number; results: SearchResult[] } | undefined;
+  for (const record of searches) {
+    if (!Array.isArray(record.value) || record.value.length === 0) continue;
+    const score = similarity(wanted, tokenize(record.payload));
+    if (score >= NEAR_MATCH_THRESHOLD && (!best || score > best.score)) {
+      best = { score, results: record.value };
+    }
+  }
+  if (best) return best.results;
+
+  // Nothing close among the queries — build results from the recorded pages
+  // themselves, so a differently-worded search still finds captured sources.
+  const scored = (await store.all<PageRecord>('fetch'))
+    .filter((record) => isPageRecord(record.value))
+    .map((record) => ({
+      page: record.value,
+      score: similarity(wanted, tokenize(`${record.value.url} ${record.value.title}`)),
+    }))
+    .filter((entry) => entry.score >= NEAR_MATCH_THRESHOLD)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, NEAR_MATCH_RESULTS);
+
+  if (scored.length === 0) return undefined;
+
+  return scored.map(({ page }) => ({
+    title: page.title || page.url,
+    url: page.url,
+    snippet: page.text.replace(/\s+/g, ' ').slice(0, 240).trim(),
+  }));
+}
+
+/**
+ * The part of a URL that identifies the page rather than the site.
+ *
+ * Scoring whole URLs does not work: on a documentation site the scaffolding
+ * (`developer.mozilla.org`, `/en-US/docs/Web/`) is most of the string, so
+ * `.../HTTP/Status/301` and `.../CSS/grid` come out 78% alike and an unrelated
+ * page gets substituted for the one asked for. The last two path segments are
+ * what actually name the page.
+ */
+function urlIdentity(raw: string): { host: string; tail: string[] } | undefined {
+  try {
+    const url = new URL(raw);
+    const segments = url.pathname.split('/').filter((segment) => segment !== '');
+    return {
+      host: url.hostname.toLowerCase().replace(/^www\./, ''),
+      tail: tokenize(segments.slice(-2).join(' ')),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Closest recorded page to a URL that was not captured verbatim.
+ *
+ * Stricter than the search fallback in two ways — the host must match exactly,
+ * and the match is on the page-identifying tail — because a substituted page
+ * reads to the agent as a real source, whereas an off-target search result is
+ * merely ignored.
+ */
+async function nearestRecordedPage(
+  store: FixtureStore,
+  raw: string,
+): Promise<PageRecord | undefined> {
+  const wanted = urlIdentity(raw);
+  if (!wanted || wanted.tail.length === 0) return undefined;
+
+  let best: { score: number; page: PageRecord } | undefined;
+  for (const record of await store.all<PageRecord>('fetch')) {
+    if (!isPageRecord(record.value)) continue;
+    const candidate = urlIdentity(record.value.url);
+    if (!candidate || candidate.host !== wanted.host) continue;
+
+    const score = similarity(wanted.tail, candidate.tail);
+    if (score >= 0.75 && (!best || score > best.score)) {
+      best = { score, page: record.value };
+    }
+  }
+  return best?.page;
+}
+
+
 
 export interface PageRecord {
   url: string;
@@ -102,10 +213,12 @@ export function createWebTools(options: WebToolsOptions): JournaledToolSpec[] {
       }
 
       if (options.fixtureMode === 'replay') {
+        const near = await nearestRecordedResults(store, query);
+        if (near) return renderSearch(query, near, limit);
         return error(
           `No recorded search results for "${query}". This run is in replay mode and never reaches ` +
             'the network, so this query cannot be answered. Continue with the sources you have ' +
-            'already gathered, or try wording the query the way it was likely recorded.',
+            'already gathered, or try a broader query.',
         );
       }
 
@@ -160,6 +273,14 @@ export function createWebTools(options: WebToolsOptions): JournaledToolSpec[] {
       }
 
       if (options.fixtureMode === 'replay') {
+        // Same problem as search: a run that phrases its way to a slightly
+        // different URL on the same page would otherwise get nothing. Accept
+        // the closest recorded URL, and say so, so the agent can judge whether
+        // it is the page it wanted.
+        const near = await nearestRecordedPage(store, raw);
+        if (near) {
+          return renderPage(near, maxPageChars, `Closest recorded page for ${raw}.`);
+        }
         return error(
           `No recorded page for ${raw}. This run is in replay mode and never reaches the network. ` +
             'Work with the pages you have already opened rather than guessing this one’s contents.',
@@ -204,10 +325,12 @@ function renderSearch(query: string, results: readonly SearchResult[], limit: nu
   return `${header}\n${lines.join('\n')}\n\nUse fetch_page on one of these URLs to read the source.`;
 }
 
-function renderPage(page: PageRecord, maxChars: number): string {
+function renderPage(page: PageRecord, maxChars: number, note?: string): string {
   const truncated = page.text.length > maxChars;
   const body = truncated ? page.text.slice(0, maxChars) : page.text;
-  const head = [`URL: ${page.url}`, page.title ? `Title: ${page.title}` : ''].filter(Boolean).join('\n');
+  const head = [note ?? '', `URL: ${page.url}`, page.title ? `Title: ${page.title}` : '']
+    .filter(Boolean)
+    .join('\n');
   const footer = truncated
     ? `\n\n[Truncated: showing the first ${maxChars} of ${page.text.length} characters.]`
     : '';
