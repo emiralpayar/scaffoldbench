@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A superseded commit's checks are worthless; cancel them rather than queue them.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # No ANTHROPIC_API_KEY is available here, and none is needed: every test
+  # injects a fake judge and a fake runQuery, and nothing touches the network.
+  # A check that started requiring a key would be a regression in the test
+  # suite, not a reason to add one.
+  check:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test
+
+  web:
+    name: Build site (${{ matrix.results }} results)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The site has to build both against committed run sets and against
+        # nothing at all — the empty state is what a fresh clone sees, and it is
+        # the state the project ships in until a real benchmark has been run.
+        results: [committed, empty]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Clear results
+        if: matrix.results == 'empty'
+        run: |
+          find results -mindepth 1 -maxdepth 1 ! -name README.md -exec rm -rf {} +
+
+      - name: Build
+        run: npm run build:web

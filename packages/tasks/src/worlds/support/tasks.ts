@@ -2,12 +2,18 @@ import { called, calledAfter, type Task, type ToolCall } from '@arena/core';
 import { defineToolUseTask } from '../../defineToolUseTask';
 import { createSupportTools } from './tools';
 import {
+  canonicalIso,
   createSupportWorld,
   findTicket,
+  impactRank,
+  matrixSeverity,
+  onCallAt,
   parseIso,
   rotationForService,
   rotationMembers,
   sameInstant,
+  severityPolicyFor,
+  type AssignableSeverity,
   type SupportWorld,
   type Ticket,
 } from './world';
@@ -67,14 +73,38 @@ function closeIndex(journal: readonly ToolCall[], ticketId: string): number {
   );
 }
 
+// The expected answers below are derived from the world rather than written out
+// as literals, so an assertion states the rule ("the on-call engineer at the
+// deadline") instead of a memorised id. Every input they read is one the agent
+// cannot move — a ticket's service and impact scope, the published rota, the
+// matrix — so this cannot be gamed by mutating state into agreement with the
+// scorer. The test suite pins the literal answers, which is what catches a
+// change to the seed data.
+
+function expectedSeverity(world: SupportWorld, ticket: Ticket): AssignableSeverity | undefined {
+  return matrixSeverity(world, ticket.service, ticket.impact);
+}
+
+/** Triage deadline: the frozen clock plus the response target for the correct severity. */
+function expectedTriageDeadline(world: SupportWorld, ticket: Ticket): string | undefined {
+  const severity = expectedSeverity(world, ticket);
+  const target = severity ? severityPolicyFor(world, severity) : undefined;
+  const now = parseIso(world.nowIso);
+  if (!target || now === null) return undefined;
+  return canonicalIso(now + target.responseMinutes * 60_000);
+}
+
+/** Engineer on call for the rotation that owns the service, at `atIso`. */
+function expectedOwner(world: SupportWorld, ticket: Ticket, atIso: string): string | undefined {
+  const rotation = rotationForService(world, ticket.service);
+  return rotation ? onCallAt(world, rotation, atIso)?.engineerId : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // support-easy: triage a new ticket
 // ---------------------------------------------------------------------------
 
 const EASY_TICKET = 'T-1041';
-const EASY_SEVERITY = 'sev3';
-const EASY_DUE_AT = '2026-03-17T17:20:00Z';
-const EASY_ENGINEER = 'E-301';
 
 export const supportEasyTask: Task = defineToolUseTask<SupportWorld>({
   id: 'support-easy',
@@ -96,26 +126,47 @@ export const supportEasyTask: Task = defineToolUseTask<SupportWorld>({
   assertions: [
     {
       id: 'severity-from-matrix',
-      label: 'Severity matches the escalation matrix for vpn / team',
+      label: 'Severity matches the escalation matrix for the service and impact scope',
       weight: 3,
-      check: (world) => requireTicket(world, EASY_TICKET).severity === EASY_SEVERITY,
-      detail: (world) => `severity=${requireTicket(world, EASY_TICKET).severity} (expected ${EASY_SEVERITY})`,
+      check: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        const expected = expectedSeverity(world, ticket);
+        return expected !== undefined && ticket.severity === expected;
+      },
+      detail: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        return `severity=${ticket.severity} (matrix says ${expectedSeverity(world, ticket) ?? '?'})`;
+      },
     },
     {
       id: 'deadline-from-response-target',
-      label: 'SLA deadline is the triage time plus the sev3 response target',
+      label: 'SLA deadline is the triage time plus the response target for that severity',
       weight: 3,
-      check: (world) => sameInstant(requireTicket(world, EASY_TICKET).slaDueAt, EASY_DUE_AT),
-      detail: (world) =>
-        `sla_due_at=${requireTicket(world, EASY_TICKET).slaDueAt ?? 'not set'} (expected ${EASY_DUE_AT})`,
+      check: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        return sameInstant(ticket.slaDueAt, expectedTriageDeadline(world, ticket));
+      },
+      detail: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        return `sla_due_at=${ticket.slaDueAt ?? 'not set'} (expected ${expectedTriageDeadline(world, ticket) ?? '?'})`;
+      },
     },
     {
       id: 'assigned-to-oncall',
       label: 'Assigned to the engineer on call for the owning rotation at the deadline',
       weight: 3,
-      check: (world) => requireTicket(world, EASY_TICKET).assignee === EASY_ENGINEER,
-      detail: (world) =>
-        `assignee=${requireTicket(world, EASY_TICKET).assignee ?? 'unassigned'} (expected ${EASY_ENGINEER})`,
+      check: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        const deadline = expectedTriageDeadline(world, ticket);
+        const expected = deadline ? expectedOwner(world, ticket, deadline) : undefined;
+        return expected !== undefined && ticket.assignee === expected;
+      },
+      detail: (world) => {
+        const ticket = requireTicket(world, EASY_TICKET);
+        const deadline = expectedTriageDeadline(world, ticket);
+        const expected = deadline ? expectedOwner(world, ticket, deadline) : undefined;
+        return `assignee=${ticket.assignee ?? 'unassigned'} (expected ${expected ?? '?'})`;
+      },
     },
     {
       id: 'ticket-opened',
@@ -156,8 +207,20 @@ const MEDIUM_SURVIVOR = 'T-1052';
 const MEDIUM_DUPLICATES = ['T-1053', 'T-1054'];
 const MEDIUM_LINKED = 'T-1061';
 const MEDIUM_DUE_AT = '2026-03-17T12:40:00Z';
-const MEDIUM_SEVERITY = 'sev2';
-const MEDIUM_ENGINEER = 'E-201';
+
+/**
+ * Severity the consolidated incident deserves: the matrix value for the widest
+ * impact scope anyone reported. Reading the scope off the whole set rather than
+ * off the survivor alone keeps this stable whether or not the merge happened.
+ */
+function expectedMergedSeverity(world: SupportWorld): AssignableSeverity | undefined {
+  const survivor = requireTicket(world, MEDIUM_SURVIVOR);
+  const scope = [survivor, ...MEDIUM_DUPLICATES.map((id) => requireTicket(world, id))].reduce(
+    (widest, ticket) => (impactRank(ticket.impact) > impactRank(widest.impact) ? ticket : widest),
+    survivor,
+  ).impact;
+  return matrixSeverity(world, survivor.service, scope);
+}
 
 /** A survivor that carries a later deadline than one of the tickets folded into it. */
 function slaLostInMerge(world: SupportWorld): boolean {
@@ -237,17 +300,26 @@ export const supportMediumTask: Task = defineToolUseTask<SupportWorld>({
       id: 'survivor-severity-from-matrix',
       label: 'Survivor re-graded from the matrix for its widened impact scope',
       weight: 2,
-      check: (world) => requireTicket(world, MEDIUM_SURVIVOR).severity === MEDIUM_SEVERITY,
+      check: (world) => {
+        const expected = expectedMergedSeverity(world);
+        return expected !== undefined && requireTicket(world, MEDIUM_SURVIVOR).severity === expected;
+      },
       detail: (world) =>
-        `severity=${requireTicket(world, MEDIUM_SURVIVOR).severity} (expected ${MEDIUM_SEVERITY})`,
+        `severity=${requireTicket(world, MEDIUM_SURVIVOR).severity} (matrix says ${expectedMergedSeverity(world) ?? '?'})`,
     },
     {
       id: 'survivor-assigned',
       label: 'Survivor assigned to the engineer on call for the owning rotation at its deadline',
       weight: 2,
-      check: (world) => requireTicket(world, MEDIUM_SURVIVOR).assignee === MEDIUM_ENGINEER,
-      detail: (world) =>
-        `assignee=${requireTicket(world, MEDIUM_SURVIVOR).assignee ?? 'unassigned'} (expected ${MEDIUM_ENGINEER})`,
+      check: (world) => {
+        const survivor = requireTicket(world, MEDIUM_SURVIVOR);
+        const expected = expectedOwner(world, survivor, MEDIUM_DUE_AT);
+        return expected !== undefined && survivor.assignee === expected;
+      },
+      detail: (world) => {
+        const survivor = requireTicket(world, MEDIUM_SURVIVOR);
+        return `assignee=${survivor.assignee ?? 'unassigned'} (expected ${expectedOwner(world, survivor, MEDIUM_DUE_AT) ?? '?'})`;
+      },
     },
     {
       id: 'duplicates-read-before-merge',
@@ -292,9 +364,22 @@ export const supportMediumTask: Task = defineToolUseTask<SupportWorld>({
 
 const HARD_TICKET = 'T-1070';
 const HARD_BLOCKER = 'T-1071';
-const HARD_SEVERITY = 'sev1';
-const HARD_DUE_AT = '2026-03-17T19:40:00Z';
-const HARD_ENGINEER = 'E-402';
+/**
+ * The deadline already committed to the requester. Held as a constant rather
+ * than read off the ticket: the escalation target is resolved against it, and
+ * reading it live would let an agent extend the deadline until the on-call
+ * engineer it already picked becomes the right answer.
+ */
+const HARD_COMMITTED_DUE_AT = '2026-03-17T19:40:00Z';
+
+/** Whoever is on call for the escalation rotation of the correct severity, at the deadline. */
+function expectedEscalationTarget(world: SupportWorld): string | undefined {
+  const ticket = requireTicket(world, HARD_TICKET);
+  const severity = expectedSeverity(world, ticket);
+  const rotation = severity ? severityPolicyFor(world, severity)?.escalationRotation : undefined;
+  if (!rotation) return undefined;
+  return onCallAt(world, rotation, HARD_COMMITTED_DUE_AT)?.engineerId;
+}
 
 export const supportHardTask: Task = defineToolUseTask<SupportWorld>({
   id: 'support-hard',
@@ -316,18 +401,28 @@ export const supportHardTask: Task = defineToolUseTask<SupportWorld>({
   assertions: [
     {
       id: 'severity-from-matrix',
-      label: 'Severity raised to the matrix value for payroll / company-wide',
+      label: 'Severity raised to the matrix value for the service and impact scope',
       weight: 3,
-      check: (world) => requireTicket(world, HARD_TICKET).severity === HARD_SEVERITY,
-      detail: (world) => `severity=${requireTicket(world, HARD_TICKET).severity} (expected ${HARD_SEVERITY})`,
+      check: (world) => {
+        const ticket = requireTicket(world, HARD_TICKET);
+        const expected = expectedSeverity(world, ticket);
+        return expected !== undefined && ticket.severity === expected;
+      },
+      detail: (world) => {
+        const ticket = requireTicket(world, HARD_TICKET);
+        return `severity=${ticket.severity} (matrix says ${expectedSeverity(world, ticket) ?? '?'})`;
+      },
     },
     {
       id: 'escalated-to-deadline-oncall',
       label: 'Escalated to the incident commander on call at the ticket deadline',
       weight: 4,
-      check: (world) => requireTicket(world, HARD_TICKET).escalatedTo === HARD_ENGINEER,
+      check: (world) => {
+        const expected = expectedEscalationTarget(world);
+        return expected !== undefined && requireTicket(world, HARD_TICKET).escalatedTo === expected;
+      },
       detail: (world) =>
-        `escalated_to=${requireTicket(world, HARD_TICKET).escalatedTo ?? 'nobody'} (expected ${HARD_ENGINEER}, on call at ${HARD_DUE_AT})`,
+        `escalated_to=${requireTicket(world, HARD_TICKET).escalatedTo ?? 'nobody'} (expected ${expectedEscalationTarget(world) ?? '?'}, on call at ${HARD_COMMITTED_DUE_AT})`,
     },
     {
       id: 'left-escalated',
@@ -344,7 +439,7 @@ export const supportHardTask: Task = defineToolUseTask<SupportWorld>({
       // for a deadline nobody has had the chance to move.
       check: (world) => {
         const ticket = requireTicket(world, HARD_TICKET);
-        return ticket.escalatedTo !== null && sameInstant(ticket.slaDueAt, HARD_DUE_AT);
+        return ticket.escalatedTo !== null && sameInstant(ticket.slaDueAt, HARD_COMMITTED_DUE_AT);
       },
       detail: (world) => `sla_due_at=${requireTicket(world, HARD_TICKET).slaDueAt ?? 'not set'}`,
     },
@@ -384,7 +479,8 @@ export const supportHardTask: Task = defineToolUseTask<SupportWorld>({
       detail: 'Rule 5: incident command hands over at 18:00, before the 19:40 deadline.',
       violated: (world) => {
         const escalatedTo = requireTicket(world, HARD_TICKET).escalatedTo;
-        return escalatedTo !== null && escalatedTo !== HARD_ENGINEER;
+        const expected = expectedEscalationTarget(world);
+        return escalatedTo !== null && expected !== undefined && escalatedTo !== expected;
       },
     },
   ],

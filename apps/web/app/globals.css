@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+@source "../app";
+@source "../components";
+@source "../lib";
+
+/*
+ * Colour is declared once as raw variables and only then exposed to Tailwind
+ * with `@theme inline`, so a single `prefers-color-scheme` block re-themes both
+ * the page and the charts. The chart palette is the validated blue/neutral set:
+ * sequential blue for magnitude, one neutral for "dominated", status green/red
+ * always paired with a glyph so nothing is carried by hue alone.
+ */
+
+@theme inline {
+  --color-plane: var(--plane);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-axis: var(--axis);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn: var(--warn);
+
+  --font-sans: var(--stack-sans);
+  --font-serif: var(--stack-serif);
+  --font-mono: var(--stack-mono);
+}
+
+:root {
+  color-scheme: light;
+
+  /*
+   * A pairing rather than a default: an old-style serif for prose and headings,
+   * the UI sans for chart and control text (charts stay in the system sans on
+   * purpose), and a monospace for every figure so columns align.
+   */
+  --stack-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Source Serif 4",
+    Georgia, ui-serif, serif;
+  --stack-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --stack-mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --plane: #f9f9f7;
+  --surface: #fcfcfb;
+  --sunken: #f2f1ed;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --rule: #e1e0d9;
+  --axis: #c3c2b7;
+
+  --accent: #2a78d6;
+  --good: #006300;
+  --bad: #c0332f;
+  --warn: #8a5a00;
+
+  /* Heat ramp endpoints. Both ends keep --ink legible, so the number in the
+     cell never needs a second colour rule. */
+  --heat-0: #fcfcfb;
+  --heat-1: #5598e7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --sunken: #141413;
+    --ink: #f4f3ef;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --rule: #2c2c2a;
+    --axis: #383835;
+
+    --accent: #3987e5;
+    --good: #0ca30c;
+    --bad: #e66767;
+    --warn: #fab219;
+
+    --heat-0: #1a1a19;
+    --heat-1: #256abf;
+  }
+}
+
+* {
+  border-color: var(--rule);
+}
+
+html {
+  /* No page may scroll sideways; wide content scrolls inside its own box. */
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--plane);
+  color: var(--ink);
+  font-family: var(--stack-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --- primitives ---------------------------------------------------------- */
+
+.num {
+  font-family: var(--stack-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.eyebrow {
+  font-family: var(--stack-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.prose-serif {
+  font-family: var(--stack-serif);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+.scroll-x::-webkit-scrollbar-thumb {
+  background: var(--axis);
+  border-radius: 999px;
+}
+
+/* --- heatmap ------------------------------------------------------------- */
+
+/*
+ * `--t` is the 0..1 magnitude. The mix runs between two endpoints chosen per
+ * theme so --ink clears 4.5:1 anywhere on the ramp; the printed number is the
+ * primary encoding and the wash is the secondary one.
+ */
+.heat {
+  background-color: color-mix(in oklab, var(--heat-1) calc(var(--t, 0) * 100%), var(--heat-0));
+}
+
+/* --- disclosure ---------------------------------------------------------- */
+
+details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* --- recharts ------------------------------------------------------------ */
+
+.recharts-surface {
+  overflow: visible;
+}
+
+.recharts-cartesian-axis-tick text {
+  font-family: var(--stack-sans);
+  font-size: 11px;
+  fill: var(--muted);
+}

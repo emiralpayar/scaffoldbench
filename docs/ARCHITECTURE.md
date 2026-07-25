@@ -1,0 +1,289 @@
+# Architecture
+
+How a benchmark run flows, end to end, and why the seams are where they are.
+
+The whole design follows from one requirement: **the only thing allowed to differ between two
+rows of the leaderboard is the architecture under test.** Everything below is either a mechanism
+for holding something else constant, or a mechanism for proving afterwards that it was.
+
+---
+
+## The flow
+
+```mermaid
+flowchart TD
+    CLI["arena run --strategies … --tasks …"] --> RM["runMatrix()<br/>packages/core/src/runner.ts"]
+    RM -->|"strategy x task x repeat"| CELL["one cell"]
+
+    subgraph cell ["executeRun — one cell, isolated"]
+      direction TB
+      ENV["task.createEnvironment()<br/>fresh world · journaled MCP tools · allowlist"]
+      CTX["RunContext<br/>budget · trace · signal · systemPrompt · cwd"]
+      STRAT["strategy.run(ctx)<br/>plan / execute / verify / fan-out …"]
+      RQ["runQuery(ctx, spec)<br/>THE choke point"]
+      SDK["Agent SDK query()<br/>+ PreToolUse sandbox guard"]
+      SCORE["task.score({ env, outcome, trace, deps })"]
+      ENV --> CTX --> STRAT
+      STRAT -->|one call per phase| RQ
+      RQ --> SDK
+      SDK -->|SDKMessage stream| RQ
+      RQ -->|"TraceEvent[] + charge()"| STRAT
+      STRAT -->|StrategyOutcome| SCORE
+    end
+
+    CELL --> cell
+    SCORE --> REC["RunRecord<br/>score · cost · judgeCost · latency · phases · failureMode"]
+    REC --> DISK["results/&lt;runSetId&gt;/<br/>manifest.json · catalog.json · runs/*.json · traces/*.jsonl"]
+    DISK --> REPORT["arena report<br/>summarizeRuns() + bootstrap CIs"]
+    REPORT --> SITE["apps/web — leaderboard, matrix, Pareto, trace viewer"]
+```
+
+---
+
+## 1. `runMatrix` — the sweep
+
+[`packages/core/src/runner.ts`](../packages/core/src/runner.ts)
+
+`runMatrix` expands `{strategies} x {tasks} x {repeats}` into a flat list of cells and drains it
+with a fixed pool of workers (`concurrency`). Cells are independent by construction — each builds
+its own world — so ordering does not matter, and records are sorted by `runId` at the end so a run
+set is byte-stable regardless of how the pool happened to interleave.
+
+Two things live at this level rather than inside a cell:
+
+- **The total budget.** Before each cell the worker checks `totalCostUsd + totalJudgeCostUsd`
+  against `totalBudgetUsd`. Once it is reached, every remaining cell is skipped and the manifest
+  records `Stopped early: total budget reached.` A truncated run set is honest; an unexpected
+  invoice is not.
+- **The manifest.** `runSetId`, `gitSha`, model, effort, repeats, `fixtureMode`, totals and
+  duration. This is what makes a result citable: it says exactly what was measured and against
+  which commit.
+
+A cell that throws does not take the sweep down. It is reported as `run-error` and the pool moves
+on.
+
+## 2. Per-cell environment
+
+`task.createEnvironment({ cwd, fixtureMode, fixtureDir })` returns a `TaskEnvironment`:
+
+```ts
+interface TaskEnvironment {
+  mcpServers: Record<string, McpServerConfig>;
+  allowedTools: string[];    // mcp__<server>__<tool>, the exact permitted set
+  readOnlyTools: string[];   // subset that cannot mutate state
+  state: unknown;            // the world the scorer will inspect
+  journal: ToolCall[];       // every invocation, appended by the wrapper
+  dispose?(): Promise<void> | void;
+}
+```
+
+Every task builds its tools through `createJournaledToolServer`
+([`tools.ts`](../packages/core/src/tools.ts)), which wraps each handler so that **every**
+invocation lands in `journal` with its arguments, result, success flag and relative timestamp.
+The journal is the scorer's ground truth for "what did the agent actually do", entirely
+independent of anything the agent claims in prose. Handler exceptions are converted into error
+replies rather than propagating, because a thrown tool would abort the run and make the strategy
+look worse than it was.
+
+`readOnlyTools` exists because two architectures need it: `debate-select` hands only read-only
+tools to its three parallel proposers, and `plan-execute-verify` hands only read-only tools to its
+verifier so it has to check the real state rather than the executor's account of it. When
+`readOnlyTools.length === allowedTools.length` the task has nothing to mutate, which is how
+`debate-select` knows to skip its execution phase on research tasks instead of burning a call.
+
+Each cell also gets a scratch `cwd` under `.arena-scratch/`, removed in a `finally` block whatever
+happens.
+
+## 3. Strategies
+
+[`packages/strategies/src/`](../packages/strategies/src/)
+
+A strategy is orchestration and nothing else:
+
+```ts
+interface Strategy {
+  id: string;
+  label: string;
+  description: string;
+  run(ctx: RunContext): Promise<StrategyOutcome>;
+}
+```
+
+Strategies never import the Agent SDK. They call `runQuery`, taken as an injectable dependency
+(`StrategyDeps`), which is what lets the entire orchestration logic — how many calls, in what
+order, with which tools, what happens when a phase returns nothing — be tested without a network
+or an API key. The 63 strategy tests all run against a fake `runQuery`.
+
+`createPhaseRunner` ([`helpers.ts`](../packages/strategies/src/helpers.ts)) carries the
+bookkeeping every architecture shares: one `PhaseRecord` per model call, a fallback answer if the
+final phase produces nothing, `runAll` for fan-out (recorded in spec order, never completion
+order, so a parallel phase list is stable), and the `canContinue()` budget check that every
+strategy makes before starting another phase.
+
+Prompt symmetry is enforced by shared helpers rather than by discipline: `taskBlock(ctx)` quotes
+`ctx.task.prompt` verbatim into every phase of every architecture, and `REASONING_TURNS = 1` caps
+every tool-less phase identically. See the Limitations section of the README for what this
+mitigates and what it does not.
+
+Phase names as they appear in traces and reports:
+
+| Strategy | Phases |
+| --- | --- |
+| `single` | `main` |
+| `plan-execute` | `plan` → `execute` |
+| `orchestrator-workers` | `decompose` → `worker-<id>` x N (parallel, depth 1) → `synthesize` |
+| `plan-execute-verify` | `plan` → `execute` → (`verify` → `revise-<n>`) x ≤2 |
+| `debate-select` | `propose-1..3` (parallel, depth 1) → `select` → `execute` |
+
+## 4. `runQuery` — the choke point
+
+[`packages/core/src/runQuery.ts`](../packages/core/src/runQuery.ts)
+
+Every model call in the system goes through this one function. That is the central design decision
+of the project, and it is what makes the comparison mean anything: if each architecture set up its
+own `query()` call, a leaderboard difference could just as easily be a difference in instrumentation
+— one strategy inheriting a setting, another accounting for cost differently, a third silently
+allowed a tool the others were not.
+
+Held identical for all five architectures, on every call:
+
+| Concern | Mechanism |
+| --- | --- |
+| Tool access | `allowedTools` from the task (or an explicit narrower list), `disallowedTools: SANDBOX_DENYLIST`, `permissionMode: 'dontAsk'` |
+| Hermeticity | `settingSources: []` — no `~/.claude`, no repo settings, no plugins |
+| Cost ceiling | `maxBudgetUsd: ctx.budget.remainingUsd`, so the SDK's per-call limit tracks our run-level ledger |
+| Cost accounting | the terminal `result` message charges `ctx.budget` exactly once |
+| Trace capture | every SDK message is normalized and appended to `ctx.trace` |
+| Abort | the parent `AbortSignal` is forwarded, and the stream is cut mid-flight the moment `budget.exceeded` flips |
+| Isolation | `persistSession: false`, per-run `cwd` |
+| Structured output | `outputSchema` → `outputFormat: { type: 'json_schema' }`, read back by `readStructured` |
+
+`runQuery` never throws for an out-of-budget or aborted run. It returns an empty `QueryOutcome`
+with `aborted: true` and a reason, so a strategy that runs out of money mid-plan degrades into a
+recorded partial result rather than a harness error.
+
+`readStructured` falls back to parsing JSON out of prose when the model answers without honouring
+the schema — a formatting slip should not discard a phase that produced usable content.
+
+## 5. The sandbox guard
+
+[`packages/core/src/guard.ts`](../packages/core/src/guard.ts)
+
+`SANDBOX_DENYLIST` blocks the built-in tools — `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`,
+`WebFetch`, `WebSearch` and the rest. `Agent` is deliberately *absent*: subagent-based strategies
+need it, and subagents inherit the same allowlist anyway.
+
+On top of the denylist and the allowlist there is a `PreToolUse` hook that checks each tool name
+against the allowlist (supporting `mcp__server__*` wildcards) and denies anything outside it. That
+is redundant as an access control — `permissionMode: 'dontAsk'` with an exact allowlist already
+blocks it. It is not redundant as *evidence*: the hook writes a `tool_denied` trace event and
+increments a counter that ends up on the run record as `deniedToolCalls`. Without it, "this
+architecture never tried to leave the sandbox" and "this architecture tried repeatedly and was
+stopped" would look identical in the data, and they are a real behavioural difference.
+
+## 6. Budget and trace
+
+**`BudgetTracker`** ([`budget.ts`](../packages/core/src/budget.ts)) is the run-level ledger. The SDK
+enforces `maxBudgetUsd` per `query()` call, but an architecture making six calls needs a ceiling
+above them all, and `remainingUsd` is fed back into each subsequent call so the two layers agree.
+The wall-clock limit is evaluated lazily inside `stopReason`, so a stalled run trips even though
+nothing has been charged.
+
+**`TraceCollector`** ([`trace.ts`](../packages/core/src/trace.ts)) holds a normalized
+`TraceEvent[]`. The normalizer is deliberately decoupled from the SDK's `SDKMessage` union — that
+union has dozens of members and grows between releases, and anything unrecognized is skipped
+rather than thrown. Stored traces therefore stay readable across SDK upgrades, and so does the
+viewer. Events carry `phase`, `depth` (0 for the main thread, 1 for a subagent), `seq` and `tMs`,
+which is what lets the UI lay parallel phases out on one timeline.
+
+## 7. Scoring
+
+Two scorers, deliberately different in kind.
+
+**Tool-use** ([`defineToolUseTask.ts`](../packages/tasks/src/defineToolUseTask.ts)) reads the final
+world and the journal, and computes
+
+```
+raw   = Σ(weight_i x earned_i) / Σ(weight_i)
+score = clamp01(raw x Π multiplier_j)
+```
+
+Penalties multiply so a hard rule (`multiplier: 0`) cannot be bought off with credit elsewhere. A
+throwing assertion scores zero and the rest still report, so one bad predicate cannot discard an
+otherwise valid data point. No model is involved anywhere in this path.
+
+**Research** ([`defineResearchTask.ts`](../packages/tasks/src/research/defineResearchTask.ts)) has
+a model-graded half and a deterministic half. The rubric half calls `sampleJudge` for N independent
+gradings and reduces each item by median. The citation half calls `auditCitations`, comparing URLs
+extracted from the answer against the URLs actually opened — collected from both the trace and the
+journal, because a retrieval made inside a subagent may never surface in the parent trace. Judge
+spend is routed through a wrapper in the runner so it accrues to `judgeCostUsd` and never to the
+strategy's `costUsd`.
+
+## 8. The fixture layer
+
+[`webTools.ts`](../packages/tasks/src/research/webTools.ts) ·
+[`fixtureStore.ts`](../packages/tasks/src/research/fixtureStore.ts)
+
+Research agents get exactly two tools, `search` and `fetch_page`, and the built-in `WebSearch`/
+`WebFetch` are denied. Routing every retrieval through our own tools buys three things at once:
+replay determinism, a per-task domain allowlist, and — most importantly — a provable record of
+which pages were opened, which is what makes the citation audit possible at all.
+
+`FixtureStore` is a content-addressed cache, one JSON file per key. The key hashes the
+whitespace-and-case-normalized request, so `RFC  7538` and `rfc 7538` share a recording instead of
+missing and silently penalising the strategy.
+
+| Mode | Behaviour |
+| --- | --- |
+| `replay` | Fixtures only. A miss returns an explanatory error telling the agent it is offline, so it continues with what it has instead of hallucinating. CI and the weekly benchmark default. |
+| `record` | Real requests, written to the store. Run once, commit, replay forever. |
+| `live` | Real requests, nothing persisted. For probing whether a page has changed. |
+
+Fixtures store more text than the model is shown (60k vs 6k chars), so raising the render cap does
+not require re-recording.
+
+## 9. Statistics
+
+[`stats.ts`](../packages/core/src/stats.ts) · [`aggregate.ts`](../packages/core/src/aggregate.ts)
+
+`summarizeRuns` reduces raw records into everything the site renders, once, at report time — the
+site stays a pure renderer with no statistics of its own.
+
+- **Bootstrap CIs.** Percentile bootstrap for the mean, 2,000 iterations, from a seeded mulberry32
+  PRNG. The seed matters: confidence intervals that moved between two reports of the same data
+  would not be citable.
+- **`comparisonVerdict`.** Returns `inconclusive` whenever two intervals overlap, and only names a
+  winner when they do not. Overlap-based rather than a formal test — it is conservative, which is
+  the right direction to err with a handful of repeats.
+- **`paretoFrontier`.** Strategies not dominated on both score and cost. The interesting question
+  is rarely "which is best" but "which is worth what it costs", and `scorePerDollar` is computed
+  alongside for the same reason.
+- **Per-category summaries.** `tool-use` and `research` are summarized separately as well as
+  together, because an architecture that helps on procedural sandbox work and one that helps on
+  open-ended research are not the same claim.
+
+## 10. Persistence and the site
+
+```
+results/
+  latest.json                 { "runSetId": "…" } — what the site renders by default
+  <runSetId>/
+    manifest.json             config, git sha, model, totals, duration
+    catalog.json              strategy and task metadata as of that run
+    runs/<runId>.json         one RunRecord per strategy x task x repeat
+    traces/<runId>.jsonl      one normalized TraceEvent per line
+    REPORT.md                 written by `arena report --markdown`
+```
+
+`catalog.json` is written per run set rather than read from the live code, so a historical result
+still renders with the task prompts and strategy descriptions *as they were when it was measured*.
+
+`runId` is `<strategyId>__<taskId>__r<repeat>` and `runSetId` is an ISO timestamp with a random
+suffix, so both sort meaningfully and neither collides. Run records are committed; traces are
+gitignored by default because they are large.
+
+The manifest's optional `synthetic: true` flag is set by exactly one thing —
+`scripts/generate-demo-data.ts` — and the site renders an unmissable banner when it sees it.
+Fabricated data exists so the interface can be built without spending money, and it must never be
+mistakable for a measurement.

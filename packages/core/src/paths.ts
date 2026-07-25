@@ -1,10 +1,57 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Repo root, resolved from this file rather than `process.cwd()`. */
-export const REPO_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
+/**
+ * Locate the workspace root.
+ *
+ * Resolving from `import.meta.url` is the accurate answer and the one used
+ * whenever it works. It cannot be the only answer: this module is imported by
+ * the Next.js app, and a bundler rewrites `import.meta.url` such that the
+ * `URL` handed to `fileURLToPath` comes from a different realm — the built-in
+ * `instanceof URL` check then fails with the memorable "must be of type string
+ * or an instance of URL. Received an instance of URL". Evaluating that at
+ * module scope took the whole web build down.
+ *
+ * So: an explicit override wins, then the module path, then walking up from the
+ * working directory looking for this workspace's package.json.
+ */
+function resolveRepoRoot(): string {
+  const override = process.env.ARENA_REPO_ROOT;
+  if (override && existsSync(override)) return override;
+
+  try {
+    const fromModule = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
+    if (isWorkspaceRoot(fromModule)) return fromModule;
+  } catch {
+    // Bundled: fall through to the directory walk.
+  }
+
+  let dir = process.cwd();
+  for (let depth = 0; depth < 8; depth++) {
+    if (isWorkspaceRoot(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return process.cwd();
+}
+
+function isWorkspaceRoot(dir: string): boolean {
+  try {
+    const pkg = path.join(dir, 'package.json');
+    if (!existsSync(pkg)) return false;
+    const parsed = JSON.parse(readFileSync(pkg, 'utf8')) as { name?: string };
+    return parsed.name === 'agent-arena';
+  } catch {
+    return false;
+  }
+}
+
+/** Repo root, resolved from this file rather than `process.cwd()` where possible. */
+export const REPO_ROOT = resolveRepoRoot();
 
 export const RESULTS_DIR = path.join(REPO_ROOT, 'results');
 export const FIXTURES_DIR = path.join(REPO_ROOT, 'fixtures');

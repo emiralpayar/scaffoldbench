@@ -8,7 +8,7 @@ import {
   supportMediumTask,
   supportTasks,
   type SupportWorld,
-} from '../src/worlds/support/index';
+} from '../src/worlds/support';
 
 // Expected answers are written out literally here rather than imported from the
 // world definition: the test is the specification, so it must fail if the world
