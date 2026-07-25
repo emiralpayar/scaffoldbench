@@ -11,3 +11,4 @@ export * from './paths';
 export * from './systemPrompt';
 export * from './runner';
 export * from './aggregate';
+export * from './credentials';

@@ -212,6 +212,12 @@ export interface RunContext {
   trace: TraceSink;
   /** Base system prompt every phase should build on. */
   systemPrompt: string;
+  /**
+   * Environment for the model subprocess. Normally undefined, so the process
+   * environment applies. The live demo sets it to run on a visitor's own key
+   * without the site operator's credentials leaking into the run.
+   */
+  subprocessEnv?: Record<string, string | undefined>;
 }
 
 // ---------------------------------------------------------------------------

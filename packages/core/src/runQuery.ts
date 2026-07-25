@@ -131,6 +131,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
         },
       }),
     },
+    ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),
     ...(spec.agents ? { agents: spec.agents } : {}),
     ...(spec.outputSchema
       ? { outputFormat: { type: 'json_schema' as const, schema: spec.outputSchema } }

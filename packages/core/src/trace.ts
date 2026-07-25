@@ -10,6 +10,11 @@ export function truncate(value: string, max = MAX_TEXT): string {
 
 export interface TraceCollectorOptions {
   now?: () => number;
+  /**
+   * Called as each event is recorded. The live demo streams these to the
+   * browser; a subscriber that throws must not take the run down with it.
+   */
+  onAppend?: (event: TraceEvent) => void;
 }
 
 /** In-memory trace sink. The runner persists `events` to JSONL after the run. */
@@ -17,19 +22,29 @@ export class TraceCollector implements TraceSink {
   readonly #events: TraceEvent[] = [];
   readonly #startedAt: number;
   readonly #now: () => number;
+  readonly #onAppend: ((event: TraceEvent) => void) | undefined;
   #seq = 0;
 
   constructor(options: TraceCollectorOptions = {}) {
     this.#now = options.now ?? Date.now;
+    this.#onAppend = options.onAppend;
     this.#startedAt = this.#now();
   }
 
   append(event: Omit<TraceEvent, 'seq' | 'tMs'>): void {
-    this.#events.push({
+    const full: TraceEvent = {
       ...event,
       seq: this.#seq++,
       tMs: this.#now() - this.#startedAt,
-    });
+    };
+    this.#events.push(full);
+    if (this.#onAppend) {
+      try {
+        this.#onAppend(full);
+      } catch {
+        // A failing subscriber is a delivery problem, not a run problem.
+      }
+    }
   }
 
   get events(): readonly TraceEvent[] {

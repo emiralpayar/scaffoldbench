@@ -33,6 +33,7 @@ import type {
   TaskEnvironment,
   TaskInfo,
   TaskScore,
+  TraceEvent,
 } from './types';
 
 const execFileAsync = promisify(execFile);
@@ -59,6 +60,13 @@ export interface RunnerConfig {
   /** Overrides the results root. Defaults to the repo's `results/`. */
   resultsRoot?: string;
   onEvent?: (event: RunnerEvent) => void;
+  /** Live trace feed, used by the demo endpoint to stream a run as it happens. */
+  onTraceEvent?: (runId: string, event: TraceEvent) => void;
+  /**
+   * Environment for the model subprocess. The live demo uses it to run on a
+   * visitor's own API key — see `visitorEnv` in `credentials.ts`.
+   */
+  subprocessEnv?: Record<string, string | undefined>;
 }
 
 export type RunnerEvent =
@@ -188,7 +196,11 @@ async function executeRun(
   const cwd = path.join(SCRATCH_DIR, config.runSetId, runId);
   await ensureDir(cwd);
 
-  const trace = new TraceCollector();
+  const trace = new TraceCollector(
+    config.onTraceEvent
+      ? { onAppend: (event) => config.onTraceEvent?.(runId, event) }
+      : {},
+  );
   const budget = new BudgetTracker({
     maxCostUsd: config.maxCostUsdPerRun,
     maxWallClockMs: config.maxWallClockMsPerRun,
@@ -228,6 +240,7 @@ async function executeRun(
       budget,
       trace,
       systemPrompt: buildSystemPrompt(task),
+      ...(config.subprocessEnv ? { subprocessEnv: config.subprocessEnv } : {}),
     };
 
     outcome = await strategy.run(ctx);
