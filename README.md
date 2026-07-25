@@ -37,6 +37,15 @@ hook is deliberately redundant with the allowlist: it makes each escape attempt 
 from the repository's own settings, or from whatever plugins the operator happens to have
 installed. A result that depended on whose machine produced it would not be a result.
 
+**A tool surface pinned to the task.** `settingSources: []` turned out not to be sufficient on its
+own. Reading an `init` message during development showed the session still loading its own agent
+tools — `Task`, `Skill`, `Workflow`, `ToolSearch`, the scheduling tools — into every run. The
+permission mode kept them uncallable, so nothing was *wrong* in the results, but they still
+occupied the prompt and their exact set depends on the host: two runs of the same task on two
+machines would not have been comparable. Every call now pins `tools` as well as `allowedTools`, so
+the model is shown exactly the task's toolset and nothing else.
+([`runQuery.ts`](packages/core/src/runQuery.ts))
+
 **Record/replay fixtures for the research half.** The research tasks reach the web through two
 tools of our own, `search` and `fetch_page`, backed by a content-addressed fixture store. `record`
 mode performs real requests and writes them to disk; `replay` mode — the default for CI and for
@@ -180,6 +189,23 @@ And browse it, including per-run traces:
 npm run dev:web   # http://localhost:3210
 ```
 
+The site also has a **`/live`** page: pick one task and one architecture, paste your own API key,
+and watch a single run stream — tool calls, subagents, anything the sandbox guard blocks, and the
+deterministic score at the end. It is the fastest way to see what the aggregate numbers are made
+of. The run is capped at $0.50 and four minutes, is never written to `results/`, and never reaches
+the leaderboard.
+
+That endpoint is the one place the project handles somebody else's credentials, so it is worth
+being precise about what it does. The Agent SDK resolves credentials from the subprocess
+environment in a documented order — API key, then auth token, then an on-disk OAuth profile, then
+platform variables. A server that simply spread `process.env` and added the visitor's key could
+therefore fall through to its *own* credentials and bill the operator for a stranger's run. So the
+run executes under [`visitorEnv`](packages/core/src/credentials.ts), which deletes every one of
+those sources before setting the supplied key. The behaviour is
+[tested](packages/core/test/credentials.test.ts), and was confirmed against a machine that does
+have ambient credentials: an invalid key fails with a 401 rather than quietly succeeding on the
+host's account.
+
 Other useful commands:
 
 ```bash
@@ -257,7 +283,8 @@ packages/tasks/       the task factories and the task set:
                         research/              web tools, fixture store, research tasks
 apps/cli/             the `arena` command (run · report · tasks · strategies)
 apps/web/             Next.js site rendering a stored run set — leaderboard, per-cell
-                      matrix, score/cost frontier, run detail and traces
+                      matrix, score/cost frontier, run detail, traces, and the
+                      /live page that runs one task on the visitor's own key
 results/              run sets — manifest, catalog, one RunRecord per cell, traces
 fixtures/             recorded web responses for replay mode (created by a record run)
 scripts/              demo data generator, MCP wiring canary
