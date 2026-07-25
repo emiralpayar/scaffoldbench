@@ -175,6 +175,20 @@ npm run arena -- run \
 `--tasks` accepts ids, whole worlds, categories and globs — `--tasks airline-*`, `--tasks research`,
 `--tasks support,ecommerce-hard` — so you rarely have to type twelve ids.
 
+> **Record the research fixtures before you run the research half.** Runs default to `--replay`,
+> which reads recorded pages and never touches the network. On a fresh clone `fixtures/` is empty,
+> so every `search` and `fetch_page` returns *"no recording exists"* and all three research tasks
+> score near zero — for every architecture, which looks like a finding and is not one. Populate it
+> once, with any single architecture, then commit what it captured:
+>
+> ```bash
+> npm run arena -- run --strategies single --tasks research --repeats 1 --record
+> git add fixtures && git commit -m "Record research fixtures"
+> ```
+>
+> Every later run replays those pages, so the research half is then free, offline and identical
+> between runs. The tool-use half needs none of this — its worlds are in-memory and always ready.
+
 Then aggregate and read it:
 
 ```bash
