@@ -10,27 +10,36 @@ export const RESULTS_DIR = path.join(REPO_ROOT, 'results');
 export const FIXTURES_DIR = path.join(REPO_ROOT, 'fixtures');
 export const SCRATCH_DIR = path.join(REPO_ROOT, '.arena-scratch');
 
-export function runSetDir(runSetId: string): string {
-  return path.join(RESULTS_DIR, runSetId);
+/**
+ * Every path helper takes an optional root so a run set can be written
+ * somewhere other than `results/` — used by the integration tests and by the
+ * live demo, which must never touch published results.
+ */
+export function runSetDir(runSetId: string, root: string = RESULTS_DIR): string {
+  return path.join(root, runSetId);
 }
 
-export function runsDir(runSetId: string): string {
-  return path.join(runSetDir(runSetId), 'runs');
+export function runsDir(runSetId: string, root: string = RESULTS_DIR): string {
+  return path.join(runSetDir(runSetId, root), 'runs');
 }
 
-export function tracesDir(runSetId: string): string {
-  return path.join(runSetDir(runSetId), 'traces');
+export function tracesDir(runSetId: string, root: string = RESULTS_DIR): string {
+  return path.join(runSetDir(runSetId, root), 'traces');
 }
 
-export function manifestPath(runSetId: string): string {
-  return path.join(runSetDir(runSetId), 'manifest.json');
+export function manifestPath(runSetId: string, root: string = RESULTS_DIR): string {
+  return path.join(runSetDir(runSetId, root), 'manifest.json');
 }
 
-export function catalogPath(runSetId: string): string {
-  return path.join(runSetDir(runSetId), 'catalog.json');
+export function catalogPath(runSetId: string, root: string = RESULTS_DIR): string {
+  return path.join(runSetDir(runSetId, root), 'catalog.json');
 }
 
-export const LATEST_POINTER = path.join(RESULTS_DIR, 'latest.json');
+export function latestPointerPath(root: string = RESULTS_DIR): string {
+  return path.join(root, 'latest.json');
+}
+
+export const LATEST_POINTER = latestPointerPath();
 
 export async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });

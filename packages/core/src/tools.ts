@@ -12,6 +12,15 @@ export interface JournaledToolSpec {
   // Zod's generic shape type is intentionally loose here so tasks can declare
   // schemas without wrestling with variance.
   schema: Record<string, any>;
+  /**
+   * True when the tool only inspects state.
+   *
+   * Architectures that explore several approaches before committing to one
+   * (`debate-select`) need to know which tools are safe to hand to a proposer
+   * that will be thrown away. Without this, running proposals in parallel would
+   * have them all mutating the same world.
+   */
+  readOnly?: boolean;
   handler: (args: any) => Promise<ToolReply> | ToolReply;
 }
 
@@ -30,6 +39,8 @@ export interface JournaledServer {
   server: McpServerConfig;
   /** Fully-qualified names to put in `allowedTools`. */
   allowedTools: string[];
+  /** Subset of `allowedTools` that cannot mutate world state. */
+  readOnlyTools: string[];
 }
 
 export function qualifiedToolName(serverName: string, toolName: string): string {
@@ -92,6 +103,9 @@ export function createJournaledToolServer(options: JournaledServerOptions): Jour
       tools: sdkTools,
     }) as McpServerConfig,
     allowedTools: options.tools.map((spec) => qualifiedToolName(serverName, spec.name)),
+    readOnlyTools: options.tools
+      .filter((spec) => spec.readOnly === true)
+      .map((spec) => qualifiedToolName(serverName, spec.name)),
   };
 }
 

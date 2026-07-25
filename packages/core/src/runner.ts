@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 
 import { BudgetTracker } from './budget';
 import {
+  RESULTS_DIR,
   SCRATCH_DIR,
   catalogPath,
   ensureDir,
@@ -55,6 +56,8 @@ export interface RunnerConfig {
   judgeSamples: number;
   /** When false, nothing is written to `results/` (used by the live demo). */
   persist: boolean;
+  /** Overrides the results root. Defaults to the repo's `results/`. */
+  resultsRoot?: string;
   onEvent?: (event: RunnerEvent) => void;
 }
 
@@ -83,10 +86,12 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
   let totalJudgeCostUsd = 0;
   let budgetStopped = false;
 
+  const resultsRoot = config.resultsRoot ?? RESULTS_DIR;
+
   if (config.persist) {
-    await ensureDir(runsDir(config.runSetId));
-    await ensureDir(tracesDir(config.runSetId));
-    await writeCatalog(config);
+    await ensureDir(runsDir(config.runSetId, resultsRoot));
+    await ensureDir(tracesDir(config.runSetId, resultsRoot));
+    await writeCatalog(config, resultsRoot);
   }
 
   let cursor = 0;
@@ -115,7 +120,7 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
       config.onEvent?.({ type: 'run-start', runId, index, total });
 
       try {
-        const record = await executeRun(config, cell, runId);
+        const record = await executeRun(config, cell, runId, resultsRoot);
         records.push(record);
         totalCostUsd += record.costUsd;
         totalJudgeCostUsd += record.judgeCostUsd;
@@ -154,7 +159,7 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
   };
 
   if (config.persist) {
-    await writeJson(manifestPath(config.runSetId), manifest);
+    await writeJson(manifestPath(config.runSetId, resultsRoot), manifest);
   }
 
   return { manifest, records };
@@ -172,7 +177,12 @@ function buildMatrix(config: RunnerConfig): Cell[] {
   return cells;
 }
 
-async function executeRun(config: RunnerConfig, cell: Cell, runId: string): Promise<RunRecord> {
+async function executeRun(
+  config: RunnerConfig,
+  cell: Cell,
+  runId: string,
+  resultsRoot: string,
+): Promise<RunRecord> {
   const { strategy, task, repeat } = cell;
   const startedAt = Date.now();
   const cwd = path.join(SCRATCH_DIR, config.runSetId, runId);
@@ -291,15 +301,15 @@ async function executeRun(config: RunnerConfig, cell: Cell, runId: string): Prom
   };
 
   if (config.persist) {
-    const traceFile = path.join(tracesDir(config.runSetId), `${runId}.jsonl`);
+    const traceFile = path.join(tracesDir(config.runSetId, resultsRoot), `${runId}.jsonl`);
     await ensureDir(path.dirname(traceFile));
     await writeFile(
       traceFile,
       `${trace.events.map((event) => JSON.stringify(event)).join('\n')}\n`,
       'utf8',
     );
-    record.traceFile = path.relative(path.join(runsDir(config.runSetId), '..'), traceFile);
-    await writeJson(path.join(runsDir(config.runSetId), `${runId}.json`), record);
+    record.traceFile = path.posix.join('traces', `${runId}.jsonl`);
+    await writeJson(path.join(runsDir(config.runSetId, resultsRoot), `${runId}.json`), record);
   }
 
   return record;
@@ -315,7 +325,7 @@ function inferRuntimeFailure(
   return undefined;
 }
 
-async function writeCatalog(config: RunnerConfig): Promise<void> {
+async function writeCatalog(config: RunnerConfig, resultsRoot: string): Promise<void> {
   const strategies: StrategyInfo[] = config.strategies.map((s) => ({
     id: s.id,
     label: s.label,
@@ -332,7 +342,7 @@ async function writeCatalog(config: RunnerConfig): Promise<void> {
     tags: t.tags,
     maxTurns: t.maxTurns,
   }));
-  await writeJson(catalogPath(config.runSetId), { strategies, tasks });
+  await writeJson(catalogPath(config.runSetId, resultsRoot), { strategies, tasks });
 }
 
 async function currentGitSha(): Promise<string | null> {

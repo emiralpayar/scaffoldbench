@@ -48,6 +48,13 @@ export interface TaskEnvironment {
    * what keeps a strategy inside its sandbox.
    */
   allowedTools: string[];
+  /**
+   * Subset of `allowedTools` that cannot mutate state. Strategies that explore
+   * candidate approaches in parallel hand only these to their proposers.
+   * When it equals `allowedTools` the task has nothing to mutate, so a
+   * separate execution phase is unnecessary.
+   */
+  readOnlyTools: string[];
   /** World state, mutated by tool handlers during the run. */
   state: unknown;
   journal: ToolCall[];
