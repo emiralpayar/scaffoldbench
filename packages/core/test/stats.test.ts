@@ -182,6 +182,16 @@ describe('normal distribution', () => {
     expect(normalQuantile(0)).toBe(Number.NEGATIVE_INFINITY);
     expect(Number.isNaN(normalQuantile(1.5))).toBe(true);
   });
+
+  it('stays finite for subnormal tail probabilities', () => {
+    // A test statistic 38 standard errors from the null has a tail area below
+    // 1e-308. The refinement step used to overflow there and return NaN, which
+    // then poisoned every Holm-adjusted p-value ranked after it.
+    expect(normalQuantile(1e-315)).toBeCloseTo(-37.96730035106736, 6);
+    expect(normalQuantile(1e-320)).toBeCloseTo(-38.269125343032655, 6);
+    expect(normalQuantile(5e-324)).toBeCloseTo(-38.467405617144344, 6);
+    expect(normalQuantile(normalCdf(-38))).toBeCloseTo(-38, 6);
+  });
 });
 
 describe('Student t distribution', () => {

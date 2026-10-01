@@ -286,9 +286,13 @@ export function normalQuantile(p: number): number {
   }
 
   // Halley refinement against the accurate CDF takes ~1e-9 to full precision.
+  // Beyond about 37.5 standard deviations exp(x²/2) overflows (and the CDF
+  // itself is subnormal), so the step is skipped there rather than turning
+  // the answer into NaN; Acklam's ~1e-9 relative error is what remains.
   for (let i = 0; i < 2; i++) {
     const e = normalCdf(x) - p;
     const u = e * Math.sqrt(2 * Math.PI) * Math.exp((x * x) / 2);
+    if (!Number.isFinite(u)) break;
     x -= u / (1 + (x * u) / 2);
   }
   return x;

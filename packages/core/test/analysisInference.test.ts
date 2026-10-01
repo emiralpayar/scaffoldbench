@@ -118,6 +118,17 @@ describe('bootstrapPValues', () => {
     expect(farther).toBeGreaterThan(0);
   });
 
+  it('stays a number when the value is dozens of standard errors away', () => {
+    // Replicates with mean 0 and SD 1; 38 SDs out the normal tail area is
+    // subnormal. A NaN here used to reach Holm and void the whole family.
+    const sorted = new Float64Array(Array.from({ length: 999 }, (_, i) => normalQuantile((i + 1) / 1_000)));
+    for (const theta0 of [-38, 38, 1e6]) {
+      const p = bootstrapPValues(sorted, theta0, 70, 1e-12);
+      expect(Number.isNaN(p.greater) || Number.isNaN(p.less)).toBe(false);
+      expect(Math.min(p.greater, p.less)).toBeLessThan(1e-20);
+    }
+  });
+
   it('reads the empirical tail where enough replicates lie beyond the value', () => {
     // Exactly 50 of 1,000 replicates at or below 0.05 -> q = (50 + 0.5) / 1001.
     const sorted = new Float64Array(Array.from({ length: 1_000 }, (_, i) => (i < 50 ? 0.04 : 0.2)));
