@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { EmptyState } from '../../../components/EmptyState';
 import { Field, PageHeader, Panel, Tag } from '../../../components/Layout';
-import { SyntheticBanner } from '../../../components/RunSetMeta';
+import { RunSetBanner } from '../../../components/RunSetMeta';
 import type { StrategyCellRow } from '../../../components/TaskTables';
 import {
   AssertionTable,
@@ -12,15 +12,15 @@ import {
 } from '../../../components/TaskTables';
 import {
   assertionPassRates,
+  defaultModel,
   findTask,
-  formatFailureMode,
-  formatPercent,
-  formatUsd,
-  hasResults,
-  loadRunSet,
+  modelView,
   selectRunsForTask,
   strategyLabel,
-} from '../../../lib/data';
+} from '../../../lib/derive';
+import { formatFailureMode, formatPercent, formatUsd } from '../../../lib/format';
+import { modelShortName } from '../../../lib/models';
+import { EMPTY_PARAM, loadRunSet } from '../../../lib/server/runSet';
 
 interface Params {
   params: Promise<{ taskId: string }>;
@@ -28,7 +28,10 @@ interface Params {
 
 export async function generateStaticParams(): Promise<{ taskId: string }[]> {
   const data = await loadRunSet();
-  return (data?.catalog.tasks ?? []).map((task) => ({ taskId: task.id }));
+  const ids = (data?.catalog.tasks ?? []).map((task) => ({ taskId: task.id }));
+  // A static export rejects an empty list, and an empty results/ is a state
+  // the site must build in. The placeholder renders the empty state.
+  return ids.length > 0 ? ids : [{ taskId: EMPTY_PARAM }];
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -44,18 +47,23 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function TaskPage({ params }: Params) {
   const { taskId } = await params;
   const data = await loadRunSet();
-  if (!hasResults(data)) return <EmptyState />;
+  const model = data ? defaultModel(data.models) : undefined;
+  if (!data || !model || data.records.length === 0) return <EmptyState />;
 
   const task = findTask(data.catalog, taskId);
   if (!task) notFound();
 
-  const records = selectRunsForTask(data.records, taskId);
-  const assertions = assertionPassRates(data.records, taskId);
+  const view = modelView(data.records, model);
+  const records = selectRunsForTask(view.records, taskId);
+  const assertions = assertionPassRates(view.ranked, taskId);
   const labels = Object.fromEntries(
-    data.catalog.strategies.map((strategy) => [strategy.id, strategy.label]),
+    data.catalog.strategies.map((strategy) => [
+      strategy.id,
+      strategyLabel(data.catalog, strategy.id),
+    ]),
   );
 
-  const strategyRows: StrategyCellRow[] = data.summary.cells
+  const strategyRows: StrategyCellRow[] = view.summary.cells
     .filter((cell) => cell.taskId === taskId)
     .map((cell) => ({
       strategyId: cell.strategyId,
@@ -68,10 +76,10 @@ export default async function TaskPage({ params }: Params) {
 
   return (
     <>
-      <SyntheticBanner manifest={data.manifest} />
+      <RunSetBanner data={data} />
 
       <PageHeader
-        eyebrow={`${task.category} · ${task.world}`}
+        eyebrow={`${task.category} · ${task.world} · ${modelShortName(model)}`}
         title={task.title}
         aside={
           <div className="flex flex-wrap items-center gap-2">

@@ -5,18 +5,17 @@ import { comparisonVerdict } from '@arena/core';
 import { EmptyState } from '../../components/EmptyState';
 import { PageHeader, Panel, Tag } from '../../components/Layout';
 import { ParetoChart } from '../../components/ParetoChart';
-import { SyntheticBanner } from '../../components/RunSetMeta';
-import type { LeaderboardRow } from '../../lib/data';
+import { RunSetBanner } from '../../components/RunSetMeta';
+import type { LeaderboardRow } from '../../lib/derive';
 import {
   buildLeaderboardRows,
   buildParetoModel,
-  formatDuration,
-  formatPercent,
-  formatScore,
-  formatUsd,
-  hasResults,
-  loadRunSet,
-} from '../../lib/data';
+  defaultModel,
+  modelView,
+} from '../../lib/derive';
+import { formatDuration, formatPercent, formatScore, formatUsd } from '../../lib/format';
+import { modelShortName } from '../../lib/models';
+import { loadRunSet } from '../../lib/server/runSet';
 
 export const metadata: Metadata = {
   title: 'Score against cost',
@@ -26,18 +25,20 @@ export const metadata: Metadata = {
 
 export default async function ParetoPage() {
   const data = await loadRunSet();
-  if (!hasResults(data)) return <EmptyState />;
+  const focus = data ? defaultModel(data.models) : undefined;
+  if (!data || !focus || data.records.length === 0) return <EmptyState />;
 
-  const rows = buildLeaderboardRows(data.summary, data.catalog, 'all');
+  const view = modelView(data.records, focus);
+  const rows = buildLeaderboardRows(view.summary, data.catalog, 'all');
   const model = buildParetoModel(rows);
   const advice = recommend(rows);
 
   return (
     <>
-      <SyntheticBanner manifest={data.manifest} />
+      <RunSetBanner data={data} />
 
       <PageHeader
-        eyebrow="Score against cost"
+        eyebrow={`Score against cost · ${modelShortName(focus)}`}
         title="Which architecture should I use?"
         lede="Every architecture placed on the plane it is actually chosen on. A point is on the frontier when nothing else scores at least as well for the same money or less; everything below and to the right of the line is a worse deal at every budget."
       />

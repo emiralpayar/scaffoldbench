@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
 
-import type { ParetoModel, ParetoPoint } from '../lib/data';
+import type { ParetoModel, ParetoPoint } from '../lib/derive';
 
 /**
  * Score against cost, with the non-dominated set joined by a line.

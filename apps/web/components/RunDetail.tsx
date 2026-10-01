@@ -1,11 +1,10 @@
-import type { Penalty, RunRecord, ScoreItem } from '@arena/core';
+import type { Penalty, ScoreItem } from '@arena/core';
 
-import type { PhaseRow } from '../lib/data';
-import { formatDuration, formatPercent, formatScore, formatUsd } from '../lib/data';
+import type { PhaseRow } from '../lib/derive';
+import { FULL_CREDIT, formatDuration, formatPercent, formatScore, formatUsd } from '../lib/format';
+import type { RunRecord } from '../lib/records';
 import { MiniBar } from './ScoreBar';
 import { Tag, Verdict } from './Layout';
-
-const FULL_CREDIT = 0.999;
 
 /** The graded assertions behind a score, each as a pass, a partial or a miss. */
 export function ScoreBreakdown({ breakdown }: { breakdown: readonly ScoreItem[] }) {

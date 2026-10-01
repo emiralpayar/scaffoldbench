@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import type { CategoryFilter, LeaderboardViewModel } from '../lib/data';
+import type { CategoryFilter, LeaderboardViewModel } from '../lib/derive';
 import { ScoreBar } from './ScoreBar';
 
 const COLUMNS = [

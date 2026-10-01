@@ -11,19 +11,12 @@ import {
   ScoreBreakdown,
   ScoreMetadata,
 } from '../../../components/RunDetail';
-import { SyntheticBanner } from '../../../components/RunSetMeta';
+import { RunSetBanner } from '../../../components/RunSetMeta';
 import { TraceTimeline } from '../../../components/TraceTimeline';
-import {
-  buildPhaseRows,
-  findRun,
-  formatDuration,
-  formatInt,
-  formatUsd,
-  hasResults,
-  loadRunSet,
-  loadTrace,
-  strategyLabel,
-} from '../../../lib/data';
+import { buildPhaseRows, findRun, strategyLabel } from '../../../lib/derive';
+import { formatDuration, formatInt, formatUsd } from '../../../lib/format';
+import { modelShortName } from '../../../lib/models';
+import { EMPTY_PARAM, loadRunSet, loadTrace } from '../../../lib/server/runSet';
 
 interface Params {
   params: Promise<{ runId: string }>;
@@ -31,7 +24,9 @@ interface Params {
 
 export async function generateStaticParams(): Promise<{ runId: string }[]> {
   const data = await loadRunSet();
-  return (data?.records ?? []).map((record) => ({ runId: record.runId }));
+  const ids = (data?.records ?? []).map((record) => ({ runId: record.runId }));
+  // See tasks/[taskId]: an empty list fails a static export.
+  return ids.length > 0 ? ids : [{ runId: EMPTY_PARAM }];
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -42,18 +37,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function RunPage({ params }: Params) {
   const { runId } = await params;
   const data = await loadRunSet();
-  if (!hasResults(data)) return <EmptyState />;
+  if (!data || data.records.length === 0) return <EmptyState />;
 
   const record = findRun(data.records, runId);
   if (!record) notFound();
 
-  const trace = await loadTrace(data.runSetId, record);
+  const trace = await loadTrace(data, record);
   const phaseRows = buildPhaseRows(record, trace ?? []);
   const subagentPhases = trace ? new Set(trace.filter((e) => e.depth > 0).map((e) => e.phase)) : null;
 
   return (
     <>
-      <SyntheticBanner manifest={data.manifest} />
+      <RunSetBanner data={data} />
 
       <PageHeader eyebrow="Run" title={record.runId} mono aside={<RunHeadline record={record} />} />
 
@@ -68,6 +63,7 @@ export default async function RunPage({ params }: Params) {
         <span className="text-ink-2">{strategyLabel(data.catalog, record.strategyId)}</span>
         <Tag>{record.taskCategory}</Tag>
         <Tag>{record.taskDifficulty}</Tag>
+        <Tag>{modelShortName(record.model)}</Tag>
         <Tag>repeat {record.repeat}</Tag>
       </nav>
 

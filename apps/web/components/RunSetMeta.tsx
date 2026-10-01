@@ -1,26 +1,56 @@
-import type { RunSetManifest } from '@arena/core';
+import Link from 'next/link';
 
-import { formatDuration, formatUsd, loadRunSet } from '../lib/data';
+import { formatDuration, formatUsd } from '../lib/format';
+import { modelShortName } from '../lib/models';
+import type { RunSetData } from '../lib/server/runSet';
+import { POSTMORTEM_RUN_SET_ID, loadRunSet } from '../lib/server/runSet';
 
 /**
+ * What kind of numbers the page is showing, said before any of them.
+ *
  * Fabricated data must be impossible to mistake for a measurement, so the
- * banner is loud and unconditional whenever the manifest says `synthetic`.
+ * synthetic banner is loud and unconditional. A legacy run set recorded
+ * before the fidelity gate is shown too, but flagged: its architectures were
+ * never proven to have run as designed.
  */
-export function SyntheticBanner({ manifest }: { manifest: RunSetManifest | null }) {
-  if (!manifest?.synthetic) return null;
+export function RunSetBanner({ data }: { data: Pick<RunSetData, 'verification' | 'runSetId'> }) {
+  if (data.verification === 'synthetic') {
+    return (
+      <div role="note" className="banner banner-warn mb-8">
+        <p className="banner-title">Synthetic data — not a measurement</p>
+        <p className="banner-body">
+          Every number on this page was fabricated by{' '}
+          <code className="code-inline">scripts/generate-demo-data.ts</code> so the interface can
+          be built and reviewed without spending anything. Do not quote it.
+        </p>
+      </div>
+    );
+  }
 
-  return (
-    <div className="mb-6 rounded-[3px] border border-warn/50 bg-warn/10 px-4 py-3">
-      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-warn">
-        Synthetic data — not a measurement
-      </p>
-      <p className="prose-serif mt-1 !text-[14px]">
-        Every number on this page was fabricated by{' '}
-        <span className="font-mono text-[12.5px]">scripts/generate-demo-data.ts</span> so the
-        interface can be reviewed without spending anything. Do not quote it.
-      </p>
-    </div>
-  );
+  if (data.verification === 'unverified') {
+    return (
+      <div role="note" className="banner banner-bad mb-8">
+        <p className="banner-title">Unverified run set — recorded before the fidelity gate</p>
+        {data.runSetId === POSTMORTEM_RUN_SET_ID ? (
+          <p className="banner-body">
+            This is the run set whose traces showed that most of its architectures never ran as
+            designed.{' '}
+            <Link href="/#act-1" className="link">
+              Read what went wrong
+            </Link>
+            . Its numbers are kept as evidence, not as results.
+          </p>
+        ) : (
+          <p className="banner-body">
+            Its records carry no integrity checks, so nothing here proves that each architecture
+            executed its design. Treat every comparison on this page as unconfirmed.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 /** Provenance strip: which run set this is and under what conditions it ran. */
@@ -28,10 +58,10 @@ export async function RunSetFooter() {
   const data = await loadRunSet();
   if (!data) return null;
 
-  const { manifest, runSetId, records } = data;
+  const { manifest, runSetId, records, models } = data;
   const facts: [string, string][] = [
     ['run set', runSetId],
-    ['model', manifest?.model ?? '—'],
+    [models.length === 1 ? 'model' : 'models', models.map(modelShortName).join(', ') || '—'],
     ['effort', manifest?.effort ?? '—'],
     ['repeats', manifest ? String(manifest.repeats) : '—'],
     ['fixtures', manifest?.fixtureMode ?? '—'],
@@ -43,25 +73,25 @@ export async function RunSetFooter() {
   ];
 
   return (
-    <footer className="mt-16 border-t border-rule">
-      <div className="mx-auto w-full max-w-[80rem] px-5 py-6 sm:px-8">
+    <section aria-label="Provenance" className="border-t border-rule">
+      <div className="container-page py-8">
+        <p className="eyebrow mb-4">Provenance of the numbers on this page</p>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
           {facts.map(([label, value]) => (
             <div key={label} className="min-w-0">
               <dt className="eyebrow">{label}</dt>
-              <dd className="num mt-0.5 truncate text-[12.5px] text-ink-2" title={value}>
+              <dd className="num mt-0.5 truncate text-[13px] text-ink-2" title={value}>
                 {value}
               </dd>
             </div>
           ))}
         </dl>
-        <p className="mt-5 max-w-3xl text-[11.5px] leading-relaxed text-muted">
-          Confidence intervals are percentile bootstraps over runs with a fixed seed, so they are
-          reproducible. Cost excludes judge calls, which are tracked separately so a scoring model
-          never flatters or penalises a strategy. Every figure on this site is read from{' '}
-          <span className="font-mono">results/</span> at build time.
+        <p className="mt-5 max-w-3xl text-[13px] leading-relaxed text-muted">
+          Cost excludes judge calls, which are tracked separately so a scoring model never
+          flatters or penalises an architecture. Every figure on this site is read from{' '}
+          <code className="code-inline">results/</code> at build time.
         </p>
       </div>
-    </footer>
+    </section>
   );
 }

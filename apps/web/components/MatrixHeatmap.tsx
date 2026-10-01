@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
-import type { MatrixModel } from '../lib/data';
-import { formatPercent, formatScore, matrixKey } from '../lib/data';
+import type { MatrixModel } from '../lib/derive';
+import { matrixKey } from '../lib/derive';
+import { formatPercent, formatScore } from '../lib/format';
 
 const RAMP_STOPS = [0, 0.25, 0.5, 0.75, 1];
 

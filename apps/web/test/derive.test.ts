@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { summarizeRuns } from '@arena/core';
-import type { RunRecord, StrategyInfo, TaskInfo, TraceEvent } from '@arena/core';
+import type { StrategyInfo, TraceEvent } from '@arena/core';
 
 import {
   assertionPassRates,
@@ -11,16 +10,17 @@ import {
   buildParetoModel,
   buildPhaseRows,
   describeFindings,
-  emptyCatalog,
-  formatDuration,
-  formatUsd,
   groupTraceByPhase,
   indexToolResults,
   matrixKey,
   parseTraceLines,
   selectRunsForTask,
   sortTasks,
-} from '../lib/data';
+  summarize as summarizeRuns,
+} from '../lib/derive';
+import { formatDuration, formatUsd } from '../lib/format';
+import type { RunRecord, TaskInfo } from '../lib/records';
+import { emptyCatalog } from '../lib/records';
 
 const BASE_RUN: RunRecord = {
   runId: 'single__alpha__r1',
@@ -152,7 +152,9 @@ describe('a single run', () => {
 
     expect(rows).toHaveLength(1);
     expect(row?.rank).toBe(1);
-    expect(row?.label).toBe('Single agent');
+    // A known architecture is labelled by the registry, not the catalog, so the
+    // same short name appears on every page whichever run set is shown.
+    expect(row?.label).toBe('Single');
     expect(row?.runs).toBe(1);
     expect(row?.score.mean).toBe(1);
     expect(row?.score.ciLow).toBe(1);
@@ -167,7 +169,7 @@ describe('a single run', () => {
     const rows = buildLeaderboardRows(summary, catalog, 'all');
     const prose = describeFindings(rows, { runs: 1, taskCount: 1, scope: 'all' });
 
-    expect(prose).toContain('Single agent');
+    expect(prose).toContain('Single');
     expect(prose).toMatch(/1 run/);
     expect(prose).toMatch(/single run|one run|no comparison/i);
   });
@@ -269,13 +271,14 @@ describe('assertionPassRates', () => {
     expect(side?.meanEarned).toBeCloseTo(0.5, 6);
   });
 
-  it('selects and orders the runs for a task by strategy then repeat', () => {
+  it('selects and orders the runs for a task by architecture order then repeat', () => {
     const selected = selectRunsForTask(records, 'alpha');
 
+    // Known architectures come in registry order; an unknown id sorts after them.
     expect(selected.map((r) => r.runId)).toEqual([
-      'plan__alpha__r1',
       'single__alpha__r1',
       'single__alpha__r2',
+      'plan__alpha__r1',
     ]);
   });
 
@@ -473,8 +476,9 @@ describe('describeFindings', () => {
     const rows = buildLeaderboardRows(summarizeRuns(records), buildCatalog(null, records), 'all');
     const prose = describeFindings(rows, { runs: 4, taskCount: 1, scope: 'all' });
 
-    expect(prose).toMatch(/inconclusive/i);
-    expect(prose).toMatch(/1 of 1/);
+    // Every comparison is inconclusive, so the prose must not crown a leader.
+    expect(prose).toMatch(/do not separate/i);
+    expect(prose).not.toMatch(/highest mean|leads/i);
   });
 
   it('states a separation when the intervals do not overlap', () => {

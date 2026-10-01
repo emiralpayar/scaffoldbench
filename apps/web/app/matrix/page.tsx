@@ -3,8 +3,10 @@ import type { Metadata } from 'next';
 import { EmptyState } from '../../components/EmptyState';
 import { PageHeader, Panel } from '../../components/Layout';
 import { MatrixHeatmap } from '../../components/MatrixHeatmap';
-import { SyntheticBanner } from '../../components/RunSetMeta';
-import { buildMatrix, hasResults, loadRunSet, matrixKey } from '../../lib/data';
+import { RunSetBanner } from '../../components/RunSetMeta';
+import { buildMatrix, defaultModel, matrixKey, modelView } from '../../lib/derive';
+import { modelShortName } from '../../lib/models';
+import { loadRunSet } from '../../lib/server/runSet';
 
 export const metadata: Metadata = {
   title: 'Strategy × task matrix',
@@ -13,9 +15,11 @@ export const metadata: Metadata = {
 
 export default async function MatrixPage() {
   const data = await loadRunSet();
-  if (!hasResults(data)) return <EmptyState />;
+  const model = data ? defaultModel(data.models) : undefined;
+  if (!data || !model || data.records.length === 0) return <EmptyState />;
 
-  const matrix = buildMatrix(data.summary, data.catalog);
+  const view = modelView(data.records, model);
+  const matrix = buildMatrix(view.summary, data.catalog);
   const hardest = [...matrix.tasks]
     .map((task) => {
       const scores = matrix.strategies
@@ -29,10 +33,10 @@ export default async function MatrixPage() {
 
   return (
     <>
-      <SyntheticBanner manifest={data.manifest} />
+      <RunSetBanner data={data} />
 
       <PageHeader
-        eyebrow="Matrix"
+        eyebrow={`Matrix · ${modelShortName(model)}`}
         title="Where each architecture holds and where it breaks"
         lede="Mean score per strategy and task. An aggregate leaderboard hides the fact that architectures do not fail uniformly — a plan-and-verify loop that pays for itself on a hard multi-step refund can be dead weight on an easy lookup."
       />

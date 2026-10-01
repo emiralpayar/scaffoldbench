@@ -1,48 +1,42 @@
 /**
- * The site's whole data layer.
+ * Pure view-model derivations over already-parsed run records.
  *
- * Everything below `Filesystem` touches disk; everything above it is a pure
- * function over already-parsed JSON. The split is deliberate: the derivations
- * are what the pages actually depend on, and keeping them free of `fs` is what
- * lets them be tested without building a fixture tree.
- *
- * Statistics are never recomputed here. `summarizeRuns` in @arena/core owns the
- * means, the bootstrap intervals and the Pareto frontier; this module only
- * joins them to catalog metadata and shapes them for rendering.
+ * No filesystem access here (that is `lib/server/`), so every function is
+ * testable on a literal and usable from any component. Means, bootstrap
+ * intervals and the Pareto frontier come from `@arena/core` (`summarizeRuns`)
+ * or from `lib/analysis`; this module joins them to catalog metadata and
+ * shapes them for rendering.
  */
-
-import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
-import path from 'node:path';
 
 import { comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@arena/core';
 import type {
   Aggregate,
   CellSummary,
   ReportSummary,
-  RunRecord,
-  RunSetManifest,
+  RunRecord as CoreRunRecord,
   StrategyInfo,
   TaskCategory,
-  TaskInfo,
   TraceEvent,
 } from '@arena/core';
 
-/** An assertion earning less than this is credit, not a pass. */
-const FULL_CREDIT = 0.999;
-
-export interface Catalog {
-  strategies: StrategyInfo[];
-  tasks: TaskInfo[];
-}
-
-export interface RunSetData {
-  runSetId: string;
-  manifest: RunSetManifest | null;
-  catalog: Catalog;
-  records: RunRecord[];
-  summary: ReportSummary;
-}
+import {
+  architectureName,
+  canonicalArchitectureId,
+  compareArchitectures,
+  isKnownArchitecture,
+} from './architectures';
+import {
+  FULL_CREDIT,
+  clamp01,
+  formatDuration,
+  formatPercent,
+  formatScore,
+  formatUsd,
+  joinList,
+  plural,
+} from './format';
+import type { Catalog, Difficulty, RunRecord, TaskInfo } from './records';
+import { isRankable } from './records';
 
 export type CategoryFilter = 'all' | TaskCategory;
 
@@ -52,8 +46,12 @@ export const CATEGORY_FILTERS: { id: CategoryFilter; label: string }[] = [
   { id: 'research', label: 'Research' },
 ];
 
-export function emptyCatalog(): Catalog {
-  return { strategies: [], tasks: [] };
+/**
+ * `summarizeRuns` reads only fields both record shapes share; the cast is the
+ * one place the site's contract-ahead record type meets core's current one.
+ */
+export function summarize(records: readonly RunRecord[]): ReportSummary {
+  return summarizeRuns(records as unknown as CoreRunRecord[]);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,21 +62,28 @@ export function emptyCatalog(): Catalog {
  * Merge the catalog written next to the results with whatever the run records
  * mention. A run set produced by an older CLI, or hand-trimmed, can name a
  * strategy the catalog has never heard of; the site shows it rather than
- * silently dropping a measured row.
+ * silently dropping a measured row. Strategy ids are mapped to their current
+ * names (`debate-select` became `propose-select`).
  */
 export function buildCatalog(
   raw: Partial<Catalog> | null | undefined,
   records: readonly RunRecord[],
 ): Catalog {
-  const strategies: StrategyInfo[] = Array.isArray(raw?.strategies) ? [...raw.strategies] : [];
-  const tasks: TaskInfo[] = Array.isArray(raw?.tasks) ? [...raw.tasks] : [];
+  const strategies: StrategyInfo[] = [];
+  const seen = new Set<string>();
+  for (const strategy of Array.isArray(raw?.strategies) ? raw.strategies : []) {
+    const id = canonicalArchitectureId(strategy.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    strategies.push({ ...strategy, id });
+  }
 
-  const knownStrategies = new Set(strategies.map((s) => s.id));
+  const tasks: TaskInfo[] = Array.isArray(raw?.tasks) ? [...raw.tasks] : [];
   const knownTasks = new Set(tasks.map((t) => t.id));
 
   for (const record of records) {
-    if (!knownStrategies.has(record.strategyId)) {
-      knownStrategies.add(record.strategyId);
+    if (!seen.has(record.strategyId)) {
+      seen.add(record.strategyId);
       strategies.push({ id: record.strategyId, label: record.strategyId, description: '' });
     }
     if (!knownTasks.has(record.taskId)) {
@@ -96,19 +101,20 @@ export function buildCatalog(
     }
   }
 
+  strategies.sort((a, b) => compareArchitectures(a.id, b.id));
   return { strategies, tasks };
 }
 
-const DIFFICULTY_RANK: Record<TaskInfo['difficulty'], number> = { easy: 0, medium: 1, hard: 2 };
+const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2, expert: 3 };
 const CATEGORY_RANK: Record<TaskCategory, number> = { 'tool-use': 0, research: 1 };
 
 /** Reading order for every task list on the site: category, world, then difficulty. */
 export function sortTasks(tasks: readonly TaskInfo[]): TaskInfo[] {
   return [...tasks].sort(
     (a, b) =>
-      CATEGORY_RANK[a.category] - CATEGORY_RANK[b.category] ||
+      (CATEGORY_RANK[a.category] ?? 9) - (CATEGORY_RANK[b.category] ?? 9) ||
       a.world.localeCompare(b.world) ||
-      DIFFICULTY_RANK[a.difficulty] - DIFFICULTY_RANK[b.difficulty] ||
+      (DIFFICULTY_RANK[a.difficulty] ?? 9) - (DIFFICULTY_RANK[b.difficulty] ?? 9) ||
       a.id.localeCompare(b.id),
   );
 }
@@ -121,8 +127,28 @@ export function findStrategy(catalog: Catalog, strategyId: string): StrategyInfo
   return catalog.strategies.find((strategy) => strategy.id === strategyId);
 }
 
+/** The short architecture name everywhere; the catalog's label only for unknown ids. */
 export function strategyLabel(catalog: Catalog, strategyId: string): string {
+  if (isKnownArchitecture(strategyId)) return architectureName(strategyId);
   return findStrategy(catalog, strategyId)?.label ?? strategyId;
+}
+
+// ---------------------------------------------------------------------------
+// Model scoping
+// ---------------------------------------------------------------------------
+
+/**
+ * A model is a matrix dimension, so pooling records across models would
+ * average Haiku with Opus. Every per-architecture view is scoped to one model.
+ */
+export function recordsForModel(records: readonly RunRecord[], model: string): RunRecord[] {
+  return records.filter((record) => record.model === model);
+}
+
+/** The model a single-model view shows by default: the middle tier if present. */
+export function defaultModel(models: readonly string[]): string | undefined {
+  if (models.includes('claude-sonnet-5-5')) return 'claude-sonnet-5-5';
+  return models[Math.floor((models.length - 1) / 2)];
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +156,9 @@ export function strategyLabel(catalog: Catalog, strategyId: string): string {
 // ---------------------------------------------------------------------------
 
 export interface LeaderboardRow {
+  /** Competition rank: rows with the same mean score (to 3 dp) share one. */
   rank: number;
+  tied: boolean;
   strategyId: string;
   label: string;
   description: string;
@@ -145,11 +173,8 @@ export interface LeaderboardRow {
 }
 
 /**
- * A row with every figure already rendered to a string.
- *
- * The leaderboard's category toggle is client state, and this module reaches
- * for `node:fs`; formatting on the server keeps the interactive table free of
- * any import from here beyond the types.
+ * A row with every figure already rendered to a string, so the interactive
+ * table imports no formatter it could disagree with.
  */
 export interface LeaderboardRowView extends LeaderboardRow {
   scoreText: string;
@@ -169,7 +194,7 @@ export interface LeaderboardViewModel {
   rows: LeaderboardRowView[];
 }
 
-/** One view model per category tab, ready to hand to a client component. */
+/** One view model per category that has runs, ready to hand to a client component. */
 export function buildLeaderboardViews(
   summary: ReportSummary,
   catalog: Catalog,
@@ -200,7 +225,7 @@ export function buildLeaderboardViews(
         valueText: row.scorePerDollar > 0 ? row.scorePerDollar.toFixed(1) : '—',
       })),
     };
-  });
+  }).filter((view) => view.id === 'all' || view.rows.length > 0);
 }
 
 export function buildLeaderboardRows(
@@ -223,25 +248,42 @@ export function buildLeaderboardRows(
         ).map((s) => s.strategyId),
   );
 
-  return [...strategies]
-    .sort((a, b) => b.score.mean - a.score.mean)
-    .map((strategy, index) => {
-      const info = findStrategy(catalog, strategy.strategyId);
-      return {
-        rank: index + 1,
-        strategyId: strategy.strategyId,
-        label: info?.label ?? strategy.strategyId,
-        description: info?.description ?? '',
-        runs: strategy.runs,
-        score: strategy.score,
-        costUsd: strategy.costUsd,
-        latencyMs: strategy.latencyMs,
-        passRate: strategy.passRate,
-        scorePerDollar: strategy.scorePerDollar,
-        totalCostUsd: strategy.totalCostUsd,
-        onFrontier: frontier.has(strategy.strategyId),
-      };
-    });
+  // Equal means are ordered by cost, so the cheaper of two tied rows is read
+  // first, and they share a rank instead of inventing an order.
+  const sorted = [...strategies].sort(
+    (a, b) =>
+      roundScore(b.score.mean) - roundScore(a.score.mean) || a.costUsd.mean - b.costUsd.mean,
+  );
+
+  return sorted.map((strategy, index) => {
+    const info = findStrategy(catalog, strategy.strategyId);
+    const firstEqual = sorted.findIndex(
+      (other) => roundScore(other.score.mean) === roundScore(strategy.score.mean),
+    );
+    const tied = sorted.some(
+      (other, otherIndex) =>
+        otherIndex !== index && roundScore(other.score.mean) === roundScore(strategy.score.mean),
+    );
+    return {
+      rank: firstEqual + 1,
+      tied,
+      strategyId: strategy.strategyId,
+      label: strategyLabel(catalog, strategy.strategyId),
+      description: info?.description ?? '',
+      runs: strategy.runs,
+      score: strategy.score,
+      costUsd: strategy.costUsd,
+      latencyMs: strategy.latencyMs,
+      passRate: strategy.passRate,
+      scorePerDollar: strategy.scorePerDollar,
+      totalCostUsd: strategy.totalCostUsd,
+      onFrontier: frontier.has(strategy.strategyId),
+    };
+  });
+}
+
+function roundScore(value: number): number {
+  return Math.round(value * 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +303,6 @@ export interface ParetoPoint {
   scorePerDollar: number;
   runs: number;
   onFrontier: boolean;
-  /** Pre-rendered so the chart, which runs on the client, imports no formatter. */
   costText: string;
   scoreText: string;
   ciText: string;
@@ -309,7 +350,7 @@ export function buildParetoModel(rows: readonly LeaderboardRow[]): ParetoModel {
 
 export interface MatrixModel {
   strategies: { id: string; label: string; meanScore: number }[];
-  tasks: { id: string; title: string; category: TaskCategory; difficulty: TaskInfo['difficulty']; world: string }[];
+  tasks: { id: string; title: string; category: TaskCategory; difficulty: Difficulty; world: string }[];
   cells: Record<string, CellSummary>;
 }
 
@@ -324,7 +365,7 @@ export function buildMatrix(summary: ReportSummary, catalog: Catalog): MatrixMod
   }
 
   const strategies = [...summary.strategies]
-    .sort((a, b) => b.score.mean - a.score.mean)
+    .sort((a, b) => compareArchitectures(a.strategyId, b.strategyId))
     .map((strategy) => ({
       id: strategy.strategyId,
       label: strategyLabel(catalog, strategy.strategyId),
@@ -343,13 +384,61 @@ export function buildMatrix(summary: ReportSummary, catalog: Catalog): MatrixMod
 }
 
 // ---------------------------------------------------------------------------
+// Per-repeat outcomes
+// ---------------------------------------------------------------------------
+
+/**
+ * The outcome of one run, as the per-repeat squares draw it. `excluded` and
+ * `api_error` are kept distinct from `fail`: neither is the architecture
+ * failing the task, and folding them in would make a flaky API look like a
+ * weak design.
+ */
+export type RunOutcome = 'pass' | 'partial' | 'fail' | 'excluded' | 'api_error';
+
+export function runOutcome(record: RunRecord): RunOutcome {
+  if (record.failureMode === 'api_error') return 'api_error';
+  if (record.integrity && !record.integrity.ok) return 'excluded';
+  if (record.passed) return 'pass';
+  return record.score > 0 ? 'partial' : 'fail';
+}
+
+export interface RepeatCell {
+  runId: string;
+  repeat: number;
+  outcome: RunOutcome;
+  score: number;
+}
+
+/** Runs of one architecture on one task, ordered by repeat. */
+export function repeatCells(
+  records: readonly RunRecord[],
+  strategyId: string,
+  taskId: string,
+): RepeatCell[] {
+  return records
+    .filter((record) => record.strategyId === strategyId && record.taskId === taskId)
+    .sort((a, b) => a.repeat - b.repeat)
+    .map((record) => ({
+      runId: record.runId,
+      repeat: record.repeat,
+      outcome: runOutcome(record),
+      score: record.score,
+    }));
+}
+
+// ---------------------------------------------------------------------------
 // Task detail
 // ---------------------------------------------------------------------------
 
 export function selectRunsForTask(records: readonly RunRecord[], taskId: string): RunRecord[] {
   return records
     .filter((record) => record.taskId === taskId)
-    .sort((a, b) => a.strategyId.localeCompare(b.strategyId) || a.repeat - b.repeat);
+    .sort(
+      (a, b) =>
+        compareArchitectures(a.strategyId, b.strategyId) ||
+        a.model.localeCompare(b.model) ||
+        a.repeat - b.repeat,
+    );
 }
 
 export interface AssertionStat {
@@ -432,6 +521,8 @@ export interface PhaseGroup {
  * appear. A strategy that interleaves subagents produces interleaved events;
  * grouping them makes the shape of the architecture legible while first-
  * appearance ordering keeps the timeline honest about what started when.
+ * Groups are keyed by phase *and* agent, so two workers that reuse a phase
+ * name are never merged into one.
  */
 export function groupTraceByPhase(events: readonly TraceEvent[]): PhaseGroup[] {
   const ordered = [...events].sort((a, b) => a.seq - b.seq);
@@ -439,7 +530,8 @@ export function groupTraceByPhase(events: readonly TraceEvent[]): PhaseGroup[] {
   const groups = new Map<string, PhaseGroup>();
 
   for (const event of ordered) {
-    let group = groups.get(event.phase);
+    const key = `${event.phase}\u0000${event.agent ?? ''}`;
+    let group = groups.get(key);
     if (!group) {
       group = {
         phase: event.phase,
@@ -448,17 +540,17 @@ export function groupTraceByPhase(events: readonly TraceEvent[]): PhaseGroup[] {
         startMs: event.tMs,
         endMs: event.tMs,
       };
-      groups.set(event.phase, group);
-      order.push(event.phase);
+      if (event.agent) group.agent = event.agent;
+      groups.set(key, group);
+      order.push(key);
     }
     group.events.push(event);
     group.depth = Math.min(group.depth, event.depth);
     group.startMs = Math.min(group.startMs, event.tMs);
     group.endMs = Math.max(group.endMs, event.tMs);
-    if (!group.agent && event.agent) group.agent = event.agent;
   }
 
-  return order.map((phase) => groups.get(phase)).filter((group): group is PhaseGroup => !!group);
+  return order.map((key) => groups.get(key)).filter((group): group is PhaseGroup => !!group);
 }
 
 export function indexToolResults(events: readonly TraceEvent[]): Record<string, TraceEvent> {
@@ -499,6 +591,7 @@ export interface PhaseRow {
   model?: string;
   aborted: boolean;
   error?: string;
+  degraded?: string;
   /** True when the row was reconstructed from the trace, not recorded by the strategy. */
   derived: boolean;
 }
@@ -516,6 +609,7 @@ export function buildPhaseRows(record: RunRecord, events: readonly TraceEvent[])
       ...(phase.model ? { model: phase.model } : {}),
       aborted: phase.aborted,
       ...(phase.error ? { error: phase.error } : {}),
+      ...(phase.degraded ? { degraded: phase.degraded } : {}),
       derived: false,
     }));
   }
@@ -546,16 +640,12 @@ export interface FindingsContext {
 /**
  * State what the table currently supports, in words, including where it does
  * not support anything. A leaderboard that only ever announces a winner
- * encourages readers to over-interpret three repeats.
+ * encourages readers to over-interpret a handful of repeats.
  */
 export function describeFindings(
   rows: readonly LeaderboardRow[],
   context: FindingsContext,
 ): string {
-  if (rows.length === 0) {
-    return 'No runs have been published for this selection yet.';
-  }
-
   const top = rows[0];
   if (!top) return 'No runs have been published for this selection yet.';
 
@@ -565,239 +655,88 @@ export function describeFindings(
       : context.scope === 'tool-use'
         ? ' in the tool-use category'
         : ' in the research category';
+  const opening = `Across ${plural(context.runs, 'run')} on ${plural(context.taskCount, 'task')}${scope}`;
 
-  const sentences: string[] = [
-    `Across ${plural(context.runs, 'run')} on ${plural(context.taskCount, 'task')}${scope}, ` +
-      `${top.label} leads on mean score at ${formatScore(top.score.mean)} ` +
-      `(95% CI ${formatScore(top.score.ciLow)}–${formatScore(top.score.ciHigh)}, n=${top.runs}).`,
-  ];
+  if (rows.length === 1) {
+    return `${opening}, ${top.label} scores ${formatScore(top.score.mean)} (95% CI ${formatScore(top.score.ciLow)}–${formatScore(top.score.ciHigh)}, n=${top.runs}). Only one architecture has runs here, so no comparison is possible yet.`;
+  }
 
-  const challenger = rows[1];
-  if (!challenger) {
-    sentences.push('Only one strategy has runs here, so no comparison is possible yet.');
-  } else {
-    const verdict = comparisonVerdict(top.score, challenger.score);
-    const delta = formatScore(top.score.mean - challenger.score.mean);
+  let inconclusive = 0;
+  let total = 0;
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const a = rows[i];
+      const b = rows[j];
+      if (!a || !b) continue;
+      total += 1;
+      if (comparisonVerdict(a.score, b.score) === 'inconclusive') inconclusive += 1;
+    }
+  }
+
+  const sentences: string[] = [];
+  const cheapest = [...rows]
+    .filter((row) => row.costUsd.mean > 0)
+    .sort((a, b) => a.costUsd.mean - b.costUsd.mean)[0];
+
+  if (inconclusive === total) {
     sentences.push(
-      verdict === 'inconclusive'
-        ? `Its ${delta} lead over ${challenger.label} is not separable at this sample size — the confidence intervals overlap.`
-        : `Its ${delta} lead over ${challenger.label} holds: the confidence intervals do not overlap.`,
+      total === 1
+        ? `${opening}, the two architectures do not separate: their intervals overlap.`
+        : `${opening}, no architecture separates from any other: all ${total} pairwise intervals overlap.`,
     );
-
-    let inconclusive = 0;
-    let total = 0;
-    for (let i = 0; i < rows.length; i++) {
-      for (let j = i + 1; j < rows.length; j++) {
-        const a = rows[i];
-        const b = rows[j];
-        if (!a || !b) continue;
-        total += 1;
-        if (comparisonVerdict(a.score, b.score) === 'inconclusive') inconclusive += 1;
-      }
+    if (cheapest) {
+      sentences.push(
+        `The cheapest is ${cheapest.label} at ${formatUsd(cheapest.costUsd.mean)} a run.`,
+      );
+    }
+  } else {
+    sentences.push(
+      `${opening}, ${top.label} has the highest mean score at ${formatScore(top.score.mean)} ` +
+        `(95% CI ${formatScore(top.score.ciLow)}–${formatScore(top.score.ciHigh)}, n=${top.runs}).`,
+    );
+    const challenger = rows[1];
+    if (challenger) {
+      const verdict = comparisonVerdict(top.score, challenger.score);
+      const delta = formatScore(top.score.mean - challenger.score.mean);
+      sentences.push(
+        verdict === 'inconclusive'
+          ? `Its ${delta} lead over ${challenger.label} is not separable at this sample size; the intervals overlap.`
+          : `Its ${delta} lead over ${challenger.label} holds: the intervals do not overlap.`,
+      );
     }
     sentences.push(
       inconclusive === 0
         ? `Every one of the ${plural(total, 'pairwise comparison')} separates.`
-        : `${inconclusive} of ${plural(total, 'pairwise comparison')} ${inconclusive === 1 ? 'is' : 'are'} inconclusive; the ranking below that point is noise.`,
-    );
-  }
-
-  const value = [...rows]
-    .filter((row) => row.costUsd.mean > 0)
-    .sort((a, b) => b.scorePerDollar - a.scorePerDollar)[0];
-  if (value) {
-    sentences.push(
-      `${value.label} returns the most score per dollar — ${value.scorePerDollar.toFixed(1)} points of score per $1, at ${formatUsd(value.costUsd.mean)} a run.`,
+        : `${inconclusive} of ${plural(total, 'pairwise comparison')} ${inconclusive === 1 ? 'is' : 'are'} inconclusive.`,
     );
   }
 
   const dominated = rows.filter((row) => !row.onFrontier);
   if (dominated.length > 0) {
     sentences.push(
-      `${joinList(dominated.map((row) => row.label))} ${dominated.length === 1 ? 'is' : 'are'} dominated: something else scores at least as well for no more money.`,
+      `On means alone, ${joinList(dominated.map((row) => row.label))} ${dominated.length === 1 ? 'is' : 'are'} dominated: something else scores at least as well for no more money.`,
     );
   }
 
   return sentences.join(' ');
 }
 
-function joinList(items: readonly string[]): string {
-  if (items.length <= 1) return items[0] ?? '';
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
 // ---------------------------------------------------------------------------
-// Formatting
+// Model views
 // ---------------------------------------------------------------------------
 
-export function clamp01(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
+export interface ModelView {
+  model: string;
+  /** Every record of this model, including excluded ones (for health and run lists). */
+  records: RunRecord[];
+  /** The records rankings are computed over (contract 3). */
+  ranked: RunRecord[];
+  summary: ReportSummary;
 }
 
-export function formatScore(value: number): string {
-  return value.toFixed(3);
-}
-
-export function formatPercent(value: number, digits = 0): string {
-  return `${(value * 100).toFixed(digits)}%`;
-}
-
-/**
- * Per-run costs live between a tenth of a cent and a few dollars, so a fixed
- * two decimals would print most of the table as `$0.00`.
- */
-export function formatUsd(value: number): string {
-  if (value === 0) return '$0';
-  if (Math.abs(value) >= 1) return `$${value.toFixed(2)}`;
-  if (Math.abs(value) >= 0.01) return `$${value.toFixed(3)}`;
-  return `$${value.toFixed(4)}`;
-}
-
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return '—';
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.round((ms % 60_000) / 1000);
-  return `${minutes}m ${seconds}s`;
-}
-
-export function formatInt(value: number): string {
-  return Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
-}
-
-export function formatFailureMode(mode: string): string {
-  return mode.replace(/_/g, ' ');
-}
-
-// ---------------------------------------------------------------------------
-// Filesystem
-// ---------------------------------------------------------------------------
-
-/**
- * `results/` sits at the repo root, but Next may be started from the repo root
- * or from `apps/web`. Probing beats hard-coding a relative depth, and the env
- * override lets a deployment point the site at a results tree it fetched.
- */
-export function resultsRoot(): string {
-  // An explicit override wins even when it does not exist: a deployment that
-  // points at the wrong directory should render the empty state, not quietly
-  // fall back to whatever results happen to be in the checkout.
-  const override = process.env.ARENA_RESULTS_DIR;
-  if (override) return path.resolve(override);
-
-  const candidates = [
-    path.join(process.cwd(), 'results'),
-    path.join(process.cwd(), '..', '..', 'results'),
-    path.join(process.cwd(), '..', 'results'),
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return candidates[0] as string;
-}
-
-async function readJsonFile<T>(file: string): Promise<T | null> {
-  try {
-    return JSON.parse(await readFile(file, 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function readRunRecords(dir: string): Promise<RunRecord[]> {
-  if (!existsSync(dir)) return [];
-  const entries = await readdir(dir, { withFileTypes: true });
-  const files = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => path.join(dir, entry.name))
-    .sort();
-
-  const records: RunRecord[] = [];
-  for (const file of files) {
-    const record = await readJsonFile<RunRecord>(file);
-    if (record && typeof record.runId === 'string') records.push(record);
-  }
-  return records;
-}
-
-async function newestRunSetId(root: string): Promise<string | null> {
-  const entries = await readdir(root, { withFileTypes: true });
-  const dirs = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-  return dirs[dirs.length - 1] ?? null;
-}
-
-async function readRunSet(): Promise<RunSetData | null> {
-  const root = resultsRoot();
-  if (!existsSync(root)) return null;
-
-  const pointer = await readJsonFile<{ runSetId?: string }>(path.join(root, 'latest.json'));
-  const runSetId = pointer?.runSetId ?? (await newestRunSetId(root));
-  if (!runSetId) return null;
-
-  const dir = path.join(root, runSetId);
-  if (!existsSync(dir)) return null;
-
-  const [manifest, rawCatalog, records] = await Promise.all([
-    readJsonFile<RunSetManifest>(path.join(dir, 'manifest.json')),
-    readJsonFile<Partial<Catalog>>(path.join(dir, 'catalog.json')),
-    readRunRecords(path.join(dir, 'runs')),
-  ]);
-
-  return {
-    runSetId,
-    manifest,
-    catalog: buildCatalog(rawCatalog, records),
-    records,
-    summary: summarizeRuns(records),
-  };
-}
-
-let cached: Promise<RunSetData | null> | undefined;
-
-/** The published run set, or `null` when nothing has been benchmarked yet. */
-export function loadRunSet(): Promise<RunSetData | null> {
-  if (process.env.NODE_ENV === 'development') return readRunSet();
-  cached ??= readRunSet();
-  return cached;
-}
-
-export function hasResults(data: RunSetData | null): data is RunSetData {
-  return !!data && data.records.length > 0;
-}
-
-/** Reject anything that could climb out of the traces directory. */
-function isSafeSegment(value: string): boolean {
-  return /^[A-Za-z0-9._-]+$/.test(value) && !value.startsWith('.');
-}
-
-/**
- * Traces are gitignored by default, so a missing file is the normal case rather
- * than an error. `null` means "not committed"; `[]` means "committed but empty".
- */
-export async function loadTrace(
-  runSetId: string,
-  record: RunRecord,
-): Promise<TraceEvent[] | null> {
-  if (!isSafeSegment(runSetId) || !isSafeSegment(record.runId)) return null;
-
-  const dir = path.join(resultsRoot(), runSetId);
-  const relative = record.traceFile ?? path.join('traces', `${record.runId}.jsonl`);
-  const file = path.resolve(dir, relative);
-  if (!file.startsWith(path.resolve(dir) + path.sep)) return null;
-  if (!existsSync(file)) return null;
-
-  try {
-    return parseTraceLines(await readFile(file, 'utf8'));
-  } catch {
-    return null;
-  }
+/** Scope a run set to one model and summarise the rankable runs. */
+export function modelView(records: readonly RunRecord[], model: string): ModelView {
+  const scoped = recordsForModel(records, model);
+  const ranked = scoped.filter(isRankable);
+  return { model, records: scoped, ranked, summary: summarize(ranked) };
 }

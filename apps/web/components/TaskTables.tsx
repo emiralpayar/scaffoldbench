@@ -1,15 +1,17 @@
 import Link from 'next/link';
 
-import type { CellSummary, RunRecord } from '@arena/core';
+import type { CellSummary } from '@arena/core';
 
-import type { AssertionStat } from '../lib/data';
+import type { RunRecord } from '../lib/records';
+
+import type { AssertionStat } from '../lib/derive';
 import {
   formatDuration,
   formatFailureMode,
   formatPercent,
   formatScore,
   formatUsd,
-} from '../lib/data';
+} from '../lib/format';
 import { MiniBar } from './ScoreBar';
 import { Verdict } from './Layout';
 
