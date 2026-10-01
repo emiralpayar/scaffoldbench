@@ -26,6 +26,8 @@ import type {
   ToolCall,
 } from '@arena/core';
 import {
+  EXECUTOR_BUDGET_SHARE,
+  createGatedExecuteStrategy,
   createProposeSelectStrategy,
   createOrchestratorWorkersStrategy,
   createPlanExecuteStrategy,
@@ -553,5 +555,165 @@ describe('plan-execute-verify through the real runQuery', () => {
       HARNESS_CHECK.notDegraded,
       'plan-execute-verify.verdicts',
     ]);
+  });
+});
+
+describe('gated-execute through the real runQuery', () => {
+  /** The reviewer answers each review with the next of `decisions`; `null` answers in prose only. */
+  function reviewerSays(decisions: ({ decision: 'allow' | 'deny'; reason: string } | null)[]) {
+    let review = 0;
+    return async function* (session: FakeSession) {
+      const decision = review < decisions.length ? decisions[review] : { decision: 'allow', reason: 'fine' };
+      review += 1;
+      const read = await session.callTool('mcp__shop__get_order', { id: 'O-1' });
+      yield toolUse('mcp__shop__get_order', { id: 'O-1' });
+      yield toolResult(read);
+      yield* decision === null ? proseOnly('I suppose it is fine.') : answerWith(session, decision);
+    };
+  }
+
+  it('reviews a change of state before it runs, and lets reads straight through', async () => {
+    const reviewer = reviewerSays([{ decision: 'allow', reason: 'O-1 is paid and eligible.' }]);
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are the action reviewer')) {
+        yield* reviewer(session);
+        return;
+      }
+      const read = await session.callTool('mcp__shop__get_order', { id: 'O-1' });
+      yield toolUse('mcp__shop__get_order', { id: 'O-1' });
+      yield toolResult(read);
+      yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Refunded O-1.');
+    });
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createGatedExecuteStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    // One review, for the refund; the executor's read was not reviewed.
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['execute', 'review-1']);
+    expect(env.journal.map((entry) => entry.name)).toEqual(['get_order', 'get_order', 'refund']);
+    expect(outcome.phases[1]?.meta).toEqual({
+      tool: 'mcp__shop__refund',
+      toolUseId: 'toolu_mcp__shop__refund',
+      decision: 'allow',
+      source: 'schema',
+      reason: 'O-1 is paid and eligible.',
+    });
+    expect(outcome.subagentCount).toBe(1);
+    expect(outcome.finalText).toBe('Refunded O-1.');
+
+    const [executor, reviewSession] = sessions();
+    expect(executor?.options.maxBudgetUsd).toBeCloseTo(0.9 * EXECUTOR_BUDGET_SHARE, 10);
+    expect(reviewSession?.prompt).toContain('tool: refund\ninput: {"id":"O-1"}');
+    expect(reviewSession?.tools).toEqual([STRUCTURED_OUTPUT_TOOL, 'mcp__shop__get_order']);
+    // The reviewer's cost is the run's cost.
+    expect(ctx.budget.spentUsd).toBeCloseTo(0.02, 10);
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
+
+  it('hands a denial back to the executor as the tool’s result, so it can adapt', async () => {
+    const reviewer = reviewerSays([
+      { decision: 'deny', reason: 'O-1 was paid by voucher; refund to the voucher, not the card.' },
+      { decision: 'allow', reason: 'Voucher refund is correct.' },
+    ]);
+    const seen: string[] = [];
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are the action reviewer')) {
+        yield* reviewer(session);
+        return;
+      }
+      const first = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+      yield toolUse('mcp__shop__refund', { id: 'O-1' });
+      yield toolResult(first);
+      seen.push(first.text);
+      yield* useTool(session, 'mcp__shop__refund', 'O-1-voucher', 'Refunded O-1 to the voucher.');
+    });
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createGatedExecuteStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(seen).toEqual([
+      'Denied by the action reviewer: O-1 was paid by voucher; refund to the voucher, not the card. ' +
+        'Nothing was changed.',
+    ]);
+    // Only the allowed refund reached the world.
+    expect(env.journal.filter((entry) => entry.name === 'refund').map((entry) => entry.args)).toEqual([
+      { id: 'O-1-voucher' },
+    ]);
+    expect(outcome.phases.map((p) => [p.phase, p.meta?.decision])).toEqual([
+      ['execute', undefined],
+      ['review-1', 'deny'],
+      ['review-2', 'allow'],
+    ]);
+    // The second reviewer knows what the first decided.
+    expect(sessions()[2]?.prompt).toContain('denied refund {"id":"O-1"} — O-1 was paid by voucher');
+    // A review denial is the architecture's decision, not a sandbox violation.
+    expect(ctx.trace.events.some((e) => e.kind === 'tool_denied')).toBe(false);
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
+
+  it('denies an action whose review gives no readable decision, and fails integrity', async () => {
+    const reviewer = reviewerSays([null]);
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are the action reviewer')) {
+        yield* reviewer(session);
+        return;
+      }
+      yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Could not refund O-1.');
+    });
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createGatedExecuteStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(env.journal.some((entry) => entry.name === 'refund')).toBe(false);
+    expect(outcome.phases[1]?.degraded).toBe('no decision could be read; the action was denied unreviewed');
+    expect(failures(strategy, ctx, outcome).map((check) => check.id)).toEqual([
+      HARNESS_CHECK.structuredOutput,
+      HARNESS_CHECK.notDegraded,
+      'gated-execute.decisions',
+    ]);
+  });
+
+  it('would catch a change of state that ran without a review', async () => {
+    // A single agent is exactly that: the gated checks applied to its run.
+    setScript(async function* (session) {
+      yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Refunded O-1.');
+    });
+    const ctx = makeCtx(makeEnv());
+    const outcome = await createSingleStrategy().run(ctx);
+
+    const checks = createGatedExecuteStrategy().fidelityChecks?.({
+      task: ctx.task,
+      env: ctx.env,
+      outcome,
+      trace: ctx.trace.events,
+    });
+    expect(checks?.find((check) => check.id === 'gated-execute.reviewed')).toEqual({
+      id: 'gated-execute.reviewed',
+      ok: false,
+      detail: 'refund ran 1 time, 0 allowed by a review',
+    });
+  });
+
+  it('runs as a single agent, on the whole budget, when nothing can change state', async () => {
+    setScript(async function* (session) {
+      yield* useTool(session, 'mcp__shop__get_order', 'O-1', 'O-1 is paid.');
+    });
+    const env = { ...makeEnv() };
+    env.allowedTools = [...env.readOnlyTools];
+    const ctx = makeCtx(env);
+    const strategy = createGatedExecuteStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['execute']);
+    expect(sessions()[0]?.options.maxBudgetUsd).toBeCloseTo(0.9, 10);
+    expect(sessions()[0]?.prompt).not.toContain('reviewer');
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
   });
 });

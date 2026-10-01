@@ -29,6 +29,7 @@ import {
   createPlanExecuteStrategy,
   createPlanExecuteVerifyStrategy,
   createProposeSelectStrategy,
+  createGatedExecuteStrategy,
   createSingleStrategy,
   getStrategies,
   orchestratorWorkersFidelityChecks,
@@ -254,6 +255,7 @@ const allFactories: { id: string; create: (deps: Partial<StrategyDeps>) => Strat
   { id: 'orchestrator-workers', create: createOrchestratorWorkersStrategy },
   { id: 'plan-execute-verify', create: createPlanExecuteVerifyStrategy },
   { id: 'propose-select', create: createProposeSelectStrategy },
+  { id: 'gated-execute', create: createGatedExecuteStrategy },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1120,14 +1122,19 @@ describe('createPhaseRunner', () => {
 // ---------------------------------------------------------------------------
 
 describe('STRATEGIES', () => {
-  it('lists the five architectures in comparison order', () => {
+  it('lists the six architectures in comparison order', () => {
     expect(STRATEGIES.map((strategy) => strategy.id)).toEqual([
       'single',
       'plan-execute',
       'orchestrator-workers',
       'plan-execute-verify',
       'propose-select',
+      'gated-execute',
     ]);
+  });
+
+  it('gives every strategy its fidelity checks', () => {
+    for (const strategy of STRATEGIES) expect(strategy.fidelityChecks, strategy.id).toBeTypeOf('function');
   });
 
   it('gives every strategy a label and a description', () => {
@@ -1140,9 +1147,9 @@ describe('STRATEGIES', () => {
 
 describe('getStrategies', () => {
   it('returns everything for undefined, an empty list and "all"', () => {
-    expect(getStrategies()).toHaveLength(5);
-    expect(getStrategies([])).toHaveLength(5);
-    expect(getStrategies(['all'])).toHaveLength(5);
+    expect(getStrategies()).toHaveLength(STRATEGIES.length);
+    expect(getStrategies([])).toHaveLength(STRATEGIES.length);
+    expect(getStrategies(['all'])).toHaveLength(STRATEGIES.length);
   });
 
   it('returns the requested subset in registry order', () => {

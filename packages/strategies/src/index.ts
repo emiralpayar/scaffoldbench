@@ -4,6 +4,7 @@ import { planExecuteStrategy } from './planExecute';
 import { orchestratorWorkersStrategy } from './orchestratorWorkers';
 import { planExecuteVerifyStrategy } from './planExecuteVerify';
 import { proposeSelectStrategy } from './proposeSelect';
+import { gatedExecuteStrategy } from './gatedExecute';
 
 export type { StrategyDeps, LabeledSpec, PhaseNote, PhaseRunner } from './helpers';
 export {
@@ -40,13 +41,22 @@ export {
   proposeSelectFidelityChecks,
   proposeSelectStrategy,
 } from './proposeSelect';
+export {
+  EXECUTOR_BUDGET_SHARE,
+  REVIEW_SCHEMA,
+  createGatedExecuteStrategy,
+  gatedExecuteFidelityChecks,
+  gatedExecuteStrategy,
+} from './gatedExecute';
 
 /**
- * The comparison set, in increasing order of structure.
+ * The comparison set.
  *
  * Reports and the leaderboard render strategies in this order, so it is the
  * order the architectures are meant to be read in: one call, then two, then
- * fan-out, then review, then selection.
+ * fan-out, then review after the fact, then selection, then review at the
+ * point of action. Newer architectures go at the end, so an id keeps its
+ * place across run sets.
  */
 export const STRATEGIES: Strategy[] = [
   singleStrategy,
@@ -54,6 +64,7 @@ export const STRATEGIES: Strategy[] = [
   orchestratorWorkersStrategy,
   planExecuteVerifyStrategy,
   proposeSelectStrategy,
+  gatedExecuteStrategy,
 ];
 
 /**
