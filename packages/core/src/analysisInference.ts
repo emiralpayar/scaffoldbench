@@ -47,7 +47,55 @@ export interface Estimate {
 // ---------------------------------------------------------------------------
 
 /**
- * Replicates of `statistic` over `n` clusters resampled with replacement.
+ * Resampling draws depend only on (n, iterations, seed), and a run set runs
+ * hundreds of paired tests over the same task count, so the draws are made
+ * once and shared. Results are identical with or without the cache; it is
+ * small and bounded so a long-lived process does not grow with it.
+ */
+const DRAW_CACHE_ENTRIES = 4;
+const DRAW_CACHE_MAX_LENGTH = 2_000_000;
+const drawCache = new Map<string, Int32Array | Int8Array>();
+
+function cachedDraws<T extends Int32Array | Int8Array>(key: string, length: number, make: () => T): T {
+  const hit = drawCache.get(key);
+  if (hit) {
+    drawCache.delete(key);
+    drawCache.set(key, hit);
+    return hit as T;
+  }
+  const fresh = make();
+  if (length <= DRAW_CACHE_MAX_LENGTH) {
+    drawCache.set(key, fresh);
+    if (drawCache.size > DRAW_CACHE_ENTRIES) drawCache.delete(drawCache.keys().next().value as string);
+  }
+  return fresh;
+}
+
+/** `iterations` rows of `n` cluster indices drawn with replacement, row-major. */
+function resampleIndices(n: number, iterations: number, seed: number): Int32Array {
+  const length = n * iterations;
+  return cachedDraws(`index:${n}:${iterations}:${seed}`, length, () => {
+    const rng = makeRng(seed);
+    const draws = new Int32Array(length);
+    for (let k = 0; k < length; k++) draws[k] = Math.floor(rng() * n);
+    return draws;
+  });
+}
+
+/** `iterations` rows of `n` random signs, row-major. */
+function randomSigns(n: number, iterations: number, seed: number): Int8Array {
+  const length = n * iterations;
+  return cachedDraws(`sign:${n}:${iterations}:${seed}`, length, () => {
+    const rng = makeRng(seed ^ 0x5f1b);
+    const signs = new Int8Array(length);
+    for (let k = 0; k < length; k++) signs[k] = rng() < 0.5 ? -1 : 1;
+    return signs;
+  });
+}
+
+/**
+ * Replicates of `statistic` over `n` clusters resampled with replacement,
+ * sorted ascending.
  *
  * Only the top level is resampled: a task's repeats travel together. Also
  * resampling repeats within each task adds their variance a second time and
@@ -59,13 +107,9 @@ export function clusterBootstrap(
   seed: number,
   statistic: (indices: Int32Array) => number,
 ): Float64Array {
-  const rng = makeRng(seed);
+  const draws = resampleIndices(n, iterations, seed);
   const replicates = new Float64Array(iterations);
-  const indices = new Int32Array(n);
-  for (let b = 0; b < iterations; b++) {
-    for (let i = 0; i < n; i++) indices[i] = Math.floor(rng() * n);
-    replicates[b] = statistic(indices);
-  }
+  for (let b = 0; b < iterations; b++) replicates[b] = statistic(draws.subarray(b * n, (b + 1) * n));
   return replicates.sort();
 }
 
@@ -76,11 +120,16 @@ export function bootstrapMeans(
   seed: number,
 ): Float64Array {
   const n = values.length;
-  return clusterBootstrap(n, iterations, seed, (idx) => {
+  const draws = resampleIndices(n, iterations, seed);
+  const data = Float64Array.from(values);
+  const replicates = new Float64Array(iterations);
+  let k = 0;
+  for (let b = 0; b < iterations; b++) {
     let total = 0;
-    for (let i = 0; i < n; i++) total += values[idx[i] as number] as number;
-    return total / n;
-  });
+    for (let i = 0; i < n; i++) total += data[draws[k++] as number] as number;
+    replicates[b] = total / n;
+  }
+  return replicates.sort();
 }
 
 /**
@@ -263,13 +312,14 @@ export function signFlipTest(
     return { twoSided: two / count, aboveLower: lower / count, belowUpper: upper / count };
   }
 
-  const rng = makeRng(seed ^ 0x5f1b);
+  const draws = randomSigns(n, iterations, seed);
   tally(observed, n);
+  let k = 0;
   for (let b = 0; b < iterations; b++) {
     let sum = 0;
     let signs = 0;
     for (let i = 0; i < n; i++) {
-      const s = rng() < 0.5 ? -1 : 1;
+      const s = draws[k++] as number;
       sum += s * (values[i] as number);
       signs += s;
     }
