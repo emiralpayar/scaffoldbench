@@ -1,4 +1,5 @@
 import type { Task } from '@arena/core';
+import { breadthTasks } from './breadthTasks';
 import { defineResearchTask, type ResearchTaskSpec } from './defineResearchTask';
 
 /**
@@ -372,4 +373,5 @@ export const judgedResearchSpecs: ResearchTaskSpec[] = [httpRedirectsSpec, scrip
 
 export const judgedResearchTasks: Task[] = judgedResearchSpecs.map(defineResearchTask);
 
-export const researchTasks: Task[] = judgedResearchTasks;
+/** Every research task, judged ones first, in the order they render. */
+export const researchTasks: Task[] = [...judgedResearchTasks, ...breadthTasks];

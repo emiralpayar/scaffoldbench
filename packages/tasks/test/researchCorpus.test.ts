@@ -6,14 +6,17 @@ import { FIXTURES_DIR, type ToolCall } from '@arena/core';
 import {
   Bm25Index,
   CORPUS_DIRNAME,
+  CORPUS_ROLES,
   CORPUS_SOURCES,
   Corpus,
   LICENSES,
+  breadthResearchSpecs,
   chunkDocument,
   corpusUrlKey,
   createWebTools,
   documentFile,
   judgedResearchSpecs,
+  normalizeForMatch,
   sha256,
   type CorpusSelection,
 } from '../src/research/index';
@@ -354,6 +357,13 @@ describe('shipped corpus integrity', () => {
       expect(notice).toContain(license?.name ?? '');
     }
   });
+
+  it('is fully used: every document belongs to some task, every task document exists', () => {
+    const selections = [...judgedResearchSpecs, ...breadthResearchSpecs].map((spec) => spec.corpus);
+    const used = new Set(selections.flatMap((selection) => CORPUS_ROLES.flatMap((role) => selection[role] ?? [])));
+    expect([...used].sort()).toEqual(corpus.documents.map((document) => document.id).sort());
+    for (const selection of selections) expect(() => corpus.forTask(selection)).not.toThrow();
+  });
 });
 
 describe('shipped corpus sufficiency', () => {
@@ -374,14 +384,47 @@ describe('shipped corpus sufficiency', () => {
     });
   }
 
+  for (const spec of breadthResearchSpecs) {
+    it(`${spec.id}: every gold quote sits inside the section its key points at`, () => {
+      const view = corpus.forTask(spec.corpus);
+      for (const item of spec.items) {
+        expect(view.roleOf(item.source.doc), item.key).toBe('primary');
+        const document = corpus.document(item.source.doc);
+        if (!document) throw new Error(`${item.source.doc} missing`);
+        const spans = view.spans(document, item.source.from, item.source.to);
+        expect(spans.length, `${item.key}: span found`).toBeGreaterThan(0);
+        for (const span of spans) {
+          expect(span.end - span.start, item.key).toBeGreaterThan(40);
+          expect(span.end - span.start, item.key).toBeLessThan(20_000);
+        }
+        const ranges = view.locate(document, item.goldQuote);
+        const inside = ranges.some((range) => spans.some((span) => range.start < span.end && range.end > span.start));
+        expect(inside, `${item.key}: ${item.goldQuote}`).toBe(true);
+      }
+    });
+  }
+
+  it('states the facts the gold keys rely on, in the words the keys use', () => {
+    const rfc9110 = normalizeForMatch(corpus.document('rfc9110')?.text ?? '');
+    for (const item of breadthResearchSpecs[0]?.items ?? []) {
+      expect(rfc9110).toContain(normalizeForMatch(String(item.source.from)));
+      const cacheable = rfc9110.includes(normalizeForMatch(`A ${item.key} response is heuristically cacheable`));
+      expect(cacheable, item.key).toBe(item.expected.heuristicallyCacheable);
+    }
+  });
+
   // Ranking is purely lexical — no authority or recency prior — so an obsolete
   // RFC can outrank the current one, as it can on the real web. What has to
   // hold is that the authoritative page is among the five results an agent
   // sees by default.
   it('answers natural queries with the authoritative page among the default results', () => {
     const queries: Array<[CorpusSelection, string, string]> = [
-      [judgedResearchSpecs[0]!.corpus, '308 Permanent Redirect status code', 'rfc9110'],
-      [judgedResearchSpecs[0]!.corpus, 'heuristically cacheable redirect', 'rfc9110'],
+      [breadthResearchSpecs[0]!.corpus, '308 Permanent Redirect status code', 'rfc9110'],
+      [breadthResearchSpecs[0]!.corpus, 'heuristically cacheable status codes', 'rfc9110'],
+      [breadthResearchSpecs[1]!.corpus, 'Cache-Control header field definition', 'rfc9111'],
+      [breadthResearchSpecs[1]!.corpus, 'Strict-Transport-Security response header field', 'rfc6797'],
+      [breadthResearchSpecs[1]!.corpus, 'Link header field serialisation', 'rfc8288'],
+      [breadthResearchSpecs[2]!.corpus, 'password minimum length single-factor verifiers', 'nist-sp800-63b-4'],
       [judgedResearchSpecs[1]!.corpus, 'async defer script element HTML standard', 'whatwg-html-scripting'],
       [judgedResearchSpecs[2]!.corpus, 'OWASP password storage Argon2id', 'owasp-password-storage'],
       [judgedResearchSpecs[2]!.corpus, 'NIST 800-63B password hashing scheme salt', 'nist-sp800-63b-4'],

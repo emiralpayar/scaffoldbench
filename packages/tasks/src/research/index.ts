@@ -6,4 +6,6 @@ export * from './sources';
 export * from './citations';
 export * from './webTools';
 export * from './defineResearchTask';
+export * from './defineBreadthTask';
+export * from './breadthTasks';
 export * from './tasks';

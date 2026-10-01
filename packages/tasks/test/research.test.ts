@@ -6,11 +6,16 @@ import { FIXTURES_DIR, type Judge, type JudgeRequest, type ScoreInput, type Task
 import {
   JUDGE_EFFORT,
   UNGROUNDED_CREDIT,
+  breadthResearchSpecs,
   createWebTools,
+  defineBreadthTask,
   defineResearchTask,
+  fieldMatches,
   judgedResearchSpecs,
+  normalizeSection,
   researchState,
   researchTasks,
+  type BreadthTaskSpec,
   type ResearchJudgeRequest,
   type ResearchTaskSpec,
 } from '../src/research/index';
@@ -320,6 +325,145 @@ describe('defineResearchTask scoring', () => {
 });
 
 // ---------------------------------------------------------------------------
+// breadth tasks
+// ---------------------------------------------------------------------------
+
+const BREADTH: BreadthTaskSpec = {
+  id: 'research-breadth-test',
+  title: 'Widget facts',
+  question: 'For each widget colour, give its shape, the section defining it and whether it is cacheable.',
+  difficulty: 'medium',
+  tags: ['test'],
+  maxTurns: 10,
+  corpus: { primary: ['spec'], superseded: ['old'], secondary: ['guide'] },
+  key: { name: 'colour', label: 'widget colour' },
+  fields: [
+    { name: 'shape', kind: 'text', description: 'its shape' },
+    { name: 'section', kind: 'section', description: 'the defining section' },
+    { name: 'cacheable', kind: 'boolean', description: 'whether it is cacheable by default' },
+  ],
+  items: [
+    {
+      key: 'blue',
+      expected: { shape: 'round', section: '1', cacheable: true },
+      source: { doc: 'spec', from: '1. Blue Widgets', to: '2. Red Widgets' },
+      goldQuote: 'Blue widgets are cacheable by default unless a header forbids it.',
+    },
+    {
+      key: 'red',
+      expected: { shape: 'square', section: '2', cacheable: false },
+      alsoAccept: { shape: ['a square'] },
+      source: { doc: 'spec', from: '2. Red Widgets', to: '3. Index' },
+      goldQuote: 'Red widgets are never cacheable, whatever the headers say.',
+    },
+  ],
+};
+
+const breadthTask = defineBreadthTask(BREADTH);
+const noJudge: Judge = async () => {
+  throw new Error('breadth tasks must not call the judge');
+};
+
+function breadthAnswer(...entries: Array<Record<string, unknown>>): string {
+  return answerWithBlock('Here is what the specification says.', { answers: entries });
+}
+
+const BLUE = { colour: 'blue', shape: 'Round', section: 'Section 1.', cacheable: true, quote: 'Blue widgets are cacheable by default', url: SPEC_URL };
+const RED = { colour: 'Red', shape: 'a square', section: '§2', cacheable: 'no', quote: 'A red widget is square and must be painted twice before shipping.', url: SPEC_URL };
+
+describe('defineBreadthTask', () => {
+  it('lists every item and the exact answer shape in the prompt', () => {
+    expect(breadthTask.prompt).toContain('- blue\n- red');
+    expect(breadthTask.prompt).toContain('"answers":[{"colour":"blue"');
+    expect(breadthTask.prompt).toMatch(/copied word for word/);
+  });
+
+  it('refuses an item without a gold value for every field', () => {
+    const broken = { ...BREADTH, items: [{ ...BREADTH.items[0]!, expected: { shape: 'round' } }] };
+    expect(() => defineBreadthTask(broken)).toThrow(/no gold value for section/);
+  });
+
+  it('scores a correct, grounded answer 1 without a judge', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, RED)));
+    expect(score.score).toBe(1);
+    expect(score.passed).toBe(true);
+    expect(score.metadata).toMatchObject({ itemsAnswered: 2, fieldAccuracy: 1, groundedItems: 2 });
+  });
+
+  it('gives partial credit field by field and says what was expected', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer({ ...BLUE, section: '2' }, RED)));
+    const blue = score.breakdown.find((item) => item.id === 'blue');
+    expect(blue?.earned).toBeCloseTo(2 / 3, 6);
+    expect(blue?.detail).toContain('section: answered "2", expected "1"');
+    expect(score.metadata?.fieldMisses).toEqual({ section: 1 });
+  });
+
+  it('only accepts a quote from the defining section of the right document', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    await run.fetch(OLD_URL);
+    const fromOld = { ...BLUE, quote: 'A blue widget is always round and never weighs more than five grams.', url: OLD_URL };
+    const wrongSection = { ...RED, quote: 'Blue widgets are cacheable by default unless a header forbids it.' };
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(fromOld, wrongSection)));
+    expect(score.breakdown.map((item) => item.earned)).toEqual([UNGROUNDED_CREDIT, UNGROUNDED_CREDIT]);
+    expect(score.breakdown[0]?.detail).toContain('quote is from old, expected spec');
+    expect(score.breakdown[1]?.detail).toContain('outside the part that defines this item');
+  });
+
+  it('does not ground a quote from a page the run never opened, and penalises the citation', async () => {
+    const run = session(breadthTask);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, RED)));
+    expect(score.breakdown.every((item) => item.earned === UNGROUNDED_CREDIT)).toBe(true);
+    expect(score.breakdown[0]?.detail).toContain('the page was never opened');
+    expect(score.penalties[0]?.multiplier).toBe(0.5);
+  });
+
+  it('scores an unanswered item, or an answer without the block, zero', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const partial = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE)));
+    expect(partial.breakdown.find((item) => item.id === 'red')).toMatchObject({ earned: 0, detail: 'Not answered.' });
+    expect(partial.score).toBeCloseTo(0.5, 6);
+
+    const prose = await breadthTask.score(run.input(noJudge, 'Blue is round, red is square.'));
+    expect(prose.score).toBe(0);
+    expect(prose.metadata?.answerBlock).toBe(false);
+  });
+});
+
+describe('fieldMatches', () => {
+  const text = { name: 'reason', kind: 'text' as const, description: '' };
+  const section = { name: 'section', kind: 'section' as const, description: '' };
+  const integer = { name: 'rfc', kind: 'integer' as const, description: '' };
+  const keyword = { name: 'keyword', kind: 'keyword' as const, description: '' };
+  const flag = { name: 'flag', kind: 'boolean' as const, description: '' };
+
+  it('compares each kind by meaning, not formatting', () => {
+    expect(fieldMatches(text, 'non-authoritative  information', 'Non-Authoritative Information')).toBe(true);
+    expect(fieldMatches(text, 'Payload Too Large', 'Content Too Large')).toBe(false);
+    expect(normalizeSection('Section 15.4.9.')).toBe('15.4.9');
+    expect(fieldMatches(section, '§ 15.4.9', '15.4.9')).toBe(true);
+    expect(fieldMatches(section, '15.4.9.1', '15.4.9')).toBe(false);
+    expect(fieldMatches(integer, 'RFC 9,111', 9111)).toBe(true);
+    expect(fieldMatches(integer, 9111.5, 9111)).toBe(false);
+    expect(fieldMatches(keyword, 'shall  not', 'SHALL NOT')).toBe(true);
+    expect(fieldMatches(keyword, 'SHOULD NOT', 'SHALL NOT')).toBe(false);
+    expect(fieldMatches(flag, 'Yes', true)).toBe(true);
+    expect(fieldMatches(flag, 'maybe', false)).toBe(false);
+  });
+
+  it('expects nothing where the gold value is null', () => {
+    expect(fieldMatches(integer, null, null)).toBe(true);
+    expect(fieldMatches(integer, undefined, null)).toBe(true);
+    expect(fieldMatches(integer, 64, null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // the shipped task set, end to end against the shipped corpus
 // ---------------------------------------------------------------------------
 
@@ -347,11 +491,14 @@ function shippedSession(task: Task) {
 }
 
 describe('researchTasks', () => {
-  it('ships three judged tasks, each with a hypothesis and traps', () => {
+  it('ships three judged and three gold-key tasks, each with a hypothesis and traps', () => {
     expect(researchTasks.map((task) => task.id)).toEqual([
       'research-http-redirects',
       'research-script-loading',
       'research-password-hashing',
+      'research-status-codes',
+      'research-header-fields',
+      'research-nist-password-rules',
     ]);
     for (const task of researchTasks) {
       expect(task.category).toBe('research');
@@ -362,13 +509,41 @@ describe('researchTasks', () => {
     }
   });
 
-  it('keeps rubrics small and positive', () => {
+  it('keeps rubrics small and positive, and breadth tasks broad', () => {
     for (const spec of judgedResearchSpecs) {
       expect(spec.rubric.length).toBeGreaterThanOrEqual(4);
       expect(spec.rubric.length).toBeLessThanOrEqual(6);
       expect(spec.rubric.every((item) => item.weight > 0)).toBe(true);
     }
+    for (const spec of breadthResearchSpecs) expect(spec.items.length).toBeGreaterThanOrEqual(8);
   });
+
+  for (const spec of breadthResearchSpecs) {
+    const task = researchTasks.find((candidate) => candidate.id === spec.id)!;
+
+    it(`${spec.id}: the gold key, quoted from opened pages, scores 1`, async () => {
+      const run = shippedSession(task);
+      const answers = [];
+      for (const item of spec.items) {
+        const url = await run.fetchDoc(item.source.doc);
+        answers.push({ [spec.key.name]: item.key, ...item.expected, quote: item.goldQuote, url });
+      }
+      const score = await task.score(run.input(noJudge, answerWithBlock('Answer.', { answers })));
+      expect(score.score).toBe(1);
+    });
+
+    it(`${spec.id}: a perfect closed-book answer stays low`, async () => {
+      const run = shippedSession(task);
+      const answers = spec.items.map((item) => ({
+        [spec.key.name]: item.key,
+        ...item.expected,
+        quote: item.goldQuote,
+        url: run.corpus.documents.find((document) => document.id === item.source.doc)?.url,
+      }));
+      const score = await task.score(run.input(noJudge, answerWithBlock('From memory.', { answers })));
+      expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT * 0.5, 6);
+    });
+  }
 
   for (const spec of judgedResearchSpecs) {
     const task = researchTasks.find((candidate) => candidate.id === spec.id)!;
