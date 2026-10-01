@@ -68,7 +68,10 @@ export default function LivePage() {
         </div>
 
         <aside className="card self-start p-6">
-          <p className="eyebrow">Architectures you can pass to --strategies</p>
+          <p className="eyebrow">Architecture ids</p>
+          <p className="mt-1.5 text-[0.8125rem] text-muted">
+            Pass any of these to <code className="font-mono">--strategies</code>.
+          </p>
           <ul className="mt-4 space-y-3">
             {[...STRATEGIES]
               .sort((a, b) => compareArchitectures(a.id, b.id))
