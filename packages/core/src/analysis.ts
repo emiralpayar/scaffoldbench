@@ -115,7 +115,10 @@ export interface AnalysisSettings {
 export interface PassRateEstimate extends Estimate {
   passed: number;
   runs: number;
-  /** Runs after the design effect of clustering by task; the Wilson interval uses this n. */
+  /**
+   * Runs after the design effect of clustering by task, and the task count at
+   * 0% or 100%; the Wilson interval uses this n.
+   */
   effectiveRuns: number;
 }
 
