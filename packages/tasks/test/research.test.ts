@@ -350,6 +350,19 @@ describe('defineResearchTask scoring', () => {
     const score = await task.score(run.input(judge, ANSWER_PROSE));
     expect(score.metadata?.corpus).toMatchObject({ version: 1, snapshot: '2026-10-01', documents: 3 });
     expect(score.metadata?.openedByRole).toEqual({ primary: ['spec'], superseded: ['old'] });
+    // Both pages fit one window; the search also showed the guide's snippet, which is its whole text.
+    expect(score.metadata?.displayedShare).toEqual({ spec: 1, old: 1, guide: 1 });
+  });
+
+  it('records how much of a page the run was shown, not just that it opened it', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL, { find: 'red widget is square' });
+    const { judge } = judgeReturning(verdicts(['a', 'missing'], ['b', 'missing']));
+    const score = await task.score(run.input(judge, ANSWER_PROSE));
+    const share = (score.metadata?.displayedShare as Record<string, number>).spec ?? 0;
+    expect(share).toBeGreaterThan(0.2);
+    expect(share).toBeLessThan(1);
   });
 });
 

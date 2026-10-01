@@ -28,8 +28,9 @@ import {
   type CitationAudit,
   type EvidenceEntry,
   type QuoteCheck,
+  type Reading,
 } from './citations';
-import { CORPUS_DIRNAME, Corpus, type CorpusDocument, type CorpusSelection, type TaskCorpus } from './corpus';
+import { CORPUS_DIRNAME, Corpus, type CorpusSelection, type TaskCorpus } from './corpus';
 import { locateQuote, normalizeForMatch } from './text';
 import { createWebTools } from './webTools';
 
@@ -143,16 +144,24 @@ export function citationPenalty(audit: CitationAudit): Penalty[] {
   ];
 }
 
-/** Provenance and reading behaviour every research run records. */
-export function researchMetadata(
-  corpus: TaskCorpus,
-  opened: ReadonlyMap<string, CorpusDocument>,
-  audit: CitationAudit,
-): Record<string, unknown> {
+/**
+ * Provenance and reading behaviour every research run records.
+ * `displayedShare` is, per document any tool displayed, the share of its text
+ * the run was shown: how much of RFC 9110 an architecture actually read.
+ */
+export function researchMetadata(corpus: TaskCorpus, reading: Reading, audit: CitationAudit): Record<string, unknown> {
+  const { opened } = reading;
   const openedByRole: Record<string, string[]> = {};
   for (const document of opened.values()) {
     const role = corpus.roleOf(document.id) ?? 'unknown';
     (openedByRole[role] ??= []).push(document.id);
+  }
+  const displayedShare: Record<string, number> = {};
+  for (const [id, ranges] of reading.displayed) {
+    const document = corpus.corpus.document(id);
+    const length = document ? corpus.normalized(document).length : 0;
+    const shown = ranges.reduce((total, range) => total + (range.end - range.start), 0);
+    if (length > 0) displayedShare[id] = Math.round((Math.min(shown, length) / length) * 10_000) / 10_000;
   }
   return {
     corpus: {
@@ -163,6 +172,7 @@ export function researchMetadata(
     },
     openedDocuments: [...opened.keys()],
     openedByRole,
+    displayedShare,
     citedCount: audit.cited.length,
     verifiedCount: audit.verified.length,
     hallucinatedCount: audit.unopened.length + audit.outsideCorpus.length,
@@ -281,7 +291,7 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
         opened,
       );
 
-      const metadata: Record<string, unknown> = researchMetadata(corpus, opened, audit);
+      const metadata: Record<string, unknown> = researchMetadata(corpus, reading, audit);
       const verifiedQuotes = checks.filter((check) => check.ok).length;
       metadata.evidenceBlock = evidence.found;
       metadata.evidenceBlockRepaired = evidence.repaired;

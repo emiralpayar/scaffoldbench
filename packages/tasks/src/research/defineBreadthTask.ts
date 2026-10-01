@@ -232,7 +232,7 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
         };
       });
 
-      const metadata = researchMetadata(corpus, opened, audit);
+      const metadata = researchMetadata(corpus, reading, audit);
       metadata.answerBlock = block !== undefined;
       metadata.answerBlockRepaired = block?.repaired === true;
       metadata.itemsAnswered = spec.items.filter((item) => findEntry(entries, item.key)).length;
