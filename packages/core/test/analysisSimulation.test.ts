@@ -23,6 +23,8 @@ import {
   bootstrapMeans,
   expandedPercentileInterval,
   makeRng,
+  normalCdf,
+  normalQuantile,
   pairedTest,
   quantileSorted,
   resolveVerdicts,
@@ -65,6 +67,32 @@ function scoreCells(normal: () => number, tasks: number, repeats: number, delta:
   });
 }
 
+/**
+ * BCa interval for a mean (Efron & Tibshirani 1993, ch. 14), only to compare
+ * against: bias correction from the replicates, acceleration from the jackknife.
+ */
+function bcaInterval(values: number[], sorted: Float64Array, alpha: number): { low: number; high: number } {
+  const n = values.length;
+  const mean = values.reduce((a, v) => a + v, 0) / n;
+  let below = 0;
+  for (const r of sorted) if (r < mean) below += 1;
+  const z0 = normalQuantile(Math.min(1 - 1 / sorted.length, Math.max(1 / sorted.length, below / sorted.length)));
+  const jack = values.map((v) => (mean * n - v) / (n - 1));
+  const jackMean = jack.reduce((a, v) => a + v, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (const j of jack) {
+    num += (jackMean - j) ** 3;
+    den += (jackMean - j) ** 2;
+  }
+  const a = den === 0 ? 0 : num / (6 * den ** 1.5);
+  const level = (z: number) => normalCdf(z0 + (z0 + z) / (1 - a * (z0 + z)));
+  return {
+    low: quantileSorted(sorted, level(normalQuantile(alpha / 2))),
+    high: quantileSorted(sorted, level(normalQuantile(1 - alpha / 2))),
+  };
+}
+
 /** Lumpy differences at the margin: A always scores 1, B loses `penalty` with probability 0.05 / penalty. */
 function lumpyCells(rng: () => number, tasks: number, repeats: number, penalty: number): number[][] {
   return Array.from({ length: tasks }, () =>
@@ -73,11 +101,12 @@ function lumpyCells(rng: () => number, tasks: number, repeats: number, penalty: 
 }
 
 describe('interval coverage', () => {
-  it('keeps the expanded percentile interval near 95% at 9 tasks, where plain percentile falls short', () => {
+  it('keeps the expanded percentile interval near 95% at 9 tasks, where plain percentile and BCa fall short', () => {
     const rng = makeRng(101);
     const normal = gaussian(rng);
     let expanded = 0;
     let plain = 0;
+    let bca = 0;
     const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       const values = Array.from({ length: 9 }, () => 0.1 * normal());
@@ -85,10 +114,44 @@ describe('interval coverage', () => {
       const ci = expandedPercentileInterval(sorted, values.length, 0.95)!;
       if (ci.low <= 0 && 0 <= ci.high) expanded += 1;
       if (quantileSorted(sorted, 0.025) <= 0 && 0 <= quantileSorted(sorted, 0.975)) plain += 1;
+      const b = bcaInterval(values, sorted, 0.05);
+      if (b.low <= 0 && 0 <= b.high) bca += 1;
     }
     report('coverage, 9 tasks, plain percentile', plain / trials);
+    report('coverage, 9 tasks, BCa', bca / trials);
     expect(report('coverage, 9 tasks, expanded percentile', expanded / trials)).toBeGreaterThan(0.9);
     expect(expanded).toBeGreaterThan(plain);
+    expect(expanded).toBeGreaterThan(bca);
+  });
+
+  it('keeps that lead on paired pass/fail differences', () => {
+    // Task pass probability ~ U(0.6, 1), the same for both arms; 9 tasks x 3.
+    const rng = makeRng(150);
+    let expanded = 0;
+    let plain = 0;
+    let bca = 0;
+    let usable = 0;
+    const trials = trialsOr(300);
+    for (let s = 0; s < trials; s++) {
+      const values = Array.from({ length: 9 }, () => {
+        const p = 0.6 + 0.4 * rng();
+        let d = 0;
+        for (let r = 0; r < 3; r++) d += (rng() < p ? 1 : 0) - (rng() < p ? 1 : 0);
+        return d / 3;
+      });
+      if (values.every((v) => v === values[0])) continue; // no verdict is attempted on these
+      usable += 1;
+      const sorted = bootstrapMeans(values, ITERATIONS, s + 1);
+      const ci = expandedPercentileInterval(sorted, values.length, 0.95)!;
+      if (ci.low <= 0 && 0 <= ci.high) expanded += 1;
+      if (quantileSorted(sorted, 0.025) <= 0 && 0 <= quantileSorted(sorted, 0.975)) plain += 1;
+      const b = bcaInterval(values, sorted, 0.05);
+      if (b.low <= 0 && 0 <= b.high) bca += 1;
+    }
+    report('coverage, paired pass/fail 9 tasks x 3, plain percentile', plain / usable);
+    report('coverage, paired pass/fail 9 tasks x 3, BCa', bca / usable);
+    expect(report('coverage, paired pass/fail 9 tasks x 3, expanded', expanded / usable)).toBeGreaterThan(0.9);
+    expect(expanded).toBeGreaterThan(bca);
   });
 
   it('covers at 20 tasks', () => {
@@ -171,6 +234,24 @@ describe('error rates of the four-way verdict', () => {
       const label = `false equivalence, lumpy gap = margin (penalty ${penalty}), ${tasks} tasks x ${repeats}`;
       expect(report(label, falseEquivalence / trials)).toBeLessThan(0.08);
     }
+  });
+
+  it('needs on the order of 100 tasks to show 5-point pass equivalence, even for identical arms', () => {
+    // Both arms pass 95% of runs on every task: the truth is "equivalent".
+    const rng = makeRng(909);
+    const cells = (tasks: number) =>
+      Array.from({ length: tasks }, () =>
+        Array.from({ length: 3 }, () => (rng() < 0.95 ? 1 : 0) - (rng() < 0.95 ? 1 : 0)),
+      );
+    const trials = trialsOr(200);
+    const rates: number[] = [];
+    for (const tasks of [60, 100]) {
+      let shown = 0;
+      for (let s = 0; s < trials; s++) if (verdictOf(cells(tasks), 0.05, true) === 'equivalent') shown += 1;
+      rates.push(report(`power to show pass equivalence (±5 points), identical arms at 95%, ${tasks} tasks x 3`, shown / trials));
+    }
+    expect(rates[0]).toBeLessThan(0.6);
+    expect(rates[1]).toBeGreaterThan(rates[0]!);
   });
 
   it('detects a 10-point effect on 20 tasks most of the time', () => {
