@@ -173,11 +173,11 @@ describe('ecommerce-backorder-allocation', () => {
       'O-5204 L1',
       'O-5206 - L1@2026-08-14,L2@2026-08-14',
       'O-5207 L1+L2',
-      'O-5208 - L1@2026-08-05',
+      'O-5208 L1',
       'O-5209 L1',
       'O-5210 L1',
       'O-5211 L1',
-      'O-5212 - L1@2026-08-05',
+      'O-5212 L1',
       'O-5213 - L1@2026-08-14',
       'O-5214 - L1@2026-08-19',
       'O-5215 L1',
@@ -228,8 +228,24 @@ describe('ecommerce-backorder-allocation', () => {
       await d.call('get_order', { orderId: id });
       await d.call('get_customer', { customerId: findOrder(d.world, id)!.customerId });
     }
-    for (const { orderId, allocated } of plan) {
-      if (allocated.length > 0) await d.call('allocate_stock', { orderId, lineIds: allocated });
+    // Allocate down the list with the stock on hand, then check stock again and
+    // repeat: deliveries land mid-run, so one pass is not enough.
+    const pending = new Map(plan.map((entry) => [entry.orderId, [...entry.allocated]]));
+    for (let progress = true; progress; ) {
+      progress = false;
+      await d.call('get_inventory');
+      for (const { orderId } of plan) {
+        const lineIds = pending.get(orderId) ?? [];
+        if (lineIds.length === 0) continue;
+        const lines = findOrder(d.world, orderId)!.lines.filter((entry) => lineIds.includes(entry.id));
+        const fits = lines.every(
+          (entry) => (findProduct(d.world, entry.productId)?.stock ?? 0) >= entry.quantity,
+        );
+        if (!fits) continue;
+        await d.call('allocate_stock', { orderId, lineIds });
+        pending.set(orderId, []);
+        progress = true;
+      }
     }
     for (const { orderId, promised } of plan) {
       for (const [lineId, date] of Object.entries(promised)) {
@@ -254,7 +270,7 @@ describe('ecommerce-backorder-allocation', () => {
   const replace = (changes: Record<string, Partial<BackorderOutcome>>, plan = PLAN): BackorderOutcome[] =>
     plan.map((entry) => ({ ...entry, ...(changes[entry.orderId] ?? {}) }));
 
-  it('scores 1 on the reference solution and uses both deliveries', async () => {
+  it('scores 1 on the reference solution and uses every delivery', async () => {
     const d = drive(ecommerceBackordersSpec);
     await solve(d);
     const result = await score(ecommerceBackordersTask, d);
@@ -298,6 +314,21 @@ describe('ecommerce-backorder-allocation', () => {
     expect(penaltyIds(result)).toEqual(['priority-inverted']);
     expect(result.penalties[0]?.detail).toContain('O-5201 waited for P-DOC');
     expect(firedTraps(ecommerceBackordersTask, result)).toContain('aged-first');
+  });
+
+  it('trap late-delivery: monitors received near the end and never allocated are caught', async () => {
+    const d = drive(ecommerceBackordersSpec);
+    await solve(
+      d,
+      replace({
+        'O-5208': { allocated: [], promised: { L1: '2026-08-19' } },
+        'O-5212': { allocated: [], promised: { L1: '2026-08-19' } },
+      }),
+    );
+    expect(findProduct(d.world, 'P-MON')?.stock).toBe(3);
+    const result = await score(ecommerceBackordersTask, d);
+    expect(missed(result)).toEqual(expect.arrayContaining(['outcome:O-5208', 'outcome:O-5212', 'stock-used']));
+    expect(firedTraps(ecommerceBackordersTask, result)).toContain('late-delivery');
   });
 
   it('trap stops-at-first-miss: a dock left on the shelf is caught', async () => {
