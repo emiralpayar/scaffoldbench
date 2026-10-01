@@ -14,5 +14,6 @@ export * from './stats';
 export * from './paths';
 export * from './systemPrompt';
 export * from './runner';
+export * from './provenance';
 export * from './aggregate';
 export * from './credentials';

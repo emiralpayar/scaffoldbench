@@ -451,6 +451,24 @@ export interface RunRecord {
   traceFile?: string;
 }
 
+/** Where and with what a session ran: enough to reproduce it or to doubt it. */
+export interface Provenance {
+  gitSha: string | null;
+  /**
+   * True when tracked files outside `results/` had uncommitted changes, so
+   * the code that ran is not exactly `gitSha`. `null` when git was unavailable.
+   */
+  gitDirty: boolean | null;
+  agentSdkVersion: string | null;
+  /** The Claude Code CLI bundled with the Agent SDK, which is what actually runs each call. */
+  claudeCodeVersion: string | null;
+  nodeVersion: string;
+  /** `process.platform-process.arch`, e.g. `darwin-arm64`. */
+  platform: string;
+  /** The command line that started the session. */
+  argv: string[];
+}
+
 export interface RunSetManifest {
   runSetId: string;
   createdAt: string;
