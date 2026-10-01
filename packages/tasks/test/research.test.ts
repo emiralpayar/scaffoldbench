@@ -213,6 +213,19 @@ describe('defineResearchTask scoring', () => {
     expect(score.metadata?.judgeUnverifiedQuotes).toBe(1);
   });
 
+  it('accepts a judge quote that elides part of the answer', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge } = judgeReturning(
+      verdicts(['a', 'met', ['E1'], 'Blue widgets are round …'], ['b', 'met', ['E2'], 'Blue widgets ... red widgets are square']),
+    );
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+
+    expect(score.score).toBe(1);
+    expect(score.metadata?.judgeUnverifiedQuotes).toBe(0);
+  });
+
   it('takes the median of judge samples', async () => {
     const task = judgedTask();
     const run = session(task);

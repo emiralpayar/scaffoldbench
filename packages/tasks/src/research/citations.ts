@@ -193,7 +193,9 @@ function isReservedHost(host: string): boolean {
   return /(^|\.)example\.(com|net|org)$/.test(name);
 }
 
-const BARE_URL = /https?:\/\/[^\s<>"'`]+/gi;
+// Square brackets end a URL: unencoded they only appear in IPv6 hosts, which
+// no source has, while `[https://a](https://a)` is how Markdown often links.
+const BARE_URL = /https?:\/\/[^\s<>"'`[\]]+/gi;
 const TRAILING_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', '*', '_', '~', "'", '"']);
 const BRACKETS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
 

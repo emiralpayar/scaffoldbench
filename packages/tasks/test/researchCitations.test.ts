@@ -71,6 +71,7 @@ describe('citedUrls', () => {
       'See [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4.2) and',
       '[MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301 "MDN page").',
       'Also <https://a.test.org/one>, **https://b.org/two**, and (https://c.org/three).',
+      'Linked as itself: [https://d.org/four](https://d.org/four).',
     ].join('\n');
     expect(citedUrls(prose)).toEqual([
       'https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4.2',
@@ -78,6 +79,7 @@ describe('citedUrls', () => {
       'https://a.test.org/one',
       'https://b.org/two',
       'https://c.org/three',
+      'https://d.org/four',
     ]);
   });
 

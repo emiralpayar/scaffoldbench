@@ -30,7 +30,7 @@ import {
   type QuoteCheck,
 } from './citations';
 import { CORPUS_DIRNAME, Corpus, type CorpusDocument, type CorpusSelection, type TaskCorpus } from './corpus';
-import { normalizeForMatch } from './text';
+import { locateQuote, normalizeForMatch } from './text';
 import { createWebTools } from './webTools';
 
 // ---------------------------------------------------------------------------
@@ -386,10 +386,13 @@ function evidenceIndex(id: string): number {
   return Number(id.slice(1)) - 1;
 }
 
-/** True when the judge's quote really is a passage of the answer. */
+/**
+ * True when the judge's quote really is a passage of the answer. Matched like
+ * an agent's quote, so a judge that shortens with an ellipsis is not mistaken
+ * for one that invents.
+ */
 function quotedFrom(normalizedAnswer: string, quote: string): boolean {
-  const needle = normalizeForMatch(quote);
-  return needle !== '' && ` ${normalizedAnswer} `.includes(` ${needle} `);
+  return locateQuote(normalizedAnswer, quote).length > 0;
 }
 
 export function buildJudgeRequest(
@@ -497,7 +500,7 @@ function readVerdicts(value: unknown, ids: readonly string[], evidenceCount: num
     const support = Array.isArray(candidate.support)
       ? candidate.support.filter(
           (ref): ref is string =>
-            typeof ref === 'string' && /^E\d+$/.test(ref) && evidenceIndex(ref) < evidenceCount,
+            typeof ref === 'string' && /^E[1-9]\d*$/.test(ref) && evidenceIndex(ref) < evidenceCount,
         )
       : [];
     verdicts.set(id, {
