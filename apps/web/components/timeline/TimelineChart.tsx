@@ -123,7 +123,9 @@ function Row({
       <Gridlines ticks={ticks} pct={pct} />
       {started ? (
         <span
-          className={`tl-bar ${call.depth > 0 ? 'tl-bar-sub' : ''} tl-${call.status} ${blind ? 'tl-blind' : ''} ${
+          className={`tl-bar ${call.depth > 0 ? 'tl-bar-sub' : ''} tl-${call.status} ${
+            blind ? 'tl-blind' : call.toolsOffered === 0 ? 'tl-toolless' : ''
+          } ${
             call.degraded ? 'tl-degraded' : ''
           } ${running ? 'tl-running' : ''}`}
           style={

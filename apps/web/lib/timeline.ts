@@ -67,8 +67,11 @@ export interface CostPoint {
 }
 
 export interface Timeline {
-  /** `phases` when no trace was committed and the phase records stand in. */
-  source: 'trace' | 'phases';
+  /**
+   * `phases` when no trace was committed and the phase records stand in;
+   * `schematic` for a design drawn on an invented clock (`lib/schematic.ts`).
+   */
+  source: 'trace' | 'phases' | 'schematic';
   durationMs: number;
   calls: TimelineCall[];
   /**
@@ -337,7 +340,7 @@ export function timelineFromPhases(phases: readonly PhaseRecord[]): Timeline {
   return finish('phases', calls);
 }
 
-function finish(source: Timeline['source'], calls: TimelineCall[]): Timeline {
+function finish(source: 'trace' | 'phases', calls: TimelineCall[]): Timeline {
   const ends = calls.map((call) => ({ tMs: call.endMs, usd: call.costUsd })).sort((a, b) => a.tMs - b.tMs);
   const cost: CostPoint[] = [{ tMs: 0, usd: 0 }];
   let running = 0;

@@ -1,17 +1,27 @@
 import { ActOne } from '../components/landing/ActOne';
 import { ActTwo } from '../components/landing/ActTwo';
 import { Explore } from '../components/landing/Explore';
-import type { HeroFact } from '../components/landing/Hero';
+import type { HeroFact, HeroRace } from '../components/landing/Hero';
 import { Hero } from '../components/landing/Hero';
 import { TrustTiles } from '../components/landing/TrustTiles';
 import { analyzeForSite } from '../lib/analysis';
+import { ARCHITECTURES, architectureColor, architectureInfo, architectureName } from '../lib/architectures';
 import { formatInt } from '../lib/format';
+import { modelShortName } from '../lib/models';
 import { derivePostmortem } from '../lib/postmortem';
 import { isRankable } from '../lib/records';
+import { loadHeroRace } from '../lib/server/replays';
+import type { RaceGroup } from '../lib/server/replays';
 import { loadPostmortemRunSet, loadRunSet } from '../lib/server/runSet';
+import { schematicTimeline } from '../lib/schematic';
+import { timelineFromTrace } from '../lib/timeline';
 
 export default async function HomePage() {
-  const [published, evidence] = await Promise.all([loadRunSet(), loadPostmortemRunSet()]);
+  const [published, evidence, recorded] = await Promise.all([
+    loadRunSet(),
+    loadPostmortemRunSet(),
+    loadHeroRace(),
+  ]);
 
   // Act 2 is drawn only from a run set whose records all carry the fidelity
   // verdict (or, under ARENA_DEMO, from synthetic data that says so loudly).
@@ -45,6 +55,7 @@ export default async function HomePage() {
         </div>
       ) : null}
       <Hero
+        race={heroRace(recorded)}
         facts={facts}
         {...(chartable?.verification === 'synthetic'
           ? { note: 'These counts come from synthetic demo data, not a measurement.' }
@@ -56,4 +67,48 @@ export default async function HomePage() {
       <Explore />
     </>
   );
+}
+
+/**
+ * The race under the headline: recorded runs of one task when a verified
+ * (or, under ARENA_DEMO, synthetic) set has their traces, else the
+ * schematic, labelled as such and carrying no numbers.
+ */
+function heroRace(group: RaceGroup | null): HeroRace {
+  if (!group) {
+    return {
+      recorded: false,
+      speed: 6,
+      lanes: ARCHITECTURES.map((info) => ({
+        strategyId: info.id,
+        name: info.name,
+        shape: info.shape,
+        color: architectureColor(info.id),
+        timeline: schematicTimeline(info.id),
+      })),
+      title: 'How each design spends a task',
+      note: 'Schematic: the calls each design makes, on an invented clock',
+    };
+  }
+  const synthetic = group.data.verification === 'synthetic';
+  return {
+    recorded: true,
+    speed: 8,
+    lanes: group.runs.map(({ record, trace }) => ({
+      strategyId: record.strategyId,
+      name: architectureName(record.strategyId),
+      shape: architectureInfo(record.strategyId)?.shape ?? '',
+      color: architectureColor(record.strategyId),
+      timeline: timelineFromTrace(trace, record.phases),
+      outcome: {
+        score: record.score,
+        passed: record.passed,
+        costUsd: record.costUsd,
+        latencyMs: record.latencyMs,
+        runId: record.runId,
+      },
+    })),
+    title: <>Same task, {group.runs.length} harnesses: {group.taskTitle}</>,
+    note: `${synthetic ? 'Synthetic replay' : 'Replay'} · ${modelShortName(group.model)} · repeat ${group.repeat}`,
+  };
 }

@@ -176,8 +176,12 @@ function Legend() {
         tool returned an error
       </li>
       <li className="flex items-center gap-1.5">
+        <span aria-hidden className="legend-swatch legend-toolless" />
+        shown no tools (reasoning only)
+      </li>
+      <li className="flex items-center gap-1.5">
         <span aria-hidden className="legend-swatch legend-blind" />
-        ran without its tools
+        lost its tools (server failed)
       </li>
       <li className="flex items-center gap-1.5">
         <span aria-hidden className="legend-swatch legend-failed" />
