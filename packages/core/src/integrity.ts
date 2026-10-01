@@ -41,7 +41,10 @@ export const HARNESS_CHECK = {
   mcpConnected: 'harness.mcp-connected',
   /** No call loaded an MCP server the harness did not give it. */
   mcpHermetic: 'harness.mcp-hermetic',
-  /** Every call that asked for structured output and ran to the end got it. */
+  /**
+   * Every call that asked for structured output and ran to the end got it, or
+   * its strategy asked again and the retry got it (`PhaseRecord.retriedBy`).
+   */
   structuredOutput: 'harness.structured-output',
   /** No phase fell back on a default instead of its output (`PhaseRecord.degraded`). */
   notDegraded: 'harness.not-degraded',
@@ -255,12 +258,20 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
     ),
   );
 
+  // A miss the strategy asked again about is judged by the retry, which is a
+  // schema call of its own and checked here like any other.
+  const retried = new Set(
+    input.phases.flatMap((phase) =>
+      phase.retriedBy !== undefined && phase.callId !== undefined ? [phase.callId] : [],
+    ),
+  );
   add(
     HARNESS_CHECK.structuredOutput,
     calls.flatMap((call) => {
       const end = call.end;
       if (!end?.structuredMissing || end.apiError) return [];
       if (end.subtype !== undefined && CUT_SHORT.has(end.subtype)) return [];
+      if (retried.has(call.callId)) return [];
       return [`${where(call)} returned no structured output (${end.subtype ?? 'no result'})`];
     }),
   );

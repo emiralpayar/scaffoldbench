@@ -266,6 +266,24 @@ export interface PhaseRecord {
    * architecture did not run as designed, so the run fails its integrity check.
    */
   degraded?: string;
+  /** The call behind this phase (`QueryOutcome.callId`): what ties it to its events in the trace. */
+  callId?: string;
+  /**
+   * What the strategy read from the phase's reply, in the strategy's own
+   * terms: how many steps a plan had, a verifier's verdict, which proposal a
+   * selector chose, the action a reviewer allowed or denied. Fidelity checks
+   * read it, and so can an analysis of how often a verifier approved work that
+   * went on to fail.
+   */
+  meta?: Record<string, unknown>;
+  /**
+   * Set when the phase asked for structured output, got none, and the
+   * strategy asked again: the name of the phase that did. The miss is then
+   * judged by the retry, which `harness.structured-output` checks like any
+   * other schema call — so a harness that drops every structured reply still
+   * fails, and one slip the strategy recovered from does not.
+   */
+  retriedBy?: string;
 }
 
 export interface StrategyOutcome {

@@ -193,6 +193,29 @@ describe('harnessChecks', () => {
     expect(result.detail).toContain(`select (call-1) returned no structured output (${subtype})`);
   });
 
+  it('judges a schema miss the strategy asked again about by the retry', () => {
+    const trace = [
+      ...call({ callId: 'call-1', phase: 'verify-1', structuredMissing: true }),
+      ...call({ callId: 'call-2', phase: 'verify-1-retry' }),
+    ];
+    const phases = [
+      phase({ phase: 'verify-1', callId: 'call-1', retriedBy: 'verify-1-retry' }),
+      phase({ phase: 'verify-1-retry', callId: 'call-2' }),
+    ];
+    expect(check(harnessChecks({ trace, phases }), HARNESS_CHECK.structuredOutput).ok).toBe(true);
+
+    // A retry that also came back empty fails on its own account.
+    const bothMissed = [
+      ...call({ callId: 'call-1', phase: 'verify-1', structuredMissing: true }),
+      ...call({ callId: 'call-2', phase: 'verify-1-retry', structuredMissing: true }),
+    ];
+    const result = check(harnessChecks({ trace: bothMissed, phases }), HARNESS_CHECK.structuredOutput);
+    expect(result).toMatchObject({
+      ok: false,
+      detail: 'verify-1-retry (call-2) returned no structured output (success)',
+    });
+  });
+
   it.each(['aborted', 'skipped', 'error_max_budget_usd'])(
     'does not fail a schema call the run’s own limits cut short (%s)',
     (subtype) => {
