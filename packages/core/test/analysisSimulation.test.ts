@@ -5,8 +5,15 @@
  * Every simulation is seeded, so these are deterministic regression tests,
  * not flaky ones. Sizes are kept small for CI; the bounds leave room for the
  * Monte Carlo error of a few hundred replications (the standard error of a
- * coverage near 0.95 over 300 trials is about 0.013). docs/STATISTICS.md
- * quotes the same scenarios at larger sizes.
+ * coverage near 0.95 over 300 trials is about 0.013).
+ *
+ * docs/STATISTICS.md quotes these scenarios at 2,000 trials with the default
+ * 10,000 bootstrap replicates. To reproduce its table:
+ *
+ *   ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts \
+ *     --testTimeout=1200000
+ *
+ * (about two minutes, most of it the leaderboard simulation).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -31,7 +38,17 @@ function gaussian(rng: () => number): () => number {
   };
 }
 
-const settings: InferenceSettings = { iterations: 1_000, seed: 0xa11ce, alpha: 0.05, minClusters: 5 };
+const SCALE = Number(process.env.ARENA_SIM_TRIALS) || 0;
+const ITERATIONS = SCALE ? 10_000 : 1_000;
+const trialsOr = (ciDefault: number) => SCALE || ciDefault;
+
+/** Print a measured rate when running at documentation scale. */
+function report(label: string, rate: number): number {
+  if (SCALE) console.log(`[${SCALE} trials] ${label}: ${rate.toFixed(3)}`);
+  return rate;
+}
+
+const settings: InferenceSettings = { iterations: ITERATIONS, seed: 0xa11ce, alpha: 0.05, minClusters: 5 };
 
 /** Verdict of one paired contrast given its cell differences, task by task. */
 function verdictOf(cells: number[][], margin: number, binary = false): string {
@@ -61,15 +78,16 @@ describe('interval coverage', () => {
     const normal = gaussian(rng);
     let expanded = 0;
     let plain = 0;
-    const trials = 300;
+    const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       const values = Array.from({ length: 9 }, () => 0.1 * normal());
-      const sorted = bootstrapMeans(values, 1_000, s + 1);
+      const sorted = bootstrapMeans(values, ITERATIONS, s + 1);
       const ci = expandedPercentileInterval(sorted, values.length, 0.95)!;
       if (ci.low <= 0 && 0 <= ci.high) expanded += 1;
       if (quantileSorted(sorted, 0.025) <= 0 && 0 <= quantileSorted(sorted, 0.975)) plain += 1;
     }
-    expect(expanded / trials).toBeGreaterThan(0.9);
+    report('coverage, 9 tasks, plain percentile', plain / trials);
+    expect(report('coverage, 9 tasks, expanded percentile', expanded / trials)).toBeGreaterThan(0.9);
     expect(expanded).toBeGreaterThan(plain);
   });
 
@@ -77,13 +95,13 @@ describe('interval coverage', () => {
     const rng = makeRng(202);
     const normal = gaussian(rng);
     let covered = 0;
-    const trials = 300;
+    const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       const values = Array.from({ length: 20 }, () => 0.1 * normal());
-      const ci = expandedPercentileInterval(bootstrapMeans(values, 1_000, s + 1), 20, 0.95)!;
+      const ci = expandedPercentileInterval(bootstrapMeans(values, ITERATIONS, s + 1), 20, 0.95)!;
       if (ci.low <= 0 && 0 <= ci.high) covered += 1;
     }
-    expect(covered / trials).toBeGreaterThan(0.91);
+    expect(report('coverage, 20 tasks, expanded percentile', covered / trials)).toBeGreaterThan(0.91);
   });
 
   it('accounts for clustering: iid intervals over runs undercover when tasks differ', () => {
@@ -92,7 +110,7 @@ describe('interval coverage', () => {
     const normal = gaussian(rng);
     let clustered = 0;
     let iid = 0;
-    const trials = 300;
+    const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       const taskMeans: number[] = [];
       const runs: number[] = [];
@@ -102,13 +120,13 @@ describe('interval coverage', () => {
         runs.push(...reps);
         taskMeans.push((reps[0]! + reps[1]!) / 2);
       }
-      const ci = expandedPercentileInterval(bootstrapMeans(taskMeans, 1_000, s + 1), 9, 0.95)!;
+      const ci = expandedPercentileInterval(bootstrapMeans(taskMeans, ITERATIONS, s + 1), 9, 0.95)!;
       if (ci.low <= 0 && 0 <= ci.high) clustered += 1;
-      const legacy = bootstrapCI(runs, { iterations: 1_000, seed: s + 1 });
+      const legacy = bootstrapCI(runs, { iterations: ITERATIONS, seed: s + 1 });
       if (legacy.low <= 0 && 0 <= legacy.high) iid += 1;
     }
-    expect(clustered / trials).toBeGreaterThan(0.9);
-    expect(iid / trials).toBeLessThan(0.85);
+    expect(report('coverage, 9 tasks x 2 clustered, task bootstrap', clustered / trials)).toBeGreaterThan(0.9);
+    expect(report('coverage, 9 tasks x 2 clustered, legacy iid over runs', iid / trials)).toBeLessThan(0.85);
   });
 });
 
@@ -116,22 +134,22 @@ describe('error rates of the four-way verdict', () => {
   it('calls a difference under the null at most about 5% of the time', () => {
     const normal = gaussian(makeRng(404));
     let falsePositives = 0;
-    const trials = 300;
+    const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       const v = verdictOf(scoreCells(normal, 20, 3, 0), 0.05);
       if (v === 'better' || v === 'worse') falsePositives += 1;
     }
-    expect(falsePositives / trials).toBeLessThan(0.08);
+    expect(report('false difference, no effect, 20 tasks x 3', falsePositives / trials)).toBeLessThan(0.08);
   });
 
   it('calls equivalence at most about 5% of the time when the true gap equals the margin', () => {
     const normal = gaussian(makeRng(505));
     let falseEquivalence = 0;
-    const trials = 300;
+    const trials = trialsOr(300);
     for (let s = 0; s < trials; s++) {
       if (verdictOf(scoreCells(normal, 20, 3, 0.05), 0.05) === 'equivalent') falseEquivalence += 1;
     }
-    expect(falseEquivalence / trials).toBeLessThan(0.08);
+    expect(report('false equivalence, gap = margin, 20 tasks x 3', falseEquivalence / trials)).toBeLessThan(0.08);
   });
 
   it('holds that line when differences are rare and lumpy', () => {
@@ -140,7 +158,7 @@ describe('error rates of the four-way verdict', () => {
     // the binary floor) at 60 tasks, and partial-credit score penalties of
     // 0.5 at 30 tasks and 0.25 at 9 x 2 (the published run set's shape).
     const rng = makeRng(606);
-    const trials = 300;
+    const trials = trialsOr(300);
     for (const [penalty, tasks, repeats] of [
       [1, 60, 3],
       [0.5, 30, 3],
@@ -150,16 +168,17 @@ describe('error rates of the four-way verdict', () => {
       for (let s = 0; s < trials; s++) {
         if (verdictOf(lumpyCells(rng, tasks, repeats, penalty), 0.05, penalty === 1) === 'equivalent') falseEquivalence += 1;
       }
-      expect(falseEquivalence / trials).toBeLessThan(0.08);
+      const label = `false equivalence, lumpy gap = margin (penalty ${penalty}), ${tasks} tasks x ${repeats}`;
+      expect(report(label, falseEquivalence / trials)).toBeLessThan(0.08);
     }
   });
 
   it('detects a 10-point effect on 20 tasks most of the time', () => {
     const normal = gaussian(makeRng(707));
     let detected = 0;
-    const trials = 100;
+    const trials = trialsOr(100);
     for (let s = 0; s < trials; s++) if (verdictOf(scoreCells(normal, 20, 3, 0.1), 0.05) === 'better') detected += 1;
-    expect(detected / trials).toBeGreaterThan(0.8);
+    expect(report('power, 10-point effect, 20 tasks x 3', detected / trials)).toBeGreaterThan(0.8);
   });
 });
 
@@ -214,15 +233,15 @@ describe('familywise error across a leaderboard', () => {
     const rng = makeRng(808);
     let legacyAny = 0;
     let pairedAny = 0;
-    const trials = 120;
+    const trials = trialsOr(120);
     for (let s = 0; s < trials; s++) {
       const records = identicalRunSet(rng);
       if (summarizeRuns(records).pairwise.some((p) => p.verdict !== 'inconclusive')) legacyAny += 1;
-      const analysis = analyzeRunSet(records, { iterations: 300, seed: s + 1 });
+      const analysis = analyzeRunSet(records, { iterations: SCALE ? ITERATIONS : 300, seed: s + 1 });
       const pairwise = analysis.models[0]!.pairwise.filter((c) => c.metric === 'score');
       if (pairwise.some((c) => c.verdict === 'better' || c.verdict === 'worse')) pairedAny += 1;
     }
-    expect(pairedAny / trials).toBeLessThanOrEqual(0.05);
-    expect(legacyAny / trials).toBeGreaterThan(0.1);
+    expect(report('run sets with a false winner, paired + Holm', pairedAny / trials)).toBeLessThanOrEqual(0.05);
+    expect(report('run sets with a false winner, legacy overlap rule', legacyAny / trials)).toBeGreaterThan(0.1);
   });
 });
