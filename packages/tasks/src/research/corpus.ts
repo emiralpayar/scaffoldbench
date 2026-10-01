@@ -280,8 +280,7 @@ export class TaskCorpus {
     const hits: FindHit[] = [];
     for (let at = flat.indexOf(needle); at !== -1; at = flat.indexOf(needle, at + 1)) {
       const offset = offsets[at] ?? 0;
-      const from = Math.max(0, at - FIND_CONTEXT_CHARS / 2);
-      const to = Math.min(flat.length, at + needle.length + FIND_CONTEXT_CHARS / 2);
+      const { from, to } = wholeWords(flat, at - FIND_CONTEXT_CHARS / 2, at + needle.length + FIND_CONTEXT_CHARS / 2);
       const context = document.text
         .slice(offsets[from] ?? 0, offsets[to] ?? document.text.length)
         .replace(/\s+/g, ' ')
@@ -395,13 +394,24 @@ function snippetOf(text: string, terms: ReadonlySet<string>): string {
     }
   }
 
-  const start = Math.max(0, best - 40);
-  let end = Math.min(flat.length, start + SNIPPET_CHARS);
-  if (end < flat.length) {
-    const space = flat.lastIndexOf(' ', end);
-    if (space > start + SNIPPET_CHARS / 2) end = space;
-  }
+  const { from: start, to: end } = wholeWords(flat, best - 40, best - 40 + SNIPPET_CHARS);
   return `${start > 0 ? '…' : ''}${flat.slice(start, end).trim()}${end < flat.length ? '…' : ''}`;
+}
+
+/**
+ * Widen `[from, to)` of single-spaced text so it neither starts nor ends inside
+ * a word. Agents copy quotes out of snippets and `find` contexts, and a window
+ * that cut "Balloon" to "Ball" would hand them a quote that cannot verify.
+ */
+function wholeWords(flat: string, from: number, to: number): { from: number; to: number } {
+  let start = Math.max(0, from);
+  let end = Math.min(flat.length, to);
+  if (start > 0 && flat[start - 1] !== ' ') start = flat.lastIndexOf(' ', start) + 1;
+  if (end < flat.length && flat[end] !== ' ') {
+    const space = flat.indexOf(' ', end);
+    end = space === -1 ? flat.length : space;
+  }
+  return { from: start, to: end };
 }
 
 function escapeRegExp(value: string): string {

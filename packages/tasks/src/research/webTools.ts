@@ -121,14 +121,21 @@ function header(document: CorpusDocument): string {
 }
 
 /**
- * One window of a page, ending at a line break when one is near so a window
- * never stops mid-word, with the offset to continue from.
+ * One window of a page, with the offset to continue from. It ends at a line
+ * break when one is near, and otherwise after the last whole word: a window
+ * that stopped mid-word would invite a quote ending in half a word, which can
+ * never verify.
  */
 export function pageWindow(text: string, offset: number, size: number): { start: number; end: number } {
   let end = Math.min(text.length, offset + size);
   if (end < text.length) {
     const lineBreak = text.lastIndexOf('\n', end);
-    if (lineBreak > offset + size * 0.75) end = lineBreak + 1;
+    if (lineBreak > offset + size * 0.75) {
+      end = lineBreak + 1;
+    } else {
+      const space = text.slice(offset, end + 1).search(/\s\S*$/);
+      if (space > size / 2) end = offset + space + 1;
+    }
   }
   return { start: offset, end };
 }

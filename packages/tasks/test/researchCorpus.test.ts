@@ -298,6 +298,45 @@ describe('fetch_page tool', () => {
   });
 });
 
+describe('tool output is quotable', () => {
+  // One long paragraph without line breaks, like an extracted NIST or MDN page.
+  const words = Array.from({ length: 600 }, (_unused, index) => `w${'x'.repeat(index % 9)}${index}`);
+  words.splice(300, 0, 'derivation', 'functions', 'include', 'PBKDF2', 'and', 'Balloon');
+  const dir = writeCorpus(freshDir(), [
+    { id: 'prose', url: 'https://prose.test.org/guidelines.html', title: 'Guidelines', text: words.join(' ') },
+  ]);
+  const view = Corpus.load(path.join(dir, CORPUS_DIRNAME)).forTask({ primary: ['prose'] });
+  const document = view.resolve('https://prose.test.org/guidelines.html');
+  if (!document) throw new Error('fixture missing');
+  const tools = createWebTools({ corpus: view, pageChars: 500 });
+  const unwrap = (text: string) => text.replace(/^…|…$/g, '');
+
+  it('ends every window of a long paragraph after a whole word', async () => {
+    let offset = 0;
+    for (let guard = 0; guard < 100; guard++) {
+      const reply = await callTool(tools, [], 'fetch_page', { url: document.url, offset });
+      const end = Number(/Characters [\d,]+–([\d,]+) of/.exec(reply.text)?.[1]?.replace(/,/g, '') ?? document.text.length);
+      expect(view.locate(document, document.text.slice(offset, end))).not.toHaveLength(0);
+      const next = /offset=(\d+)/.exec(reply.text)?.[1];
+      if (!next) break;
+      expect(document.text[Number(next) - 1]).toBe(' ');
+      offset = Number(next);
+    }
+  });
+
+  it('cuts find contexts and search snippets at word boundaries', async () => {
+    const found = await callTool(tools, [], 'fetch_page', { url: document.url, find: 'and Balloon' });
+    const context = /offset \d+: (.*)/.exec(found.text)?.[1] ?? '';
+    expect(context).toContain('PBKDF2 and Balloon');
+    expect(view.locate(document, unwrap(context))).not.toHaveLength(0);
+
+    const results = await callTool(tools, [], 'search', { query: 'Balloon derivation' });
+    const snippet = results.text.split('\n')[3]?.trim() ?? '';
+    expect(snippet).toContain('Balloon');
+    expect(view.locate(document, unwrap(snippet))).not.toHaveLength(0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // the shipped corpus
 // ---------------------------------------------------------------------------
