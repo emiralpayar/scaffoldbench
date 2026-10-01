@@ -1,8 +1,22 @@
+/**
+ * Report-time reductions of run records.
+ *
+ * Two layers live behind this module. `analyzeRunSet` (re-exported from
+ * `analysis.ts`) is the inference: paired, task-clustered contrasts with
+ * four-way verdicts, per model. `summarizeRuns` is the older descriptive
+ * summary the site and CLI were built on; it is kept working, but its
+ * pairwise verdicts compare marginal intervals and should not be cited.
+ */
+
+import { exclusionReasons } from './analysisData';
 import { aggregate, comparisonVerdict, paretoFrontier } from './stats';
 import type { Aggregate, Verdict } from './stats';
 import type { FailureMode, RunRecord, TaskCategory } from './types';
 
+export * from './analysis';
 export * from './analysisInference';
+export { uncertainFrontier } from './analysisPareto';
+export type { FrontierCandidate, FrontierResult } from './analysisPareto';
 
 /** Everything the site needs about one strategy, precomputed at report time. */
 export interface StrategySummary {
@@ -50,6 +64,11 @@ export interface ReportSummary {
     costUsd: number;
     judgeCostUsd: number;
     failureModes: Record<string, number>;
+    /**
+     * Runs left out of every ranking above because they failed an integrity
+     * check or hit an `api_error`. They still count in `runs` and the costs.
+     */
+    excludedRuns: number;
   };
 }
 
@@ -99,8 +118,15 @@ function groupBy<T, K extends string>(items: readonly T[], key: (item: T) => K):
 /**
  * Reduce raw run records into everything the leaderboard, matrix and Pareto
  * views need. Done once at report time so the site stays a pure renderer.
+ *
+ * Descriptive: runs are pooled across tasks and models, intervals treat runs
+ * as independent, and `pairwise` compares marginal intervals. Use
+ * `analyzeRunSet` for anything that claims one strategy beats another. Like
+ * it, this leaves runs that failed an integrity check or hit an `api_error`
+ * out of every ranking; `totals` still counts them.
  */
-export function summarizeRuns(records: readonly RunRecord[]): ReportSummary {
+export function summarizeRuns(allRecords: readonly RunRecord[]): ReportSummary {
+  const records = allRecords.filter((r) => exclusionReasons(r, ['api_error']).length === 0);
   const byStrategy = groupBy(records, (r) => r.strategyId);
   const strategies = [...byStrategy.entries()]
     .map(([id, rows]) => summarizeStrategy(id, rows))
@@ -159,10 +185,11 @@ export function summarizeRuns(records: readonly RunRecord[]): ReportSummary {
     paretoStrategyIds: frontier.map((s) => s.strategyId),
     byCategory,
     totals: {
-      runs: records.length,
-      costUsd: records.reduce((acc, r) => acc + r.costUsd, 0),
-      judgeCostUsd: records.reduce((acc, r) => acc + r.judgeCostUsd, 0),
-      failureModes: countFailureModes(records),
+      runs: allRecords.length,
+      costUsd: allRecords.reduce((acc, r) => acc + r.costUsd, 0),
+      judgeCostUsd: allRecords.reduce((acc, r) => acc + r.judgeCostUsd, 0),
+      failureModes: countFailureModes(allRecords),
+      excludedRuns: allRecords.length - records.length,
     },
   };
 }

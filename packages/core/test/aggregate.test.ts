@@ -180,6 +180,22 @@ describe('summarizeRuns', () => {
     expect(summary.byCategory.research[0]?.score.mean).toBe(0);
   });
 
+  it('leaves runs that failed integrity or hit an api error out of the rankings', () => {
+    const summary = summarizeRuns([
+      run({ strategyId: 'a', score: 0.2 }),
+      run({ strategyId: 'a', score: 1, integrity: { ok: false, checks: [{ id: 'plan-non-empty', ok: false }] } }),
+      run({ strategyId: 'b', score: 0.9, failureMode: 'api_error' }),
+      run({ strategyId: 'c', score: 0.4, integrity: { ok: true, checks: [] } }),
+    ]);
+
+    expect(summary.strategies.map((s) => s.strategyId)).toEqual(['c', 'a']);
+    expect(summary.strategies.find((s) => s.strategyId === 'a')?.score.mean).toBe(0.2);
+    expect(summary.cells).toHaveLength(2);
+    expect(summary.totals.runs).toBe(4);
+    expect(summary.totals.excludedRuns).toBe(2);
+    expect(summary.totals.failureModes).toEqual({ none: 3, api_error: 1 });
+  });
+
   it('tracks judge cost separately from strategy cost', () => {
     const summary = summarizeRuns([
       run({ costUsd: 0.2, judgeCostUsd: 0.05 }),
