@@ -1,70 +1,76 @@
 /**
- * Run one task, once, on a visitor's own API key, and stream the trace back.
+ * Run one tool-use task, once, on a visitor's own API key, and stream the
+ * trace back. Server mode only: the file is named `route.live.ts` and only a
+ * `NEXT_PUBLIC_ARENA_LIVE=1` build lists `live.ts` as a page extension, so the
+ * public static export has no API at all.
  *
- * Three things make this safe to expose:
+ * Hosting: this spawns the Agent SDK's native subprocess (hundreds of MB of
+ * RSS per run) and writes a scratch directory, so it needs a long-lived Node
+ * server or container, not a serverless function.
  *
- *  1. The run executes with an environment built by `visitorEnv`, which deletes
- *     every credential source the SDK would otherwise fall back to. A visitor's
- *     run cannot authenticate as the site operator, so it cannot bill them.
- *  2. The key is read from the request body, handed to the subprocess, and
- *     never written anywhere — not to `results/`, not to a log line. Anything
- *     echoed back passes through `redactSecrets` first.
- *  3. The run is bounded on every axis that costs money: one strategy, one
- *     task, one repeat, a hard USD ceiling, a wall-clock timeout, and a per-IP
- *     rate limit.
+ * What keeps it safe to expose (the rules live in `lib/server/live.ts`, with
+ * tests):
+ *
+ *  1. The model subprocess runs with `liveEnv(apiKey)`, which removes every
+ *     credential source the SDK would otherwise fall back to, the operator's
+ *     Claude Code subscription token included. A visitor's run can only
+ *     authenticate as the visitor.
+ *  2. No judge runs at all. The demo accepts only tool-use tasks, which are
+ *     scored deterministically, and hands the runner a judge that refuses to
+ *     run, so no grading call can fall back to the operator's credentials.
+ *  3. The key is read from the request body, checked against the API's model
+ *     list (a free call) so a bad key fails in a second instead of after a
+ *     full run, handed to the subprocess, and never written anywhere.
+ *     Everything streamed back, trace events included, passes through
+ *     `redactSecrets`.
+ *  4. Every run is bounded: one architecture, one task, one repeat, a USD
+ *     ceiling, a wall-clock ceiling, a cap on runs in flight, and a rate
+ *     limit. Each request gets its own run-set id, so concurrent visitors
+ *     never share a scratch directory, and the directory is removed after.
+ *
+ * Known gap until the runner accepts an external abort signal (contract 2):
+ * the request signal is passed through but not yet honoured, so a visitor
+ * who closes the tab still pays for the rest of their run, up to the caps.
  */
 
-import { NextRequest } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
+
+import type { NextRequest } from 'next/server';
 
 import {
+  FIXTURES_DIR,
   InvalidApiKeyError,
+  SCRATCH_DIR,
   assertApiKeyShape,
-  createJudge,
   redactSecrets,
   runMatrix,
-  visitorEnv,
 } from '@arena/core';
-import type { RunRecord, TraceEvent } from '@arena/core';
+import type { RunnerConfig, TraceEvent } from '@arena/core';
 import { getStrategies } from '@arena/strategies';
 import { getTasks } from '@arena/tasks';
+
+import {
+  LIVE_DEFAULT_MODEL,
+  LIVE_HEARTBEAT_MS,
+  LIVE_MAX_COST_USD,
+  LIVE_MAX_WALL_CLOCK_MS,
+  LIVE_MODELS,
+  LiveAdmissions,
+  checkApiKey,
+  clientBucket,
+  isLiveModel,
+  liveEnv,
+  refusingJudge,
+  summarizeLiveRun,
+} from '../../../lib/server/live';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Well below what a full benchmark run allows — this is a demonstration. */
-const MAX_COST_USD = 0.5;
-const MAX_WALL_CLOCK_MS = 240_000;
-const RATE_LIMIT_PER_HOUR = 6;
-
-const ALLOWED_MODELS = new Set(['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5']);
-
-/**
- * Per-IP counter.
- *
- * In-memory, so it resets on redeploy and does not span instances. That is an
- * accepted limit: the real ceiling is that every run is paid for by the key
- * that requested it. This exists to stop one visitor monopolising the process,
- * not to enforce a quota.
- */
-const attempts = new Map<string, number[]>();
-
-function rateLimited(ip: string, now: number): boolean {
-  const hourAgo = now - 3_600_000;
-  const recent = (attempts.get(ip) ?? []).filter((t) => t > hourAgo);
-  if (recent.length >= RATE_LIMIT_PER_HOUR) {
-    attempts.set(ip, recent);
-    return true;
-  }
-  recent.push(now);
-  attempts.set(ip, recent);
-  return false;
-}
-
-function clientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
-}
+const admissions = new LiveAdmissions();
 
 interface LiveRequestBody {
   apiKey?: unknown;
@@ -84,19 +90,18 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     assertApiKeyShape(body.apiKey);
   } catch (error) {
-    const message =
-      error instanceof InvalidApiKeyError ? error.message : 'The API key is not usable.';
+    const message = error instanceof InvalidApiKeyError ? error.message : 'The API key is not usable.';
     return errorResponse(400, message);
   }
-  const apiKey = body.apiKey;
+  const apiKey = body.apiKey.trim();
 
   if (typeof body.taskId !== 'string' || typeof body.strategyId !== 'string') {
-    return errorResponse(400, 'Pick a task and a strategy.');
+    return errorResponse(400, 'Pick a task and an architecture.');
   }
 
-  const model = typeof body.model === 'string' ? body.model : 'claude-sonnet-5';
-  if (!ALLOWED_MODELS.has(model)) {
-    return errorResponse(400, `Model must be one of: ${[...ALLOWED_MODELS].join(', ')}.`);
+  const model = typeof body.model === 'string' ? body.model : LIVE_DEFAULT_MODEL;
+  if (!isLiveModel(model)) {
+    return errorResponse(400, `Model must be one of: ${LIVE_MODELS.map((m) => m.id).join(', ')}.`);
   }
 
   let tasks;
@@ -105,68 +110,88 @@ export async function POST(request: NextRequest): Promise<Response> {
     tasks = getTasks([body.taskId]);
     strategies = getStrategies([body.strategyId]);
   } catch (error) {
-    return errorResponse(400, error instanceof Error ? error.message : 'Unknown selection.');
+    return errorResponse(400, redactSecrets(error instanceof Error ? error.message : 'Unknown selection.'));
   }
-  if (tasks.length !== 1 || strategies.length !== 1) {
-    return errorResponse(400, 'Pick exactly one task and one strategy.');
+  const task = tasks[0];
+  const strategy = strategies[0];
+  if (tasks.length !== 1 || strategies.length !== 1 || !task || !strategy) {
+    return errorResponse(400, 'Pick exactly one task and one architecture.');
   }
-
-  if (rateLimited(clientIp(request), Date.now())) {
+  if (task.category !== 'tool-use') {
     return errorResponse(
-      429,
-      `That is ${RATE_LIMIT_PER_HOUR} runs this hour from your address. Try again later, or run the benchmark locally.`,
+      400,
+      'The live demo runs tool-use tasks only: they are scored deterministically and need no judge.',
     );
   }
 
+  // The slot is taken before the first await, so concurrent requests cannot
+  // both see it free; every path below either hands it to the stream or
+  // releases it.
+  const admission = admissions.admit(clientBucket(request.headers), Date.now());
+  if (!admission.ok) return errorResponse(admission.status, admission.message);
+
+  // Never throws: a failed check is 'unknown' and the run proceeds.
+  if ((await checkApiKey(apiKey, request.signal)) === 'rejected') {
+    admission.release();
+    return errorResponse(401, 'Anthropic rejected this API key. Nothing was run.');
+  }
+
+  const runSetId = `live-${randomUUID()}`;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
-      const send = (event: string, data: unknown) => {
+      const write = (chunk: string) => {
         if (closed) return;
         try {
-          controller.enqueue(
-            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
-          );
+          controller.enqueue(encoder.encode(chunk));
         } catch {
           closed = true;
         }
       };
+      const send = (event: string, data: unknown) =>
+        write(`event: ${event}\ndata: ${redactSecrets(JSON.stringify(data))}\n\n`);
 
-      send('status', { phase: 'starting', task: tasks[0]?.id, strategy: strategies[0]?.id });
+      // Idle proxies cut silent connections; a comment frame keeps this one open.
+      const heartbeat = setInterval(() => write(': ping\n\n'), LIVE_HEARTBEAT_MS);
+
+      send('status', { phase: 'starting', task: task.id, strategy: strategy.id, model });
 
       try {
-        const { records } = await runMatrix({
-          runSetId: 'live-demo',
+        // `signal` is contract 2's external abort. It is typed onto the config
+        // here so it reaches the runner as soon as the runner reads it.
+        const config: RunnerConfig & { signal?: AbortSignal } = {
+          runSetId,
           strategies,
           tasks,
           model,
           effort: 'high',
           repeats: 1,
           concurrency: 1,
-          maxCostUsdPerRun: MAX_COST_USD,
-          maxWallClockMsPerRun: MAX_WALL_CLOCK_MS,
-          totalBudgetUsd: MAX_COST_USD,
+          maxCostUsdPerRun: LIVE_MAX_COST_USD,
+          maxWallClockMsPerRun: LIVE_MAX_WALL_CLOCK_MS,
+          totalBudgetUsd: LIVE_MAX_COST_USD,
           fixtureMode: 'replay',
-          fixtureDir: fixtureDirectory(),
-          judge: createJudge({ model }),
+          fixtureDir: FIXTURES_DIR,
+          judge: refusingJudge,
           judgeSamples: 1,
           // Nothing a visitor runs may reach published results.
           persist: false,
-          // The whole point: this run can only authenticate as its caller.
-          subprocessEnv: visitorEnv(apiKey),
+          subprocessEnv: liveEnv(apiKey),
           onTraceEvent: (_runId, event: TraceEvent) => send('trace', event),
-        });
+          signal: request.signal,
+        };
+        const { records } = await runMatrix(config);
 
         const record = records[0];
-        if (record) send('result', summarize(record));
+        if (record) send('result', summarizeLiveRun(record));
         else send('error', { message: 'The run produced no result.' });
       } catch (error) {
-        send('error', {
-          message: redactSecrets(error instanceof Error ? error.message : String(error)),
-        });
+        send('error', { message: error instanceof Error ? error.message : String(error) });
       } finally {
+        clearInterval(heartbeat);
+        admission.release();
         send('done', {});
         closed = true;
         try {
@@ -174,6 +199,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         } catch {
           // Already closed by the client disconnecting.
         }
+        // The runner removes each run's directory; this removes the set's.
+        await rm(path.join(SCRATCH_DIR, runSetId), { recursive: true, force: true }).catch(() => undefined);
       }
     },
   });
@@ -186,31 +213,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       'x-accel-buffering': 'no',
     },
   });
-}
-
-/** Only the fields the demo renders — deliberately not the whole record. */
-function summarize(record: RunRecord) {
-  return {
-    runId: record.runId,
-    score: record.score,
-    passed: record.passed,
-    failureMode: record.failureMode,
-    costUsd: record.costUsd,
-    judgeCostUsd: record.judgeCostUsd,
-    latencyMs: record.latencyMs,
-    turns: record.turns,
-    toolCalls: record.toolCalls,
-    deniedToolCalls: record.deniedToolCalls,
-    subagentCount: record.subagentCount,
-    breakdown: record.breakdown,
-    penalties: record.penalties,
-    finalText: redactSecrets(record.finalText),
-    phases: record.phases,
-  };
-}
-
-function fixtureDirectory(): string {
-  return `${process.cwd()}/../../fixtures`;
 }
 
 function errorResponse(status: number, message: string): Response {
