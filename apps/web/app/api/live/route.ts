@@ -141,7 +141,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           runSetId: 'live-demo',
           strategies,
           tasks,
-          model,
+          models: [model],
           effort: 'high',
           repeats: 1,
           concurrency: 1,

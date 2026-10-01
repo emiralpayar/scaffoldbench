@@ -158,7 +158,7 @@ describe('grading inside a run', () => {
       runSetId: 'judge-test',
       strategies: [answers],
       tasks: [judgedTask()],
-      model: MODEL,
+      models: [MODEL],
       effort: 'low',
       repeats: 1,
       concurrency: 1,
@@ -170,6 +170,8 @@ describe('grading inside a run', () => {
       judge,
       judgeSamples: 3,
       persist: false,
+      // One attempt: these tests are about grading, not about retrying the run.
+      retry: { maxAttempts: 1 },
       ...(subprocessEnv ? { subprocessEnv } : {}),
     });
     const record = records[0];

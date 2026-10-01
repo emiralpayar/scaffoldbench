@@ -69,6 +69,32 @@ describe('buildScore', () => {
     expect(buildScore({ breakdown: [item('a', 1, 0)] }).failureMode).toBe('wrong_answer');
   });
 
+  it('blames a soft penalty when it alone cost the pass', () => {
+    const citation: Penalty = {
+      id: 'citation-integrity',
+      label: 'cited unopened pages',
+      kind: 'hallucinated_citation',
+      multiplier: 0.75,
+    };
+    const rule: Penalty = { id: 'r', label: 'r', kind: 'unsafe_action', multiplier: 0.5 };
+
+    expect(buildScore({ breakdown: [item('a', 1, 1)], penalties: [citation] }).failureMode).toBe(
+      'hallucinated_citation',
+    );
+    // The heaviest penalty names the failure.
+    expect(
+      buildScore({ breakdown: [item('a', 1, 1)], penalties: [citation, rule] }).failureMode,
+    ).toBe('policy_violation');
+  });
+
+  it('calls it a wrong answer when assertions were missed as well as penalised', () => {
+    const score = buildScore({
+      breakdown: [item('a', 1, 1), item('b', 1, 0)],
+      penalties: [{ id: 'c', label: 'c', kind: 'hallucinated_citation', multiplier: 0.75 }],
+    });
+    expect(score.failureMode).toBe('wrong_answer');
+  });
+
   it('honours an explicit failure mode from the runner', () => {
     const score = buildScore({ breakdown: [item('a', 1, 0)], failureMode: 'timeout' });
     expect(score.failureMode).toBe('timeout');

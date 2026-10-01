@@ -4,7 +4,14 @@ import { SANDBOX_DENYLIST } from './guard';
 import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
 import { CallMeter } from './meter';
 import { SCHEMA_MIN_TURNS, parseLooseJson } from './runQuery';
-import type { ApiError, Judge, JudgeCallOptions, JudgeRequest, JudgeResponse } from './types';
+import type {
+  ApiError,
+  Judge,
+  JudgeCallOptions,
+  JudgeInfo,
+  JudgeRequest,
+  JudgeResponse,
+} from './types';
 
 /**
  * Grading effort when none is given. Pinned rather than left to the SDK, whose
@@ -53,16 +60,30 @@ export class JudgeError extends Error {
 }
 
 /**
+ * A judge that says which model grades and at what effort, which the runner
+ * records in the manifest. Taken from the judge itself rather than passed
+ * alongside it, so the record cannot drift from what actually graded.
+ */
+export type DescribedJudge = Judge & { readonly info: JudgeInfo };
+
+/** The judge's own description, when it has one. */
+export function judgeInfoOf(judge: Judge): JudgeInfo | undefined {
+  const info = (judge as Partial<DescribedJudge>).info;
+  return info && typeof info.model === 'string' ? info : undefined;
+}
+
+/**
  * A tool-less, structured-output model call used for rubric grading.
  *
  * Judge spend is reported separately from strategy spend everywhere in the
  * pipeline. Folding grading cost into a strategy's cost would make an
  * architecture look expensive for reasons that have nothing to do with it.
  */
-export function createJudge(options: JudgeOptions): Judge {
+export function createJudge(options: JudgeOptions): DescribedJudge {
   const timeoutMs = options.timeoutMs ?? DEFAULT_JUDGE_TIMEOUT_MS;
+  const effort = options.effort ?? DEFAULT_JUDGE_EFFORT;
 
-  return async function judge<T>(
+  const judge = async function judge<T>(
     req: JudgeRequest,
     call: JudgeCallOptions = {},
   ): Promise<JudgeResponse<T>> {
@@ -85,7 +106,7 @@ export function createJudge(options: JudgeOptions): Judge {
         options: {
           ...hermeticOptions(),
           model: options.model,
-          effort: options.effort ?? DEFAULT_JUDGE_EFFORT,
+          effort,
           systemPrompt: req.system,
           // No built-in tools and no MCP servers: the judge reads and answers.
           // The structured-output tool is how it answers.
@@ -136,6 +157,8 @@ export function createJudge(options: JudgeOptions): Judge {
     }
     return { value: value as T, costUsd };
   };
+
+  return Object.assign(judge, { info: { model: options.model, effort } });
 }
 
 /**

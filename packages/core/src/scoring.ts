@@ -40,14 +40,11 @@ export interface BuildScoreOptions {
 
 export function buildScore(options: BuildScoreOptions): TaskScore {
   const penalties = options.penalties ?? [];
-  const { score } = computeScore(options.breakdown, penalties);
+  const { raw, score } = computeScore(options.breakdown, penalties);
   const passed = score >= PASS_THRESHOLD;
 
   let failureMode: FailureMode = options.failureMode ?? 'none';
-  if (failureMode === 'none' && !passed) {
-    const hardPenalty = penalties.find((p) => p.multiplier === 0);
-    failureMode = hardPenalty ? mapPenaltyToFailure(hardPenalty) : 'wrong_answer';
-  }
+  if (failureMode === 'none' && !passed) failureMode = inferFailure(raw, penalties);
 
   return {
     score,
@@ -59,15 +56,35 @@ export function buildScore(options: BuildScoreOptions): TaskScore {
   };
 }
 
-function mapPenaltyToFailure(penalty: Penalty): FailureMode {
+/**
+ * Name what cost a run its pass, from the score alone.
+ *
+ * A hard penalty decides it outright. Otherwise a penalty is the cause only
+ * when every assertion held and the penalties alone pulled the score under the
+ * threshold — an answer that met its whole rubric but cited a page it never
+ * opened failed for the citation, not for being wrong. When assertions were
+ * missed as well, the answer itself fell short.
+ */
+function inferFailure(raw: number, penalties: readonly Penalty[]): FailureMode {
+  const hard = penalties.find((p) => clamp01(p.multiplier) === 0);
+  if (hard) return failureForPenalty(hard);
+
+  if (raw >= PASS_THRESHOLD && penalties.length > 0) {
+    const heaviest = penalties.reduce((worst, p) =>
+      clamp01(p.multiplier) < clamp01(worst.multiplier) ? p : worst,
+    );
+    return failureForPenalty(heaviest);
+  }
+  return 'wrong_answer';
+}
+
+function failureForPenalty(penalty: Penalty): FailureMode {
   switch (penalty.kind) {
     case 'policy_violation':
     case 'unsafe_action':
       return 'policy_violation';
     case 'hallucinated_citation':
-      return 'wrong_answer';
-    default:
-      return 'wrong_answer';
+      return 'hallucinated_citation';
   }
 }
 

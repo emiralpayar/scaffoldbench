@@ -237,7 +237,7 @@ async function runCommand(args: RunArgs): Promise<number> {
     runSetId,
     strategies,
     tasks,
-    model: args.model,
+    models: [args.model],
     effort: args.effort,
     repeats: args.repeats,
     concurrency: args.concurrency,

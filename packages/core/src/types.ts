@@ -121,15 +121,38 @@ export interface Penalty {
   detail?: string;
 }
 
+/**
+ * Why a run did not pass.
+ *
+ * Every member is produced by the pipeline; none exists only to decorate demo
+ * data. `buildScore` produces the first four, the runner the rest. The last
+ * two are failures of the harness or of the infrastructure, never of the
+ * architecture under test, and a record carrying either always has
+ * `integrity.ok === false`.
+ */
 export type FailureMode =
+  /** The run passed. */
   | 'none'
-  | 'timeout'
-  | 'budget_exceeded'
-  | 'max_turns'
-  | 'tool_error_loop'
-  | 'policy_violation'
-  | 'gave_up'
+  /** The final state or answer fell short, and nothing more specific explains why. */
   | 'wrong_answer'
+  /** A domain rule was broken: a hard penalty, or a rule penalty that alone cost the pass. */
+  | 'policy_violation'
+  /** Every rubric item held, but the answer cited pages the agent never opened. */
+  | 'hallucinated_citation'
+  /**
+   * A phase that was working the task with its tools ran out of turns (the
+   * SDK's `error_max_turns`) and the run did not pass.
+   */
+  | 'max_turns'
+  /** The run hit its per-run cost ceiling before it could finish. */
+  | 'budget_exceeded'
+  /** The run hit its per-run wall-clock ceiling before it could finish. */
+  | 'timeout'
+  /**
+   * The harness failed: the environment, the strategy or the grader threw, a
+   * task tool server never connected, the guard blocked a tool the harness
+   * itself offered, or the grader never returned a usable verdict.
+   */
   | 'harness_error'
   /**
    * The infrastructure failed — authentication, a rate limit, an overloaded
@@ -259,6 +282,33 @@ export interface Strategy {
   /** One paragraph, rendered on the site next to the leaderboard row. */
   description: string;
   run(ctx: RunContext): Promise<StrategyOutcome>;
+  /**
+   * The architecture's own invariants, checked after every run: the plan was
+   * not empty, the fan-out happened, the selector's choice was readable, and
+   * so on. The runner adds these to its harness checks in
+   * `RunRecord.integrity`, and a failing one keeps the run out of the
+   * rankings: a run in which the architecture silently degraded into another
+   * one measured the wrong thing.
+   *
+   * Ids should be stable and specific to the strategy (`plan-execute.plan`).
+   * Not called when `run` threw.
+   */
+  fidelityChecks?(input: FidelityInput): IntegrityCheck[];
+}
+
+/** What a strategy's `fidelityChecks` gets to inspect. */
+export interface FidelityInput {
+  task: Task;
+  env: TaskEnvironment;
+  outcome: StrategyOutcome;
+  /** Everything the run's calls recorded, `phase_end` metadata included. */
+  trace: readonly TraceEvent[];
+  /**
+   * Set when the run was cut short by its cost or wall-clock ceiling. Phases
+   * after the cut never ran, which is the run's failure, not a lapse of
+   * fidelity: a check about a phase that never got to run should pass.
+   */
+  stoppedBy?: BudgetStopReason;
 }
 
 /** One verified property of a run. */
@@ -458,8 +508,15 @@ export interface RunRecord {
   model: string;
   effort: EffortLevel;
   repeat: number;
+  /** When the recorded attempt started building its environment. */
   startedAt: string;
   finishedAt: string;
+  /**
+   * Wall-clock time of the strategy alone, from `strategy.run` to its return.
+   * Building the environment and grading are timed separately (`setupMs`,
+   * `gradingMs`), so a slow judge never makes an architecture look slow.
+   * (Run sets from before those fields existed timed the whole cell.)
+   */
   latencyMs: number;
   score: number;
   passed: boolean;
@@ -467,6 +524,7 @@ export interface RunRecord {
   penalties: Penalty[];
   failureMode: FailureMode;
   scoreMetadata: Record<string, unknown>;
+  /** What the recorded attempt's model calls cost, aborted and crashed calls included. */
   costUsd: number;
   /** Cost of the judge calls, tracked separately so it never skews strategy cost. */
   judgeCostUsd: number;
@@ -479,6 +537,62 @@ export interface RunRecord {
   finalText: string;
   error?: string;
   traceFile?: string;
+
+  // The fields below are always written by the current runner. They are
+  // optional because records from earlier run sets do not have them.
+
+  /** Building the task environment, in milliseconds. */
+  setupMs?: number;
+  /** Scoring, judge calls included, in milliseconds. */
+  gradingMs?: number;
+  /**
+   * How many times this cell was executed. Above 1 when transient API
+   * failures forced a retry; only the last attempt is recorded.
+   */
+  attempts?: number;
+  /**
+   * What the discarded attempts spent, agent and judge together. Kept out of
+   * `costUsd` so infrastructure trouble never makes an architecture look
+   * expensive, and counted in the run set's totals and total budget.
+   */
+  discardedCostUsd?: number;
+  /** The infrastructure failure behind an `api_error` record. */
+  apiError?: ApiError;
+  /**
+   * Whether this run measured the architecture it claims to. A record with
+   * `integrity.ok === false` must not be ranked; see `Integrity`.
+   */
+  integrity?: Integrity;
+}
+
+/** How a run set's session ended, or that it is still going. */
+export type RunSetStatus = 'running' | 'interrupted' | 'complete';
+
+/** Why a session stopped before reaching every cell. */
+export type RunSetStopReason =
+  /** The caller's abort signal: in-flight runs were cut off and discarded. */
+  | 'signal'
+  /** The caller's drain signal: in-flight runs finished, nothing new started. */
+  | 'drain'
+  /** The next run's cap no longer fit in the total budget. */
+  | 'total_budget'
+  /** The API rejected the credentials, so every further run would have failed. */
+  | 'auth';
+
+/** Transient API failures are retried by re-running the whole cell. */
+export interface RetryPolicy {
+  /** Most times one cell is executed; 1 disables retries. */
+  maxAttempts: number;
+  /** Delay before the first retry. It doubles with each retry, with jitter. */
+  baseDelayMs: number;
+  /** Ceiling on a single delay. */
+  maxDelayMs: number;
+}
+
+/** What a judge says about itself, so a manifest can record how grading was done. */
+export interface JudgeInfo {
+  model: string;
+  effort: EffortLevel;
 }
 
 /** Where and with what a session ran: enough to reproduce it or to doubt it. */
@@ -499,11 +613,28 @@ export interface Provenance {
   argv: string[];
 }
 
+/** One earlier session of a run set that was resumed. */
+export interface ManifestSession {
+  startedAt: string;
+  finishedAt?: string;
+  status?: RunSetStatus;
+  stoppedBy?: RunSetStopReason;
+  durationMs: number;
+  concurrency?: number;
+  provenance?: Provenance;
+}
+
 export interface RunSetManifest {
   runSetId: string;
+  /** When the run set's first session started. */
   createdAt: string;
   finishedAt?: string;
+  /** Legacy alias of `provenance.gitSha`. */
   gitSha: string | null;
+  /**
+   * The model under test; for a run set over several models, their ids joined
+   * with ", ". Kept for readers that predate `models`.
+   */
   model: string;
   effort: EffortLevel;
   repeats: number;
@@ -511,12 +642,45 @@ export interface RunSetManifest {
   strategyIds: string[];
   taskIds: string[];
   totalRuns: number;
+  /** Cells of the matrix that have a record. */
   completedRuns: number;
   totalCostUsd: number;
   totalJudgeCostUsd: number;
+  /** Total time spent in sessions of this run set. */
   durationMs: number;
   maxCostUsdPerRun: number;
   notes?: string;
+
+  // The fields below are always written by the current runner. They are
+  // optional because earlier run sets do not have them.
+
+  /**
+   * `running` while a session is in progress (also what a crashed session
+   * leaves behind), `interrupted` when it stopped before reaching every cell
+   * (`stoppedBy` says why), `complete` when it reached them all.
+   */
+  status?: RunSetStatus;
+  stoppedBy?: RunSetStopReason;
+  /** When the current (latest) session started. */
+  startedAt?: string;
+  /** Model ids, in matrix order. */
+  models?: string[];
+  maxWallClockMsPerRun?: number;
+  totalBudgetUsd?: number;
+  concurrency?: number;
+  /** Grading settings. `model` and `effort` are null for a judge that does not describe itself. */
+  judge?: { model: string | null; effort: EffortLevel | null; samples: number };
+  retry?: RetryPolicy;
+  /**
+   * Spend that no record's `costUsd` or `judgeCostUsd` shows: attempts retried
+   * after a transient API error (see `RunRecord.discardedCostUsd`), and runs a
+   * hard stop cut off and discarded.
+   */
+  totalDiscardedCostUsd?: number;
+  /** The current session's provenance. */
+  provenance?: Provenance;
+  /** Earlier sessions, oldest first, when the run set was resumed. */
+  previousSessions?: ManifestSession[];
   /**
    * True for fabricated run sets used to develop the site.
    *

@@ -229,7 +229,7 @@ async function main(): Promise<void> {
         totalCostUsd += costUsd;
         totalJudgeCostUsd += judgeCostUsd;
 
-        const runId = makeRunId({ strategyId: strategy.id, taskId: task.id, repeat });
+        const runId = makeRunId({ model: MODEL, strategyId: strategy.id, taskId: task.id, repeat });
         const failureMode = pickFailureMode(score, rng);
 
         const record: RunRecord = {

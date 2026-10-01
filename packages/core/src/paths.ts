@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,7 +55,27 @@ export const REPO_ROOT = resolveRepoRoot();
 
 export const RESULTS_DIR = path.join(REPO_ROOT, 'results');
 export const FIXTURES_DIR = path.join(REPO_ROOT, 'fixtures');
-export const SCRATCH_DIR = path.join(REPO_ROOT, '.arena-scratch');
+
+/**
+ * What a run set id may look like: a letter or digit, then letters, digits,
+ * dots, dashes and underscores. The id becomes a directory under `results/`,
+ * so anything that could climb out of it (`../`, an absolute path, a
+ * separator) is refused rather than resolved.
+ */
+const RUN_SET_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
+export function isValidRunSetId(runSetId: string): boolean {
+  return RUN_SET_ID.test(runSetId);
+}
+
+export function assertValidRunSetId(runSetId: string): void {
+  if (!isValidRunSetId(runSetId)) {
+    throw new Error(
+      `Invalid run set id ${JSON.stringify(runSetId)}: use up to 100 letters, digits, dots, ` +
+        'dashes and underscores, starting with a letter or digit.',
+    );
+  }
+}
 
 /**
  * Every path helper takes an optional root so a run set can be written
@@ -86,15 +106,26 @@ export function latestPointerPath(root: string = RESULTS_DIR): string {
   return path.join(root, 'latest.json');
 }
 
-export const LATEST_POINTER = latestPointerPath();
-
 export async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
 }
 
+/**
+ * Write JSON atomically: to a temporary file beside the target, then renamed
+ * over it. A run set is read while it is being written — the manifest is
+ * rewritten after every run, and a resumed session reads every record — so a
+ * reader must never see half a file, not even when the writer is killed.
+ */
 export async function writeJson(file: string, value: unknown): Promise<void> {
   await ensureDir(path.dirname(file));
-  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  const temporary = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  try {
+    await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    await rename(temporary, file);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function readJson<T>(file: string): Promise<T> {
@@ -121,10 +152,30 @@ export function makeRunSetId(now: Date = new Date(), suffix?: string): string {
   return `${stamp}-${suffix ?? Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function makeRunId(parts: {
+/** The coordinates of one cell of the matrix. */
+export interface CellCoordinates {
+  model: string;
   strategyId: string;
   taskId: string;
   repeat: number;
-}): string {
-  return `${parts.strategyId}__${parts.taskId}__r${parts.repeat}`;
+}
+
+/**
+ * `claude-sonnet-5-5__single__airline-easy__r1`, unique within a run set.
+ *
+ * Also the file name of the cell's record and trace, so the model id is
+ * reduced to filename- and URL-safe characters: ids such as
+ * `claude-opus-4-6[1m]` exist.
+ */
+export function makeRunId(cell: CellCoordinates): string {
+  const model = cell.model.replace(/[^A-Za-z0-9._-]+/g, '-');
+  return `${model}__${cell.strategyId}__${cell.taskId}__r${cell.repeat}`;
+}
+
+/**
+ * `model|strategy|task|repeat`: identifies a cell regardless of how its run id
+ * was spelled, which is what resuming a run set matches on.
+ */
+export function cellKey(cell: CellCoordinates): string {
+  return `${cell.model}|${cell.strategyId}|${cell.taskId}|${cell.repeat}`;
 }
