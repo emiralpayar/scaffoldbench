@@ -31,9 +31,8 @@ import {
 
 export const AIRLINE_INSTRUCTIONS = [
   'Reservation system for a regional airline.',
-  'All amounts are integer cents. Dates are YYYY-MM-DD.',
+  'All amounts are integer cents. Dates are YYYY-MM-DD and times are local to the departure airport.',
   'Reads never change anything; every mutating tool reports exactly what it changed.',
-  'Fee and refund amounts are never computed for you: read the rule tools and work them out.',
 ].join(' ');
 
 const cabinSchema = z.enum(['basic_economy', 'economy', 'premium_economy', 'business']);
@@ -89,9 +88,6 @@ function describeReservation(world: AirlineWorld, reservation: Reservation): str
     `  booked_on: ${reservation.bookedOn}`,
     '  segments:',
     segments,
-    // The tier lives on the passenger record, not here, so working out an
-    // allowance or a fee waiver always costs a second lookup.
-    '  note: frequent-flyer tier is on the passenger record, use get_passenger.',
   ].join('\n');
 }
 
@@ -143,8 +139,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
     },
     {
       name: 'get_passenger',
-      description:
-        'Read a passenger profile, including the frequent-flyer tier that drives allowances and fee waivers.',
+      description: 'Read a passenger profile: name, frequent-flyer tier and contact details.',
       readOnly: true,
       schema: { passengerId: z.string().describe('Passenger id, e.g. P-1001') },
       handler: ({ passengerId }: { passengerId: string }) => {
@@ -262,7 +257,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
     {
       name: 'get_refund_policy',
       description:
-        'Read the refund policy as it applies to one reservation, with the current date. Required before any refund.',
+        'Read the refund policy as it applies to one reservation, with the current date.',
       readOnly: true,
       schema: { reservationId: z.string() },
       handler: ({ reservationId }: { reservationId: string }) => {
@@ -408,11 +403,9 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
 
         return [
           `Reservation ${reservationId} segment ${index}: ${previousFlightId} -> ${target.id}`,
-          `  cabin: ${previousCabin} -> ${newCabin}`,
-          `  new route: ${target.origin}->${target.destination} ${target.date} dep ${target.departureTime}`,
-          `  new fare in ${newCabin}: ${targetCabin.fareCents} cents (${formatCents(targetCabin.fareCents)})`,
-          `  fare originally paid: ${reservation.paidCents} cents (${formatCents(reservation.paidCents)})`,
-          '  no money has moved; settle any fee or fare difference with charge_fee.',
+          `  cabin: ${previousCabin === newCabin ? `${newCabin} (unchanged)` : `${previousCabin} -> ${newCabin}`}`,
+          `  now: ${target.origin}->${target.destination} ${target.date} dep ${target.departureTime}`,
+          '  No money was moved.',
         ].join('\n');
       },
     },
@@ -435,11 +428,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         }
         reservation.status = 'cancelled';
 
-        return [
-          `Reservation ${reservationId} is cancelled and its seats are released.`,
-          `  fare paid: ${reservation.paidCents} cents (${formatCents(reservation.paidCents)})`,
-          '  no money has moved yet; close the reservation out with issue_refund or record_non_refundable.',
-        ].join('\n');
+        return `Reservation ${reservationId} is cancelled and its seats are released. No money was moved.`;
       },
     },
     {

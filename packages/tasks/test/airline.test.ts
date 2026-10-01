@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ScoreInput, TaskEnvironment, ToolCall } from '@arena/core';
 import {
   airlineEasyTask,
   airlineHardTask,
@@ -11,6 +10,13 @@ import {
   findReservation,
   type AirlineWorld,
 } from '../src/worlds/airline';
+import {
+  createDriver,
+  environmentOptions,
+  penaltyIds,
+  scoreInput,
+  type Driver as HarnessDriver,
+} from './harness';
 
 const READ_ONLY_TOOLS = [
   'get_reservation',
@@ -34,79 +40,14 @@ const MUTATING_TOOLS = [
   'update_passenger',
 ];
 
-/**
- * Drives the tool handlers exactly as the journaling MCP wrapper would, without
- * the SDK in the loop. The world the driver mutates is the same object the
- * scorer is later handed, which is what makes these tests end-to-end.
- */
-interface Driver {
-  world: AirlineWorld;
-  journal: ToolCall[];
-  call(name: string, args?: Record<string, unknown>): Promise<string>;
-  expectError(name: string, args?: Record<string, unknown>): Promise<string>;
-}
+type Driver = HarnessDriver<AirlineWorld>;
 
 function drive(): Driver {
   const world = createAirlineWorld();
-  const journal: ToolCall[] = [];
-  const byName = new Map(createAirlineTools(world).map((spec) => [spec.name, spec] as const));
-
-  async function invoke(name: string, args: Record<string, unknown>) {
-    const spec = byName.get(name);
-    if (!spec) throw new Error(`unknown tool in test: ${name}`);
-    const reply = await spec.handler(args);
-    const text = typeof reply === 'string' ? reply : reply.text;
-    const ok = typeof reply === 'string' ? true : reply.isError !== true;
-    journal.push({ name, args, tMs: journal.length, ok, result: text });
-    return { text, ok };
-  }
-
-  return {
-    world,
-    journal,
-    async call(name, args = {}) {
-      const { text, ok } = await invoke(name, args);
-      if (!ok) throw new Error(`tool ${name} failed unexpectedly: ${text}`);
-      return text;
-    },
-    async expectError(name, args = {}) {
-      const { text, ok } = await invoke(name, args);
-      expect(ok, `expected ${name} to report an error, got: ${text}`).toBe(false);
-      return text;
-    },
-  };
+  return createDriver(world, createAirlineTools(world));
 }
 
-function scoreInput(driver: Driver): ScoreInput {
-  const env: TaskEnvironment = {
-    mcpServers: {},
-    allowedTools: [],
-    readOnlyTools: [],
-    state: driver.world,
-    journal: driver.journal,
-  };
-  return {
-    env,
-    outcome: { finalText: '', subagentCount: 0, phases: [] },
-    trace: [],
-    deps: {
-      judge: async () => {
-        throw new Error('tool-use tasks must not call the judge');
-      },
-      judgeSamples: 1,
-    },
-  };
-}
-
-function penaltyIds(score: { penalties: { id: string }[] }): string[] {
-  return score.penalties.map((penalty) => penalty.id);
-}
-
-const opts = () => ({
-  cwd: '/tmp/arena-airline-test',
-  fixtureMode: 'replay' as const,
-  fixtureDir: '/tmp/arena-airline-fixtures',
-});
+const opts = environmentOptions;
 
 // ---------------------------------------------------------------------------
 // World
@@ -233,6 +174,17 @@ describe('airline tool error handling', () => {
     expect(text).toMatch(/0 flight/i);
   });
 
+  it('reports what changed without narrating the next step or pre-computing money', async () => {
+    const d = drive();
+    const reservation = await d.call('get_reservation', { reservationId: 'R2087' });
+    expect(reservation).not.toMatch(/get_passenger|tier/i);
+    const changed = await d.call('change_flight', { reservationId: 'R2087', newFlightId: 'AA204' });
+    expect(changed).toContain('AA210 -> AA204');
+    expect(changed).not.toMatch(/fare|charge_fee|settle/i);
+    const cancelled = await d.call('cancel_reservation', { reservationId: 'R3311' });
+    expect(cancelled).not.toMatch(/issue_refund|record_non_refundable|fare paid/i);
+  });
+
   it('releases the seat back to inventory when a reservation is cancelled', async () => {
     const d = drive();
     await d.call('cancel_reservation', { reservationId: 'R3311' });
@@ -259,6 +211,13 @@ describe('airline tasks', () => {
       expect(task.policy?.length ?? 0).toBeGreaterThan(80);
       expect(task.maxTurns).toBeGreaterThan(8);
     }
+  });
+
+  it('gives every task the same handbook, which names no task-specific record', () => {
+    const policies = new Set(airlineTasks.map((task) => task.policy));
+    expect(policies.size).toBe(1);
+    const handbook = airlineTasks[0]?.policy ?? '';
+    expect(handbook).not.toMatch(/R\d{4}|P-\d{4}|AA\d+|UA\d+|gold|platinum|silver/);
   });
 
   it('builds an environment whose read-only tools are a subset of the allowlist', async () => {
@@ -365,7 +324,18 @@ describe('airline-easy', () => {
     await d.call('cancel_reservation', { reservationId: 'R4055' });
 
     const score = await airlineEasyTask.score(scoreInput(d));
-    expect(penaltyIds(score)).toContain('stray-mutation');
+    expect(penaltyIds(score)).toContain('out-of-scope-change');
+    expect(score.penalties[0]?.detail).toContain('reservations[R4055].status');
+    expect(score.score).toBe(0);
+  });
+
+  it('hard-fails when another passenger record is edited on the side', async () => {
+    const d = await goldenPath();
+    await d.call('update_passenger', { passengerId: 'P-1003', email: 'hijack@example.com' });
+
+    const score = await airlineEasyTask.score(scoreInput(d));
+    expect(penaltyIds(score)).toEqual(['out-of-scope-change']);
+    expect(score.penalties[0]?.detail).toContain('passengers[P-1003].email');
     expect(score.score).toBe(0);
   });
 });
@@ -480,10 +450,48 @@ describe('airline-medium', () => {
     expect(score.passed).toBe(false);
   });
 
+  it('halves the score when the earliest seat is found by trial and error at the booking tool', async () => {
+    const d = drive();
+    await d.call('get_reservation', { reservationId: 'R2087' });
+    await d.call('get_passenger', { passengerId: 'P-1002' });
+    await d.call('get_fare_rules', { cabin: 'economy' });
+    await d.expectError('change_flight', { reservationId: 'R2087', newFlightId: 'UA88' });
+    await d.expectError('change_flight', { reservationId: 'R2087', newFlightId: 'AA918' });
+    await d.call('change_flight', { reservationId: 'R2087', newFlightId: 'AA204' });
+    await d.call('charge_fee', {
+      reservationId: 'R2087',
+      category: 'fare_difference',
+      amountCents: 8000,
+    });
+
+    const score = await airlineMediumTask.score(scoreInput(d));
+    expect(penaltyIds(score)).toEqual(['booked-without-checking-availability']);
+    expect(score.penalties[0]?.detail).toBe('Booked without looking: UA88, AA918, AA204.');
+    expect(score.score).toBe(0.5);
+  });
+
+  it('accepts availability read flight by flight instead of by search', async () => {
+    const d = drive();
+    await d.call('get_reservation', { reservationId: 'R2087' });
+    await d.call('get_fare_rules', { cabin: 'economy' });
+    for (const flightId of ['UA88', 'AA918', 'AA204']) await d.call('get_flight', { flightId });
+    await d.call('change_flight', { reservationId: 'R2087', newFlightId: 'AA204' });
+    await d.call('charge_fee', {
+      reservationId: 'R2087',
+      category: 'fare_difference',
+      amountCents: 8000,
+    });
+
+    const score = await airlineMediumTask.score(scoreInput(d));
+    expect(score.penalties).toEqual([]);
+    expect(score.score).toBe(1);
+  });
+
   it('withholds the money assertion when the fare difference is not collected', async () => {
     const d = drive();
     await d.call('get_reservation', { reservationId: 'R2087' });
     await d.call('get_fare_rules', { cabin: 'economy' });
+    await d.call('get_flight', { flightId: 'AA204' });
     await d.call('change_flight', { reservationId: 'R2087', newFlightId: 'AA204' });
 
     const score = await airlineMediumTask.score(scoreInput(d));
@@ -592,6 +600,19 @@ describe('airline-hard', () => {
     expect(score.breakdown.find((item) => item.id === 'travel-credit-exact')?.earned).toBe(0);
     expect(score.breakdown.find((item) => item.id === 'reservation-cancelled')?.earned).toBe(1);
     expect(score.passed).toBe(false);
+  });
+
+  it('hard-fails when money is moved on another reservation as well', async () => {
+    const d = await goldenPath();
+    await d.call('issue_refund', {
+      reservationId: 'R4055',
+      amountCents: 1000,
+      method: 'original_payment',
+    });
+
+    const score = await airlineHardTask.score(scoreInput(d));
+    expect(penaltyIds(score)).toEqual(['out-of-scope-change']);
+    expect(score.score).toBe(0);
   });
 
   it('rejects a settlement that mixes a travel credit with a service fee', async () => {
