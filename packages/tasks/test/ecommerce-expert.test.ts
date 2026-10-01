@@ -10,6 +10,7 @@ import {
   backorderOracle,
   backorderPriority,
   createBackorderWorld,
+  settledBackorderWorld,
   createEcommerceOpsTools,
   createInboxWorld,
   createReturnsWorld,
@@ -23,6 +24,7 @@ import {
   findOrder,
   findProduct,
   returnsOracle,
+  settledReturnsWorld,
   type BackorderOutcome,
   type EcommerceOpsWorld,
   type ReturnSettlement,
@@ -148,7 +150,9 @@ describe('ecommerce expert tier', () => {
 // ---------------------------------------------------------------------------
 
 describe('ecommerce-backorder-allocation', () => {
-  const PLAN = backorderOracle(createBackorderWorld());
+  const PLAN = backorderOracle(settledBackorderWorld(createBackorderWorld()));
+  /** The plan an agent makes from the stock it sees at the start, before the early delivery. */
+  const STALE_PLAN = backorderOracle(createBackorderWorld());
   const ORDERS = backorderPriority(createBackorderWorld()).map((entry) => entry.id);
 
   it('derives the pinned priority, allocation and promise dates from the seed', () => {
@@ -167,17 +171,49 @@ describe('ecommerce-backorder-allocation', () => {
       'O-5202 L1+L2',
       'O-5203 L1',
       'O-5204 L1',
-      'O-5206 - L1@2026-08-06,L2@2026-08-06',
+      'O-5206 - L1@2026-08-14,L2@2026-08-14',
       'O-5207 L1+L2',
       'O-5208 - L1@2026-08-05',
-      'O-5209 - L1@2026-08-03',
+      'O-5209 L1',
       'O-5210 L1',
-      'O-5211 - L1@2026-08-03',
+      'O-5211 L1',
       'O-5212 - L1@2026-08-05',
       'O-5213 - L1@2026-08-14',
       'O-5214 - L1@2026-08-19',
-      'O-5215 - L1@2026-08-14',
+      'O-5215 L1',
     ]);
+  });
+
+  it('reaches the same allocation walking before and after the early delivery as in one walk', () => {
+    // First walk: the seven docks on hand. Second walk: the four that arrive, over what still waits.
+    const before = new Set(STALE_PLAN.flatMap((entry) => entry.allocated.map((id) => `${entry.orderId}/${id}`)));
+    const world = createBackorderWorld();
+    for (const entry of STALE_PLAN) {
+      for (const id of entry.allocated) world.orders.find((o) => o.id === entry.orderId)!.lines.find((l) => l.id === id)!.status = 'pending';
+    }
+    for (const product of world.products) {
+      const used = STALE_PLAN.flatMap((entry) =>
+        entry.allocated.map((id) => world.orders.find((o) => o.id === entry.orderId)!.lines.find((l) => l.id === id)!),
+      )
+        .filter((entry) => entry.productId === product.id)
+        .reduce((total, entry) => total + entry.quantity, 0);
+      product.stock -= used;
+    }
+    const after = backorderOracle(settledBackorderWorld(world));
+    const twoStep = new Set([...before, ...after.flatMap((entry) => entry.allocated.map((id) => `${entry.orderId}/${id}`))]);
+    const oneWalk = new Set(PLAN.flatMap((entry) => entry.allocated.map((id) => `${entry.orderId}/${id}`)));
+    expect([...twoStep].sort()).toEqual([...oneWalk].sort());
+  });
+
+  it('receives the early delivery once enough lines are allocated, saying nothing', async () => {
+    const d = drive(ecommerceBackordersSpec);
+    await d.call('allocate_stock', { orderId: 'O-5201', lineIds: ['L1'] });
+    await d.call('allocate_stock', { orderId: 'O-5202', lineIds: ['L1', 'L2'] });
+    expect(findProduct(d.world, 'P-DOC')?.stock).toBe(4);
+    const reply = await d.call('allocate_stock', { orderId: 'O-5203', lineIds: ['L1'] });
+    expect(reply).not.toMatch(/PO-91|deliver/i);
+    expect(findProduct(d.world, 'P-DOC')?.stock).toBe(8);
+    expect(await d.call('list_purchase_orders', { productId: 'P-DOC' })).toContain('PO-91 product=P-DOC qty=4 status=received');
   });
 
   /** Reference solution: read everything, allocate down the list, promise, then notify. */
@@ -266,11 +302,23 @@ describe('ecommerce-backorder-allocation', () => {
 
   it('trap stops-at-first-miss: a dock left on the shelf is caught', async () => {
     const d = drive(ecommerceBackordersSpec);
-    await solve(d, replace({ 'O-5210': { allocated: [], promised: { L1: '2026-08-03' } } }));
+    await solve(d, replace({ 'O-5215': { allocated: [], promised: { L1: '2026-08-14' } } }));
     const result = await score(ecommerceBackordersTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(expect.arrayContaining(['outcome:O-5210', 'stock-used']));
+    expect(missed(result)).toEqual(expect.arrayContaining(['outcome:O-5215', 'stock-used']));
     expect(firedTraps(ecommerceBackordersTask, result)).toEqual(['stops-at-first-miss']);
+  });
+
+  it('trap mid-run-delivery: the plan made before the early delivery leaves docks and orders waiting', async () => {
+    const d = drive(ecommerceBackordersSpec);
+    await solve(d, STALE_PLAN);
+    const result = await score(ecommerceBackordersTask, d);
+    expect(findProduct(d.world, 'P-DOC')?.stock).toBe(4);
+    expect(missed(result)).toEqual(
+      expect.arrayContaining(['outcome:O-5209', 'outcome:O-5211', 'outcome:O-5215', 'stock-used']),
+    );
+    expect(firedTraps(ecommerceBackordersTask, result)).toContain('mid-run-delivery');
+    expect(result.score).toBeLessThan(0.8);
   });
 
   it('trap ship-complete: a dock given to the order still waiting for its hub is caught', async () => {
@@ -290,7 +338,7 @@ describe('ecommerce-backorder-allocation', () => {
 
   it('traps ship-complete-date and flat-promise-date: every waiting line promised for the next delivery', async () => {
     const d = drive(ecommerceBackordersSpec);
-    const next: Record<string, string> = { 'P-DOC': '2026-08-03', 'P-MON': '2026-08-05', 'P-HUB': '2026-08-06' };
+    const next: Record<string, string> = { 'P-DOC': '2026-08-14', 'P-MON': '2026-08-05', 'P-HUB': '2026-08-06' };
     await solve(
       d,
       PLAN.map((entry) => ({
@@ -305,9 +353,8 @@ describe('ecommerce-backorder-allocation', () => {
     );
     const result = await score(ecommerceBackordersTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(
-      expect.arrayContaining(['promised:O-5206', 'promised:O-5213', 'promised:O-5214', 'promised:O-5215']),
-    );
+    // The customer is told the wrong date too.
+    expect(missed(result)).toEqual(['promised:O-5206', 'promised:O-5214', 'notified:O-5214']);
     expect(firedTraps(ecommerceBackordersTask, result)).toEqual(['ship-complete-date', 'flat-promise-date']);
   });
 
@@ -315,13 +362,15 @@ describe('ecommerce-backorder-allocation', () => {
     const d = drive(ecommerceBackordersSpec);
     await solve(d, PLAN.filter((entry) => !['O-5211', 'O-5212'].includes(entry.orderId)));
     const result = await score(ecommerceBackordersTask, d);
-    expect(result.penalties).toEqual([]);
-    expect(firedTraps(ecommerceBackordersTask, result)).toEqual(['third-page']);
+    expect(missed(result)).toEqual(
+      expect.arrayContaining(['outcome:O-5211', 'outcome:O-5212', 'notified:O-5211', 'notified:O-5212']),
+    );
+    expect(firedTraps(ecommerceBackordersTask, result)).toContain('third-page');
   });
 
   it('trap risk-hold: allocating to and contacting the held order are penalised', async () => {
     const d = drive(ecommerceBackordersSpec);
-    await solve(d, replace({ 'O-5215': { promised: { L1: '2026-08-14' } } }));
+    await solve(d);
     await d.call('notify_customer', { orderId: 'O-5205', message: 'Your dock is on its way.' });
     await d.call('set_promise_date', { orderId: 'O-5205', lineId: 'L1', date: '2026-08-14' });
     const result = await score(ecommerceBackordersTask, d);
@@ -362,7 +411,7 @@ describe('ecommerce-backorder-allocation', () => {
 // ---------------------------------------------------------------------------
 
 describe('ecommerce-returns-desk', () => {
-  const PLAN = returnsOracle(createReturnsWorld());
+  const PLAN = returnsOracle(settledReturnsWorld(createReturnsWorld()));
 
   it('derives the pinned settlements from the seed', () => {
     expect(
@@ -373,11 +422,11 @@ describe('ecommerce-returns-desk', () => {
     ).toEqual([
       'RMA-801 10965 card s1 d0 closed',
       'RMA-802 15900 card s1 d0 closed',
-      'RMA-803 27965 card s1 d0 closed',
+      'RMA-803 27965 store_credit s1 d0 closed',
       'RMA-804 27965 store_credit s1 d0 closed',
       'RMA-805 5520 card s1 d0 closed',
       'RMA-806 7350 card s0 d2 closed',
-      'RMA-807 none s0 d0 open',
+      'RMA-807 15900 card s1 d0 closed',
       'RMA-808 none s0 d0 investigating',
       'RMA-809 3800 card s1 d1 open',
       'RMA-810 9900 card s0 d1 closed',
@@ -385,6 +434,7 @@ describe('ecommerce-returns-desk', () => {
       'RMA-812 21900 card s0 d1 closed',
       'RMA-813 10965 card s1 d0 closed',
       'RMA-814 31800 card s2 d0 closed',
+      'RMA-815 10965 card s1 d0 closed',
     ]);
   });
 
@@ -403,6 +453,8 @@ describe('ecommerce-returns-desk', () => {
     }
     for (const entry of plan) {
       if (entry.refund) {
+        // The warehouse logs the missing parcel mid-run: read the receipts again before settling it.
+        if (entry.rmaId === 'RMA-807') await d.call('list_return_receipts', { rmaId: 'RMA-807' });
         await d.call('refund_order', {
           orderId: entry.orderId,
           lineIds: [entry.lineId],
@@ -444,7 +496,7 @@ describe('ecommerce-returns-desk', () => {
 
   it('pages the returns and the receipts', async () => {
     const d = drive(ecommerceReturnsSpec);
-    expect(await d.call('list_returns')).toContain('16 return(s), today=2026-07-25; page 1 of 2');
+    expect(await d.call('list_returns')).toContain('17 return(s), today=2026-07-25; page 1 of 3');
     const last = await d.call('list_return_receipts', { page: 3 });
     expect(last).toContain('RMA-809 receivedOn=2026-07-25');
     await d.expectError('list_return_receipts', { page: 4 });
@@ -458,8 +510,11 @@ describe('ecommerce-returns-desk', () => {
     expect(missed(result)).toEqual([]);
     expect(result.score).toBe(1);
     expect(d.world.customers.find((entry) => entry.id === 'C-804')?.storeCreditCents).toBe(1_200 + 27_965);
+    expect(d.world.customers.find((entry) => entry.id === 'C-803')?.storeCreditCents).toBe(27_965);
+    expect(d.world.receipts.some((entry) => entry.rmaId === 'RMA-807')).toBe(true);
     expect(findProduct(d.world, 'P-MOU')).toMatchObject({ stock: 21, damagedStock: 2 });
     expect(findProduct(d.world, 'P-CAB')).toMatchObject({ stock: 41, damagedStock: 1 });
+    expect(d.world.refunds).toHaveLength(2 + 14);
   });
 
   it('scores 0 on an untouched world', async () => {
@@ -468,13 +523,25 @@ describe('ecommerce-returns-desk', () => {
     expect(result.penalties).toEqual([]);
   });
 
-  it('trap not-received: refunding the parcel that never arrived is penalised', async () => {
+  it('trap not-received: refunding the parcel before the warehouse logs it is penalised from the journal', async () => {
     const d = drive(ecommerceReturnsSpec);
-    await solve(d, replace({ 'RMA-807': { refund: { method: 'card', amountCents: 13_515 }, sellable: 1, status: 'closed' } }));
+    await d.call('refund_order', { orderId: 'O-8007', lineIds: ['L1'], amountCents: 15_900, method: 'card' });
+    await solve(d, PLAN.map((entry) => (entry.rmaId === 'RMA-807' ? { ...entry, refund: undefined } : entry)));
     const result = await score(ecommerceReturnsTask, d);
-    expect(penaltyIds(result)).toEqual(['over-refunded:RMA-807', 'unsellable-restocked']);
-    expect(result.penalties[0]?.detail).toBe('At most 0 cents was owed for what the warehouse received.');
-    expect(firedTraps(ecommerceReturnsTask, result)).toEqual(['not-received', 'damaged-to-shelf']);
+    // The final state matches the oracle: only the journal shows the refund came first.
+    expect(missed(result)).toEqual([]);
+    expect(penaltyIds(result)).toEqual(['refunded-before-receipt']);
+    expect(firedTraps(ecommerceReturnsTask, result)).toEqual(['not-received']);
+  });
+
+  it('trap late-receipt: settling from the receipts read at the start leaves the late parcel unrefunded', async () => {
+    const d = drive(ecommerceReturnsSpec);
+    await solve(d, returnsOracle(createReturnsWorld()));
+    expect(d.world.receipts.some((entry) => entry.rmaId === 'RMA-807')).toBe(true);
+    const result = await score(ecommerceReturnsTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['settled:RMA-807', 'status:RMA-807', 'stock:P-HDP']);
+    expect(firedTraps(ecommerceReturnsTask, result)).toEqual(['late-receipt']);
   });
 
   it('trap wrong-item: refunding and restocking a box with the wrong product is caught', async () => {
@@ -491,13 +558,15 @@ describe('ecommerce-returns-desk', () => {
     const result = await score(ecommerceReturnsTask, d);
     expect(penaltyIds(result)).toEqual(['unsellable-restocked']);
     expect(missed(result)).toEqual(['stock:P-MOU']);
-    expect(result.score).toBeCloseTo(0.5 * (1 - 1 / 43), 6);
+    const total = result.breakdown.reduce((sum, item) => sum + item.weight, 0);
+    expect(result.score).toBeCloseTo(0.5 * (1 - 1 / total), 6);
   });
 
   it.each([
     ['window-from-today', 'RMA-812', { method: 'store_credit', amountCents: 21_900 }],
     ['window-edge', 'RMA-813', { method: 'store_credit', amountCents: 10_965 }],
-    ['loyalty-window', 'RMA-803', { method: 'store_credit', amountCents: 27_965 }],
+    ['loyalty-window', 'RMA-815', { method: 'store_credit', amountCents: 10_965 }],
+    ['tier-on-request', 'RMA-803', { method: 'card', amountCents: 27_965 }],
     ['dated-fee', 'RMA-805', { method: 'card', amountCents: 5_865 }],
     ['dated-fee', 'RMA-802', { method: 'card', amountCents: 13_515 }],
     ['fee-by-condition', 'RMA-811', { method: 'card', amountCents: 4_165 }],
@@ -533,13 +602,14 @@ describe('ecommerce-returns-desk', () => {
     expect(missed(result)).toEqual(['settled:RMA-804', 'credit-balances']);
   });
 
-  it('gives no credit for leaving the undelivered return alone without checking receipts', async () => {
+  it('gives no credit for leaving the wrong-item return alone without opening an investigation', async () => {
     const d = drive(ecommerceReturnsSpec);
+    await d.call('list_return_receipts', { rmaId: 'RMA-808' });
     const result = await score(ecommerceReturnsTask, d);
-    expect(missed(result)).toEqual(expect.arrayContaining(['settled:RMA-807', 'status:RMA-807']));
-    await d.call('list_return_receipts', { rmaId: 'RMA-807' });
+    expect(missed(result)).toEqual(expect.arrayContaining(['settled:RMA-808', 'status:RMA-808']));
+    await d.call('open_investigation', { rmaId: 'RMA-808', note: 'A cable arrived instead of the monitor.' });
     const after = await score(ecommerceReturnsTask, d);
-    expect(missed(after)).not.toContain('settled:RMA-807');
+    expect(missed(after)).not.toContain('settled:RMA-808');
   });
 });
 

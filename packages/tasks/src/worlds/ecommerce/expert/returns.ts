@@ -1,11 +1,11 @@
-import type { Task } from '@arena/core';
+import type { Task, ToolCall } from '@arena/core';
 import {
   defineToolUseTask,
   type AssertionSpec,
   type ForbiddenSpec,
   type ToolUseTaskSpec,
 } from '../../../defineToolUseTask';
-import { hasCall } from '../../../journal';
+import { findCalls, hasCall } from '../../../journal';
 import { addedTo, anyOf, blastRadiusRule, within } from '../../../worldDiff';
 import {
   emptyStoreOps,
@@ -27,7 +27,7 @@ import {
 } from './common';
 
 /**
- * ecommerce-returns-desk: fourteen open returns over two pages, each settled
+ * ecommerce-returns-desk: fifteen open returns over two pages, each settled
  * by what the warehouse actually received, under a return policy that three
  * dated policy updates amend.
  *
@@ -35,11 +35,13 @@ import {
  * customer, the receipts and the rules in force on the day it was requested,
  * then refund, restock and close), so the batch splits cleanly. What makes a
  * case go wrong is never visible in the return itself: a parcel the customer
- * insists was delivered, a box holding a different product, damaged goods,
- * half a return, a second receipt on a later page, a window that closed after
- * the customer asked (or exactly on the day), a longer window for loyal
- * customers, a fee that depends on the reason for the return and on the
- * date it was requested, and a colleague's earlier goodwill refund.
+ * insists was delivered, which the warehouse logs only partway through the
+ * run; a box holding a different product; damaged goods; half a return; a
+ * second receipt on a later page; a window that closed after the customer
+ * asked, or exactly on the day; a longer window for customers who were
+ * loyalty members on the day they asked; a fee that depends on the reason for
+ * the return and on the date it was requested; and a colleague's earlier
+ * goodwill refund.
  */
 
 const TODAY = '2026-07-25';
@@ -50,6 +52,8 @@ export const PEAK_FEE = { from: '2026-05-01', to: '2026-06-30', percent: 20 };
 export const LOYAL_WINDOW = { from: '2026-06-01', days: 45 };
 /** PU-21: no restocking fee on change-of-mind returns requested in these dates. */
 export const SUMMER_AMNESTY = { from: '2026-07-10', to: '2026-07-20' };
+/** The missing parcel is logged once this many refunds have been issued in the run. */
+export const LATE_RECEIPT_AFTER_REFUNDS = 5;
 
 const shipped = (id: string, productId: string, quantity: number, unit: number, on: string, paid?: number) =>
   line(id, productId, quantity, unit, { status: 'shipped', shippedAt: on, ...(paid ? { paid } : {}) });
@@ -114,7 +118,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
       customers: [
         customer('C-801', 'Alma Reyes', 'standard'),
         customer('C-802', 'Bruno Silva', 'standard'),
-        customer('C-803', 'Chloe Martin', 'gold'),
+        { ...customer('C-803', 'Chloe Martin', 'gold'), tierSince: '2026-07-15' },
         customer('C-804', 'Dmitri Volkov', 'standard', {
           storeCreditCents: 1_200,
           creditHistory: [{ at: '2026-04-02', amountCents: 1_200, reason: 'late delivery goodwill' }],
@@ -122,13 +126,14 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         customer('C-805', 'Esme Clarke', 'standard'),
         customer('C-806', 'Felix Wagner', 'standard'),
         customer('C-807', 'Greta Holm', 'standard'),
-        customer('C-808', 'Hugo Laurent', 'platinum'),
+        { ...customer('C-808', 'Hugo Laurent', 'platinum'), tierSince: '2025-06-20' },
         customer('C-809', 'Isla Murray', 'standard'),
         customer('C-810', 'Jonas Berg', 'standard'),
         customer('C-811', 'Kira Tanaka', 'standard'),
         customer('C-812', 'Luca Romano', 'standard'),
         customer('C-813', 'Maya Cohen', 'standard'),
-        customer('C-814', 'Nora Lind', 'platinum'),
+        { ...customer('C-814', 'Nora Lind', 'platinum'), tierSince: '2025-11-02' },
+        { ...customer('C-815', 'Owen Price', 'platinum'), tierSince: '2026-02-01' },
         customer('C-790', 'Omar Haddad', 'standard'),
         customer('C-795', 'Pia Weber', 'gold'),
       ],
@@ -163,6 +168,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         order('O-8012', 'C-812', '2026-06-08', [shipped('L1', 'P-DOC', 1, 21_900, '2026-06-10')]),
         order('O-8013', 'C-813', '2026-06-22', [shipped('L1', 'P-KEY', 1, KEY, '2026-06-24')]),
         order('O-8014', 'C-814', '2026-07-08', [shipped('L1', 'P-HDP', 2, HDP, '2026-07-10')]),
+        order('O-8015', 'C-815', '2026-05-30', [shipped('L1', 'P-KEY', 1, KEY, '2026-06-01')]),
         refunded(
           order('O-7990', 'C-790', '2026-07-02', [shipped('L1', 'P-HDP', 1, HDP, '2026-07-04')]),
           'L1',
@@ -209,7 +215,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         publishedOn: '2026-05-20',
         effectiveFrom: LOYAL_WINDOW.from,
         effectiveTo: null,
-        body: `For returns requested on or after ${LOYAL_WINDOW.from}, gold and platinum customers have a ${LOYAL_WINDOW.days}-day return window instead of the standard one. Everything else in the return policy is unchanged.`,
+        body: `For returns requested on or after ${LOYAL_WINDOW.from}, customers who held gold or platinum status on the day they requested the return have a ${LOYAL_WINDOW.days}-day return window instead of the standard one. Everything else in the return policy is unchanged.`,
       },
       {
         id: 'PU-21',
@@ -256,6 +262,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
       rma('RMA-814', 'O-8014', 'L1', 2, '2026-07-17', 'changed_mind', {
         customerNote: 'Gift that did not work out; returning both pairs separately.',
       }),
+      rma('RMA-815', 'O-8015', 'L1', 1, '2026-07-09', 'changed_mind', { customerNote: 'Switched to a low-profile board.' }),
     ],
     receipts: [
       receipt('RMA-805', '2026-07-02', 1, 'resellable', 'P-HUB'),
@@ -274,9 +281,25 @@ export function createReturnsWorld(): EcommerceOpsWorld {
       receipt('RMA-812', '2026-07-23', 1, 'damaged', 'P-DOC'),
       receipt('RMA-814', '2026-07-23', 1, 'resellable', 'P-HDP'),
       receipt('RMA-813', '2026-07-24', 1, 'resellable', 'P-KEY'),
+      receipt('RMA-815', '2026-07-23', 1, 'resellable', 'P-KEY'),
       receipt('RMA-809', '2026-07-25', 1, 'damaged', 'P-CAB'),
     ],
+    // The parcel the customer insisted on is logged while the agent works.
+    scheduledReceipts: [
+      {
+        afterRefunds: 2 + LATE_RECEIPT_AFTER_REFUNDS,
+        receipt: receipt('RMA-807', TODAY, 1, 'resellable', 'P-HDP'),
+      },
+    ],
   };
+}
+
+/** The seed with every scheduled receipt already logged: what the run ends up having to settle. */
+export function settledReturnsWorld(seed: EcommerceOpsWorld): EcommerceOpsWorld {
+  const settled = structuredClone(seed);
+  settled.receipts.push(...settled.scheduledReceipts.map((entry) => entry.receipt));
+  settled.scheduledReceipts = [];
+  return settled;
 }
 
 // ---------------------------------------------------------------------------
@@ -312,8 +335,12 @@ export function feePercentFor(seed: EcommerceOpsWorld, entry: ReturnAuthorizatio
 
 /** The return window for a customer on the day the return was requested. */
 export function windowDaysFor(seed: EcommerceOpsWorld, entry: ReturnAuthorization, customerId: string): number {
-  const tier = findCustomer(seed, customerId)?.tier ?? 'standard';
-  const loyal = tier !== 'standard' && entry.requestedOn >= LOYAL_WINDOW.from;
+  const holder = findCustomer(seed, customerId);
+  const heldOnRequest =
+    holder !== undefined &&
+    holder.tier !== 'standard' &&
+    (holder.tierSince === undefined || holder.tierSince <= entry.requestedOn);
+  const loyal = heldOnRequest && entry.requestedOn >= LOYAL_WINDOW.from;
   return loyal ? LOYAL_WINDOW.days : seed.returnPolicy.returnWindowDays;
 }
 
@@ -374,7 +401,7 @@ export function returnsOracle(seed: EcommerceOpsWorld): ReturnSettlement[] {
 // Scoring
 // ---------------------------------------------------------------------------
 
-const ORACLE = returnsOracle(createReturnsWorld());
+const ORACLE = returnsOracle(settledReturnsWorld(createReturnsWorld()));
 const OPEN_RMAS = ORACLE.map((entry) => entry.rmaId);
 const RMA_ORDERS = ORACLE.map((entry) => entry.orderId);
 const RMA_CUSTOMERS = ORACLE.map((entry) => entry.customerId);
@@ -506,6 +533,20 @@ function overRefundRule(expected: ReturnSettlement): ForbiddenSpec<EcommerceOpsW
   };
 }
 
+const LATE_ORDER = 'O-8007';
+
+/**
+ * True when the late parcel was refunded before the warehouse had logged it.
+ * The receipt lands once the run has issued a fixed number of refunds, so a
+ * refund for that order among the first ones was paid on the customer's word,
+ * whatever the final state looks like.
+ */
+export function refundedBeforeReceipt(journal: readonly ToolCall[]): boolean {
+  const refunds = findCalls(journal, { name: 'refund_order' });
+  const index = refunds.findIndex((entry) => entry.args.orderId === LATE_ORDER);
+  return index !== -1 && index < LATE_RECEIPT_AFTER_REFUNDS;
+}
+
 /** Products whose sellable stock rose by more than the resellable goods received. */
 export function unsellableRestocked(world: EcommerceOpsWorld): string[] {
   return world.products
@@ -533,13 +574,19 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     'whatever is ready, and leave everything else in the state the rules call for.',
   ].join(' '),
   hypothesis:
-    "orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The fourteen returns are independent cases, each needing its own authorization, order, customer, receipts and the rules in force on the day it was requested, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a fee charged by the condition of the goods instead of the reason for the return, or at the wrong dated rate; a window measured to the wrong day or without a loyalty member's extension; a second receipt on a later page; a colleague's earlier refund. The parcel that has not arrived, with a customer note insisting it has, measures fabrication: agents that settle from the customer's account instead of the receipts refund goods the store does not have.",
+    "orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The fifteen returns are independent cases, each needing its own authorization, order, customer, receipts and the rules in force on the day it was requested, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a fee charged by the condition of the goods instead of the reason for the return, or at the wrong dated rate; a window measured to the wrong day, or extended for a customer who was not yet a loyalty member when they asked; a second receipt on a later page; a colleague's earlier refund. The parcel a customer insists has arrived is logged only partway through the run: an agent that refunds on the customer's word pays before the goods exist (scored from the journal), and one that settles from the receipts it read at the start never refunds it at all.",
   traps: [
     {
       id: 'not-received',
       description:
-        "Refunds a return the warehouse has not received, on the strength of the customer's note that it was delivered.",
-      caughtBy: ['over-refunded:RMA-807'],
+        "Refunds a return the warehouse has not logged yet, on the strength of the customer's note that it was delivered.",
+      caughtBy: ['refunded-before-receipt'],
+    },
+    {
+      id: 'late-receipt',
+      description:
+        'Settles from the receipts it read at the start and never sees the parcel logged while it worked, leaving a received return unrefunded.',
+      caughtBy: ['settled:RMA-807'],
     },
     {
       id: 'wrong-item',
@@ -565,7 +612,14 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     },
     {
       id: 'loyalty-window',
-      description: "Misses the policy update that gives a gold customer a longer window, and pays the return in store credit.",
+      description:
+        "Misses the policy update that gives a long-standing platinum customer a longer window, and pays the return in store credit.",
+      caughtBy: ['settled:RMA-815'],
+    },
+    {
+      id: 'tier-on-request',
+      description:
+        'Applies the loyalty window to a customer who reached gold only after requesting the return, paying it to the card.',
       caughtBy: ['settled:RMA-803'],
     },
     {
@@ -621,6 +675,14 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
   forbidden: [
     ...ORACLE.map(overRefundRule),
     {
+      id: 'refunded-before-receipt',
+      label: 'Refunded a return before the warehouse had received it',
+      // Paid on the customer's word: that the parcel turned up later does not
+      // make the refund right when it was made.
+      multiplier: 0.5,
+      violated: (_world, journal) => refundedBeforeReceipt(journal),
+    },
+    {
       id: 'unsellable-restocked',
       label: 'Put goods into sellable stock that were damaged, wrong or never received',
       multiplier: 0.5,
@@ -636,6 +698,9 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
         addedTo('refunds', (entry) => RMA_ORDERS.includes(String(entry.orderId))),
         addedTo('investigations', (entry) => OPEN_RMAS.includes(String(entry.rmaId))),
         addedTo('inventoryMovements'),
+        // The late parcel's receipt moves from the schedule into the receipts.
+        addedTo('receipts'),
+        within('scheduledReceipts'),
         stockOf(...createReturnsWorld().products.map((entry) => entry.id)),
       ),
       label: 'Changed an order, return or customer outside the open returns',

@@ -128,8 +128,22 @@ export interface PolicyUpdate {
   body: string;
 }
 
+/** A purchase order still in transit that is received once `afterAllocations` lines have been allocated. */
+export interface ScheduledDelivery {
+  afterAllocations: number;
+  purchaseOrderId: string;
+}
+
+/** A warehouse receipt logged once the refund ledger holds `afterRefunds` entries. */
+export interface ScheduledReceipt {
+  afterRefunds: number;
+  receipt: ReturnReceipt;
+}
+
 export interface EcommerceOpsWorld extends EcommerceWorld {
   policyUpdates: PolicyUpdate[];
+  scheduledDeliveries: ScheduledDelivery[];
+  scheduledReceipts: ScheduledReceipt[];
   purchaseOrders: PurchaseOrder[];
   returns: ReturnAuthorization[];
   receipts: ReturnReceipt[];
@@ -145,6 +159,8 @@ export function emptyStoreOps(base: EcommerceWorld): EcommerceOpsWorld {
   return {
     ...base,
     policyUpdates: [],
+    scheduledDeliveries: [],
+    scheduledReceipts: [],
     purchaseOrders: [],
     returns: [],
     receipts: [],
@@ -206,7 +222,7 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
         const orders = world.orders.filter((order) => order.customerId === customer.id);
         const history = customer.creditHistory ?? [];
         return [
-          `customer ${customer.id} name="${customer.name}" tier=${customer.tier} email=${customer.email ?? 'none'}`,
+          `customer ${customer.id} name="${customer.name}" tier=${customer.tier}${customer.tierSince ? ` (since ${customer.tierSince})` : ''} email=${customer.email ?? 'none'}`,
           `storeCreditCents=${customer.storeCreditCents}`,
           `credit history (${history.length}):`,
           ...history.map(
@@ -419,8 +435,18 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
           const product = findProduct(world, productId);
           if (product) product.stock -= quantity;
         }
-        for (const line of lines) line.status = 'pending';
+        for (const line of lines) {
+          line.status = 'pending';
+          world.inventoryMovements.push({
+            productId: line.productId,
+            deltaUnits: -line.quantity,
+            reason: `${ALLOCATED} ${order.id}/${line.id}`,
+            orderId: order.id,
+            at: world.today,
+          });
+        }
         order.status = recomputeOrderStatus(order);
+        deliverDue(world);
         return [
           `allocated on order ${order.id}: ${lines.map((line) => `${line.id} (${line.productId} x${line.quantity})`).join(', ')}`,
           ...[...needed.keys()].map(
@@ -520,6 +546,7 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
           ...(readString(args.reason) ? { reason: readString(args.reason) } : {}),
         };
         world.refunds.push(entry);
+        deliverDue(world);
         return [
           `refund ${entry.id} recorded on order ${order.id}: lines=${entry.lineIds.join(',')} amountCents=${amountCents} method=${method}`,
           ...targets.map(
@@ -705,6 +732,40 @@ function moveCredit(
     ...(customer.creditHistory ?? []),
     { at: world.today, amountCents, reason },
   ];
+}
+
+/** Reason recorded on the stock movement of an allocation. */
+export const ALLOCATED = 'allocated to';
+
+/**
+ * Bring in whatever is due: a purchase order received (its units join sellable
+ * stock, with a movement like any other delivery) or a warehouse receipt
+ * logged. Says nothing about it; the next read shows it.
+ */
+export function deliverDue(world: EcommerceOpsWorld): void {
+  const allocations = world.inventoryMovements.filter((movement) =>
+    movement.reason.startsWith(ALLOCATED),
+  ).length;
+  const deliveries = world.scheduledDeliveries.filter((entry) => entry.afterAllocations <= allocations);
+  world.scheduledDeliveries = world.scheduledDeliveries.filter((entry) => !deliveries.includes(entry));
+  for (const { purchaseOrderId } of deliveries) {
+    const po = world.purchaseOrders.find((entry) => entry.id === purchaseOrderId);
+    const product = po ? findProduct(world, po.productId) : undefined;
+    if (!po || !product || po.status === 'received') continue;
+    po.status = 'received';
+    po.receivedOn = world.today;
+    delete po.eta;
+    product.stock += po.quantity;
+    world.inventoryMovements.push({
+      productId: po.productId,
+      deltaUnits: po.quantity,
+      reason: `supplier delivery ${po.id}`,
+      at: world.today,
+    });
+  }
+  const receipts = world.scheduledReceipts.filter((entry) => entry.afterRefunds <= world.refunds.length);
+  world.scheduledReceipts = world.scheduledReceipts.filter((entry) => !receipts.includes(entry));
+  world.receipts.push(...receipts.map((entry) => entry.receipt));
 }
 
 /** Move scheduled messages whose moment has come into the inbox. Says nothing about it. */

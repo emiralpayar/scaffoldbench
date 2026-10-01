@@ -20,8 +20,8 @@ import {
 import { mentionsDate } from '../../../text';
 
 /**
- * ecommerce-backorder-allocation: two short deliveries shared out among
- * fifteen orders waiting for them.
+ * ecommerce-backorder-allocation: short deliveries shared out among fifteen
+ * orders waiting for them, with another delivery arriving mid-run.
  *
  * Seven docks and four monitors go down one priority list, whole lines only,
  * with a ship-complete order that cannot take a dock while its hub is
@@ -30,8 +30,9 @@ import { mentionsDate } from '../../../text';
  * update in force puts orders that have waited two weeks ahead of every
  * tier, and an expired one would put gold beside platinum. What is left
  * waiting is promised a date by walking the same list over the purchase
- * orders still in transit. Every unit given to the wrong order is a unit
- * some other order should have had: the stock is shared, and the order of
+ * orders still in transit, and one of those is received early, while the
+ * agent is allocating. Every unit given to the wrong order is a unit some
+ * other order should have had: the stock is shared, and the order of
  * allocation is the whole task.
  */
 
@@ -40,6 +41,8 @@ export const BACKORDER_PRODUCTS = ['P-DOC', 'P-MON'];
 const RISK_HELD = 'O-5205';
 /** PU-12: orders placed at least this many days before allocation go first. */
 export const AGED_AFTER_DAYS = 14;
+/** PO-91 is received once this many backordered lines have been allocated. */
+export const MID_RUN_DELIVERY_AFTER = 4;
 
 export function createBackorderWorld(): EcommerceOpsWorld {
   const backordered = (id: string, productId: string, quantity: number, unit: number) =>
@@ -156,7 +159,32 @@ export function createBackorderWorld(): EcommerceOpsWorld {
       { id: 'PO-95', productId: 'P-DOC', quantity: 10, status: 'in_transit', eta: '2026-08-14' },
       { id: 'PO-97', productId: 'P-MON', quantity: 6, status: 'in_transit', eta: '2026-08-19' },
     ],
+    // The next dock delivery turns up early, while the agent is allocating.
+    scheduledDeliveries: [{ afterAllocations: MID_RUN_DELIVERY_AFTER, purchaseOrderId: 'PO-91' }],
   };
+}
+
+/**
+ * The seed with every scheduled delivery already received: the stock the run
+ * ends up having to share out. Allocating in priority order before and after
+ * a delivery reaches the same lines as one walk over all of it, because the
+ * delivery lands only after the top of the list (whose allocation the walk
+ * fixes first either way) has been served; the tests check this for this
+ * seed rather than assume it.
+ */
+export function settledBackorderWorld(seed: EcommerceOpsWorld): EcommerceOpsWorld {
+  const settled = structuredClone(seed);
+  for (const { purchaseOrderId } of settled.scheduledDeliveries) {
+    const po = settled.purchaseOrders.find((entry) => entry.id === purchaseOrderId);
+    const stocked = po ? findProduct(settled, po.productId) : undefined;
+    if (!po || !stocked) continue;
+    po.status = 'received';
+    po.receivedOn = settled.today;
+    delete po.eta;
+    stocked.stock += po.quantity;
+  }
+  settled.scheduledDeliveries = [];
+  return settled;
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +283,7 @@ export function backorderOracle(seed: EcommerceOpsWorld): BackorderOutcome[] {
 // Scoring
 // ---------------------------------------------------------------------------
 
-const ORACLE = backorderOracle(createBackorderWorld());
+const ORACLE = backorderOracle(settledBackorderWorld(createBackorderWorld()));
 const WORKED = ORACLE.map((outcome) => outcome.orderId);
 const ALL_BACKORDERS = backorderPriority(createBackorderWorld()).map((entry) => entry.id);
 
@@ -371,7 +399,7 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     'that is still waiting a promise date, and let each customer know where their order stands.',
   ].join(' '),
   hypothesis:
-    'single >= propose-select > orchestrator-workers. Seven docks and four monitors are shared, scarce resources handed out down one global list with two skip rules (whole lines only; a ship-complete order waits while any of its lines cannot ship), and the list itself is set by a policy update in force that puts aged orders ahead of every tier, beside an expired one that would rank gold with platinum. Workers that each take a slice of the backorders allocate in their own local order and race for the same units, inverting priority or starving a later order, while a single agent or a read-only proposer sees the whole list before any unit moves. The promise dates repeat the walk over the in-transit purchase orders, which a state-grounded verifier (plan-execute-verify) can recompute and correct.',
+    'single >= propose-select > orchestrator-workers, and plan-execute-verify > plan-execute. Docks and monitors are shared, scarce resources handed out down one global list with two skip rules (whole lines only; a ship-complete order waits while any of its lines cannot ship), and the list itself is set by a policy update in force that puts aged orders ahead of every tier, beside an expired one that would rank gold with platinum. Workers that each take a slice of the backorders allocate in their own local order and race for the same units, inverting priority or starving a later order, while a single agent or a read-only proposer sees the whole list before any unit moves. A second dock delivery is received while the agent is allocating, so a plan fixed at the start goes stale: only an agent that re-reads stock (or a state-grounded verifier) allocates it and promises the rest correctly.',
   traps: [
     {
       id: 'aged-first',
@@ -385,10 +413,16 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       caughtBy: ['outcome:O-5207', 'outcome:O-5209'],
     },
     {
+      id: 'mid-run-delivery',
+      description:
+        'Allocates from the plan it made at the start and never notices the dock delivery received while it worked, leaving docks on the shelf and orders waiting.',
+      caughtBy: ['outcome:O-5209', 'outcome:O-5211'],
+    },
+    {
       id: 'stops-at-first-miss',
       description:
         'Stops allocating when the next order needs more docks than are left, leaving a dock on the shelf that a smaller order further down should have had.',
-      caughtBy: ['outcome:O-5210', 'stock-used'],
+      caughtBy: ['outcome:O-5215', 'stock-used'],
     },
     {
       id: 'ship-complete',
@@ -406,7 +440,7 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       id: 'flat-promise-date',
       description:
         'Promises every waiting line for the next delivery of its product, although that delivery cannot cover them all.',
-      caughtBy: ['promised:O-5213', 'promised:O-5214'],
+      caughtBy: ['promised:O-5214'],
     },
     {
       id: 'third-page',
@@ -459,6 +493,9 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       allow: anyOf(
         ...ALL_BACKORDERS.map((id) => within('orders', id)),
         stockOf(...BACKORDER_PRODUCTS),
+        addedTo('inventoryMovements'),
+        within('purchaseOrders', 'PO-91'),
+        within('scheduledDeliveries'),
         addedTo('notices', (entry) => ALL_BACKORDERS.includes(String(entry.orderId))),
       ),
       label: 'Changed an order, product or customer outside the backorders',

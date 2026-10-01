@@ -60,6 +60,8 @@ export interface Customer {
   id: string;
   name: string;
   tier: LoyaltyTier;
+  /** The day the customer reached their current tier, when the world records it. */
+  tierSince?: string;
   storeCreditCents: number;
   /** The address the account holder writes from, when the world models email. */
   email?: string;
