@@ -228,9 +228,9 @@ with neither guard in place:
 
 - **Informative tasks.** Equivalence also needs the spread of the difference to rest on at least
   `minTasks` tasks, because from a handful of lumpy values the bootstrap understates it; otherwise
-  $p_{\text{eq}} = 1$ with `caveat: 'few-informative-tasks'`. Two counts must reach the minimum:
-  the tasks on which the two arms differed in some repeat, and the effective number of tasks
-  carrying the spread,
+  $p_{\text{eq}} = 1$ with `caveat: 'few-informative-tasks'`, a caveat left off any contrast that
+  shows a difference. Two counts must reach the minimum: the tasks on which the two arms differed
+  in some repeat, and the effective number of tasks carrying the spread,
 
   ```math
   n_{\text{spread}} = \frac{\big(\sum_t e_t^2\big)^2}{\sum_t e_t^4}, \qquad e_t = D_t - \hat{\theta}

@@ -490,6 +490,10 @@ function finalize(pending: readonly PendingContrast[], settings: AnalysisSetting
       const v = verdicts[k] as (typeof verdicts)[number];
       const ratio = metricScale(metric) === 'ratio';
       const { test } = p;
+      // `few-informative-tasks` says why equivalence was out of reach; once a
+      // difference is shown that no longer matters, so it is not reported.
+      const shown = v.verdict === 'better' || v.verdict === 'worse';
+      const caveat = shown && test.caveat === 'few-informative-tasks' ? undefined : test.caveat;
       results[i] = {
         family: p.family,
         metric,
@@ -508,7 +512,7 @@ function finalize(pending: readonly PendingContrast[], settings: AnalysisSetting
         pEquivalence: test.pEquivalence,
         pEquivalenceAdjusted: v.pEquivalenceAdjusted,
         verdict: v.verdict,
-        ...(test.caveat ? { caveat: test.caveat } : {}),
+        ...(caveat ? { caveat } : {}),
       };
     });
   }

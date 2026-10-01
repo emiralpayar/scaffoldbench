@@ -36,7 +36,8 @@ export type ContrastVerdict = 'better' | 'worse' | 'equivalent' | 'inconclusive'
  * the minimum, so no verdict. `no-variation`: every task moved by the same
  * amount, so there is no interval and no equivalence; a difference can
  * still be shown if that amount is not zero. `few-informative-tasks`: too
- * few tasks carry the spread of the difference to show equivalence.
+ * few tasks carry the spread of the difference to show equivalence
+ * (`analyzeRunSet` drops it from a contrast that shows a difference).
  */
 export type ContrastCaveat = 'too-few-tasks' | 'no-variation' | 'few-informative-tasks';
 

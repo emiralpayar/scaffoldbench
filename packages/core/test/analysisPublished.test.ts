@@ -98,6 +98,9 @@ describe(`published run set ${RUN_SET}`, () => {
       expect(cost.pValue).toBe(2 / 2 ** 9);
       expect(cost.pAdjusted).toBe(4 * (2 / 2 ** 9));
       expect(cost.verdict).toBe('worse');
+      // Nine tasks are too few to show equivalence, but a shown difference
+      // carries no caveat about that.
+      expect(cost.caveat).toBeUndefined();
       expect(vsSingle('latency', strategyId).verdict).toBe('worse');
     }
   });
