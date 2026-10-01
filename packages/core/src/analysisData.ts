@@ -198,9 +198,14 @@ export function buildGrid(
     }
     const existing = byRepeat.get(record.repeat);
     if (existing) {
-      // A resumed or re-run cell; keep the later run so the grid stays one-per-cell.
+      // A resumed or re-run cell; keep the later run so the grid stays
+      // one-per-cell. Ties go to the larger run id, so the order the records
+      // arrive in never changes the result.
       health.duplicates += 1;
-      if (existing.finishedAt >= record.finishedAt) continue;
+      const later =
+        record.finishedAt > existing.finishedAt ||
+        (record.finishedAt === existing.finishedAt && record.runId > existing.runId);
+      if (!later) continue;
     } else {
       health.included += 1;
     }
@@ -209,6 +214,15 @@ export function buildGrid(
 
   const { checked, ok } = health.integrity;
   health.integrity.rate = checked > 0 ? ok / checked : null;
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  health.excludedRuns.sort(
+    (x, y) =>
+      cmp(x.model, y.model) ||
+      cmp(x.strategyId, y.strategyId) ||
+      cmp(x.taskId, y.taskId) ||
+      x.repeat - y.repeat ||
+      cmp(x.runId, y.runId),
+  );
   return { models, health };
 }
 
@@ -257,7 +271,7 @@ export interface PairedDiffs {
  * Paired differences between arms `a` and `b` on the (task, repeat) cells both
  * have. Ratio metrics are differenced on the log scale, so the mean
  * difference is the log of a geometric-mean ratio; cells with a non-positive
- * cost or latency cannot be logged and are skipped.
+ * cost or latency cannot be logged and are skipped, as are non-finite values.
  *
  * Arms may be on different models: the pairing is by task and repeat.
  */
@@ -302,7 +316,7 @@ function contrastDiffs(
         const record = (m as Map<number, RunRecord>).get(repeat);
         return record === undefined ? Number.NaN : metricValue(record, metric);
       });
-      if (values.some((v) => Number.isNaN(v) || !usable(v))) continue;
+      if (values.some((v) => !Number.isFinite(v) || !usable(v))) continue;
       let d = 0;
       values.forEach((v, i) => {
         d += (weights[i] as number) * transform(v);

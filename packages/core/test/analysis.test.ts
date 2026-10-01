@@ -502,6 +502,19 @@ describe('determinism and output', () => {
     expect(analyzeRunSet(records, fast)).toEqual(analyzeRunSet(records, fast));
   });
 
+  it('does not depend on the order of the records', () => {
+    // Shuffle in duplicates (one a same-time tie) and excluded runs as well.
+    const extra = [
+      run({ strategyId: 'single', taskId: 'task-00', repeat: 1, score: 0.4, finishedAt: '2026-10-01T00:00:10.000Z' }),
+      run({ strategyId: 'single', taskId: 'task-01', repeat: 2, failureMode: 'api_error', passed: false, score: 0 }),
+      run({ strategyId: 'plan-execute', taskId: 'task-02', repeat: 1, integrity: { ok: false, checks: [{ id: 'x', ok: false }] } }),
+    ];
+    const all = [...records, ...extra];
+    const shuffled = [...all].reverse();
+    expect(analyzeRunSet(shuffled, fast)).toEqual(analyzeRunSet(all, fast));
+    expect(analyzeRunSet(all, fast).health.duplicates).toBe(1);
+  });
+
   it('serializes to JSON without losing anything', () => {
     const analysis = analyzeRunSet(records, fast);
     expect(JSON.parse(JSON.stringify(analysis))).toEqual(analysis);
