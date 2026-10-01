@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { buildDemoRunSet } from '../../../scripts/generate-demo-data';
 import { ARCHITECTURES } from '../lib/architectures';
 import { isRankable } from '../lib/records';
+import { timelineFromTrace } from '../lib/timeline';
+import { firedTraps } from '../lib/traps';
 
 /**
  * The synthetic set exists to exercise every state the site has to draw, so
@@ -54,6 +56,31 @@ describe('the synthetic demo run set', () => {
     for (const runId of demo.traces.keys()) {
       expect(demo.records.find((r) => r.runId === runId)?.traceFile).toBe(`traces/${runId}.jsonl`);
     }
+  });
+
+  it('declares traps that name scorer items its runs actually report', () => {
+    const trapped = demo.catalog.tasks.filter((task) => task.traps && task.traps.length > 0);
+    for (const task of trapped) {
+      const runs = demo.records.filter((r) => r.taskId === task.id && r.failureMode !== 'api_error');
+      const items = new Set(runs.flatMap((r) => r.breakdown.map((item) => item.id)));
+      for (const trap of task.traps ?? []) {
+        expect(trap.caughtBy.every((id) => items.has(id))).toBe(true);
+      }
+      // Some fire and some do not, or the trap view has nothing to show.
+      const fired = runs.map((r) => firedTraps(task, r).length);
+      expect(fired.some((n) => n > 0) && fired.some((n) => n === 0)).toBe(true);
+    }
+  });
+
+  it('writes traces in the v1 shape: one call per phase, keyed by call id', () => {
+    for (const [runId, events] of demo.traces) {
+      const record = demo.records.find((r) => r.runId === runId);
+      expect(events.every((event) => typeof event.callId === 'string')).toBe(true);
+      expect(timelineFromTrace(events, record?.phases).calls).toHaveLength(record?.phases.length ?? -1);
+    }
+    // Every architecture can be raced on one task and model.
+    const raced = [...demo.traces.keys()].filter((id) => id.includes('__airline-hard__claude-sonnet-5-5__r1'));
+    expect(raced).toHaveLength(ARCHITECTURES.length);
   });
 
   it('is deterministic', () => {

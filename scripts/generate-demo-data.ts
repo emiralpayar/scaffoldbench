@@ -29,7 +29,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { ensureDir, makeRng, writeJson } from '@arena/core';
-import type { Penalty, ScoreItem, StrategyInfo, TraceEvent } from '@arena/core';
+import type { Penalty, ScoreItem, StrategyInfo } from '@arena/core';
 
 import { ARCHITECTURES } from '../apps/web/lib/architectures';
 import type {
@@ -40,6 +40,7 @@ import type {
   RunRecord,
   RunSetManifest,
   TaskInfo,
+  TraceEvent,
 } from '../apps/web/lib/records';
 
 export const DEMO_RUN_SET_ID = 'demo-synthetic';
@@ -97,6 +98,18 @@ const ARCHS: DemoArchitecture[] = [
   { id: 'gated-execute', effect: [0.06, 0.035, 0.01], research: -0.01, traps: 0.09, cost: 1.65, latency: 1.6, degradeRate: 0.02 },
 ];
 
+/**
+ * A trap names the scorer item that registers it (contract 5): here, one
+ * assertion per trap. `resistedBy` is the invented part, the architectures
+ * this fake world lets avoid it more often.
+ */
+interface DemoTrap {
+  id: string;
+  description: string;
+  assertion: { id: string; label: string };
+  resistedBy: string[];
+}
+
 interface DemoTask {
   id: string;
   world: string;
@@ -104,7 +117,7 @@ interface DemoTask {
   difficulty: Difficulty;
   title: string;
   hypothesis?: string;
-  traps?: { id: string; description: string; caughtBy?: string }[];
+  traps?: DemoTrap[];
 }
 
 const HARDNESS: Record<Difficulty, number> = { easy: 0.03, medium: 0.12, hard: 0.27, expert: 0.42 };
@@ -121,8 +134,18 @@ const TASKS: DemoTask[] = [
     title: 'Split a group booking across a cancelled connection',
     hypothesis: '[synthetic] A verifier should catch the stranded second leg that a single pass misses.',
     traps: [
-      { id: 'stranded-leg', description: '[synthetic] The connection is cancelled, not delayed.', caughtBy: 'plan-execute-verify' },
-      { id: 'refund-to-card', description: '[synthetic] The fare refunds to credit only.', caughtBy: 'gated-execute' },
+      {
+        id: 'stranded-leg',
+        description: '[synthetic] Rebooks the first leg and leaves the cancelled connection unbooked.',
+        assertion: { id: 'second-leg-rebooked', label: '[synthetic] Both legs of every passenger are rebooked' },
+        resistedBy: ['plan-execute-verify', 'propose-select'],
+      },
+      {
+        id: 'refund-to-card',
+        description: '[synthetic] Refunds a credit-only fare to the card.',
+        assertion: { id: 'credit-only-respected', label: '[synthetic] The credit-only fare was refunded as credit' },
+        resistedBy: ['gated-execute'],
+      },
     ],
   },
   { id: 'ecommerce-easy', world: 'ecommerce', category: 'tool-use', difficulty: 'easy', title: 'Redirect the order that has not shipped' },
@@ -136,7 +159,18 @@ const TASKS: DemoTask[] = [
     title: 'Reconcile a bundle return across two warehouses',
     hypothesis: '[synthetic] A gate on mutating calls should stop the double restock.',
     traps: [
-      { id: 'double-restock', description: '[synthetic] Restocking both warehouses counts the bundle twice.', caughtBy: 'gated-execute' },
+      {
+        id: 'double-restock',
+        description: '[synthetic] Restocks the bundle in both warehouses and counts it twice.',
+        assertion: { id: 'restocked-once', label: '[synthetic] The bundle was restocked exactly once' },
+        resistedBy: ['gated-execute', 'plan-execute-verify'],
+      },
+      {
+        id: 'partial-refund',
+        description: '[synthetic] Refunds the full bundle when one item was kept.',
+        assertion: { id: 'refund-matches-return', label: '[synthetic] The refund covers only the returned items' },
+        resistedBy: ['plan-execute-verify'],
+      },
     ],
   },
   { id: 'support-easy', world: 'support', category: 'tool-use', difficulty: 'easy', title: 'Triage a new service desk ticket' },
@@ -150,7 +184,12 @@ const TASKS: DemoTask[] = [
     title: 'Route a security incident hidden inside a billing complaint',
     hypothesis: '[synthetic] Parallel proposals should surface the second issue a single read skims past.',
     traps: [
-      { id: 'buried-incident', description: '[synthetic] The incident is in the third paragraph.', caughtBy: 'propose-select' },
+      {
+        id: 'buried-incident',
+        description: '[synthetic] Routes the billing complaint and misses the incident in its third paragraph.',
+        assertion: { id: 'incident-routed', label: '[synthetic] The security incident went to the security queue' },
+        resistedBy: ['propose-select', 'orchestrator-workers'],
+      },
     ],
   },
   { id: 'research-http-redirects', world: 'web', category: 'research', difficulty: 'medium', title: 'Explain how browsers treat each HTTP redirect status' },
@@ -165,27 +204,42 @@ const TASKS: DemoTask[] = [
   },
 ];
 
-/** The fidelity invariants each architecture is checked against (contract 4). */
+/**
+ * The fidelity invariants each architecture is checked against (contract 4).
+ * The ids follow core's convention (`<strategy>.<what>`); the strategies
+ * stream declares the real ones, so these are placeholders in that shape.
+ */
 const FIDELITY_CHECKS: Record<string, string[]> = {
   single: [],
-  'plan-execute': ['plan-non-empty'],
-  'orchestrator-workers': ['decomposition-parsed', 'fan-out-happened'],
-  'plan-execute-verify': ['plan-non-empty', 'verdict-parsed'],
-  'propose-select': ['proposers-used-tools', 'selector-parsed'],
-  'gated-execute': ['gate-consulted'],
+  'plan-execute': ['plan-execute.plan'],
+  'orchestrator-workers': ['orchestrator-workers.decomposition', 'orchestrator-workers.fan-out'],
+  'plan-execute-verify': ['plan-execute-verify.plan', 'plan-execute-verify.verdict'],
+  'propose-select': ['propose-select.proposers-grounded', 'propose-select.selection'],
+  'gated-execute': ['gated-execute.gate'],
 };
 
-const HARNESS_CHECKS = ['phase-mcp-connected', 'no-harness-tool-denials', 'no-unexpected-mcp-servers'];
+/** The runner's own checks, by the ids `packages/core/src/integrity.ts` uses. */
+const HARNESS_CHECKS = [
+  'harness.run-completed',
+  'harness.api',
+  'harness.calls-ended',
+  'harness.harness-tools',
+  'harness.mcp-connected',
+  'harness.mcp-hermetic',
+  'harness.structured-output',
+  'harness.not-degraded',
+];
 
 const DEGRADED_REASON: Record<string, { phase: string; degraded: string; detail: string }> = {
-  'plan-non-empty': { phase: 'plan', degraded: 'schema-unreadable', detail: '[synthetic] planner output did not parse; executor received no plan' },
-  'decomposition-parsed': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] decomposition did not parse; fell back to one worker' },
-  'fan-out-happened': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] only one subtask was produced' },
-  'verdict-parsed': { phase: 'verify', degraded: 'verdict-defaulted', detail: '[synthetic] verifier verdict did not parse' },
-  'proposers-used-tools': { phase: 'propose-2', degraded: 'mcp-failed', detail: '[synthetic] proposer 2 made no tool call' },
-  'selector-parsed': { phase: 'select', degraded: 'default-winner', detail: '[synthetic] selection did not parse; proposal 1 used by default' },
-  'gate-consulted': { phase: 'act', degraded: 'default-approval', detail: '[synthetic] a mutating call ran without a review' },
-  'phase-mcp-connected': { phase: 'main', degraded: 'mcp-failed', detail: '[synthetic] a phase started without its MCP server' },
+  'plan-execute.plan': { phase: 'plan', degraded: 'empty-plan', detail: '[synthetic] the planner returned no steps; the executor ran without a plan' },
+  'orchestrator-workers.decomposition': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] the decomposition did not parse; fell back to one worker' },
+  'orchestrator-workers.fan-out': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] only one subtask was produced' },
+  'plan-execute-verify.plan': { phase: 'plan', degraded: 'empty-plan', detail: '[synthetic] the planner returned no steps; the executor ran without a plan' },
+  'plan-execute-verify.verdict': { phase: 'verify', degraded: 'verdict-unreadable', detail: '[synthetic] the verifier gave no readable verdict' },
+  'propose-select.proposers-grounded': { phase: 'propose-2', degraded: 'proposer-without-tools', detail: '[synthetic] proposer 2 started without its tool server and made no tool call' },
+  'propose-select.selection': { phase: 'select', degraded: 'default-winner', detail: '[synthetic] the selection did not parse; proposal 1 was used by default' },
+  'gated-execute.gate': { phase: 'act', degraded: 'ungated-action', detail: '[synthetic] a mutating call ran without a review' },
+  'harness.mcp-connected': { phase: 'main', degraded: 'mcp-failed', detail: '[synthetic] a call started without its tool server' },
 };
 
 // ---------------------------------------------------------------------------
@@ -213,7 +267,7 @@ export function buildDemoRunSet(): DemoRunSet {
           const record = buildRecord({ rng, repeat, task, tier, model, arch, startMs: clock });
           clock += 1_500 + Math.floor(rng() * 4_000);
           records.push(record);
-          if (repeat === 1 && model.id === 'claude-sonnet-5-5' && TRACED_TASKS.has(task.id)) {
+          if (isTraced(task.id, model.id, repeat)) {
             record.traceFile = `traces/${record.runId}.jsonl`;
             traces.set(record.runId, buildTrace(record));
           }
@@ -271,13 +325,33 @@ export function buildDemoRunSet(): DemoRunSet {
     tags: [task.world, task.difficulty],
     maxTurns: task.category === 'research' ? 24 : 16,
     ...(task.hypothesis ? { hypothesis: task.hypothesis } : {}),
-    ...(task.traps ? { traps: task.traps } : {}),
+    ...(task.traps
+      ? {
+          traps: task.traps.map((trap) => ({
+            id: trap.id,
+            description: trap.description,
+            caughtBy: [trap.assertion.id],
+          })),
+        }
+      : {}),
   }));
 
   return { manifest, catalog: { strategies, tasks }, records, traces };
 }
 
-const TRACED_TASKS = new Set(['airline-hard', 'research-script-loading']);
+/**
+ * Which runs get a trace: the first repeat of one hard task on every model
+ * (enough to race every architecture on the same task), and the first repeat
+ * on Sonnet of a research task and the expert tasks with traps.
+ */
+function isTraced(taskId: string, modelId: string, repeat: number): boolean {
+  if (repeat !== 1) return false;
+  if (taskId === 'airline-hard') return true;
+  return (
+    modelId === 'claude-sonnet-5-5' &&
+    ['research-script-loading', 'airline-expert', 'support-expert'].includes(taskId)
+  );
+}
 
 interface RecordInput {
   rng: () => number;
@@ -306,7 +380,7 @@ function buildRecord({ rng, repeat, task, tier, model, arch, startMs }: RecordIn
   const apiError = rng() < 0.012;
   const degradedCheck = !apiError && rng() < arch.degradeRate ? pickCheck(arch.id, rng) : null;
 
-  const breakdown = buildBreakdown(task, quality, rng);
+  const breakdown = buildBreakdown(task, arch.id, quality, rng);
   let score = scoreFrom(task, breakdown);
   const penalties: Penalty[] = [];
   if (!apiError && task.category === 'tool-use' && score < 1 && rng() < 0.15) {
@@ -406,16 +480,21 @@ function pickCheck(archId: string, rng: () => number): string {
   const fidelity = FIDELITY_CHECKS[archId] ?? [];
   // Most fidelity failures are the architecture's own invariants; a few are
   // harness health (an MCP server that did not connect for one phase).
-  if (fidelity.length === 0 || rng() < 0.2) return 'phase-mcp-connected';
+  if (fidelity.length === 0 || rng() < 0.2) return 'harness.mcp-connected';
   return fidelity[Math.floor(rng() * fidelity.length)] as string;
 }
 
 function buildIntegrity(archId: string, failed: string | null): Integrity {
   const ids = [...HARNESS_CHECKS, ...(FIDELITY_CHECKS[archId] ?? [])];
+  // A strategy's fidelity failure is a degraded phase, which the runner's own
+  // not-degraded check reports as well.
+  const alsoFailed = failed && !failed.startsWith('harness.') ? 'harness.not-degraded' : null;
   const checks = ids.map((id) =>
     id === failed
       ? { id, ok: false, detail: DEGRADED_REASON[id]?.detail ?? '[synthetic] check failed' }
-      : { id, ok: true },
+      : id === alsoFailed
+        ? { id, ok: false, detail: `[synthetic] ${DEGRADED_REASON[failed as string]?.phase ?? 'a phase'} fell back on a default` }
+        : { id, ok: true },
   );
   return { ok: checks.every((check) => check.ok), checks };
 }
@@ -427,7 +506,7 @@ const ASSERTIONS = [
   { id: 'reply', label: '[synthetic] The reply states what was done', weight: 1 },
 ];
 
-function buildBreakdown(task: DemoTask, quality: number, rng: () => number): ScoreItem[] {
+function buildBreakdown(task: DemoTask, archId: string, quality: number, rng: () => number): ScoreItem[] {
   if (task.category === 'research') {
     return [
       { id: 'rubric', label: '[synthetic] Judged rubric', weight: 3, earned: round(clamp01(quality + (rng() - 0.5) * 0.1), 3) },
@@ -436,10 +515,19 @@ function buildBreakdown(task: DemoTask, quality: number, rng: () => number): Sco
   }
   // Tool-use scoring is a deterministic assertion grid, so outcomes are
   // discrete and a fully correct run lands exactly on 1.0.
-  return ASSERTIONS.map((assertion) => ({
+  const grid = ASSERTIONS.map((assertion) => ({
     ...assertion,
     earned: rng() < quality ** 0.6 ? 1 : rng() < 0.3 ? 0.5 : 0,
   }));
+  // Each trap is one assertion; an architecture this world says resists the
+  // trap avoids it more often.
+  const traps = (task.traps ?? []).map((trap) => ({
+    id: trap.assertion.id,
+    label: trap.assertion.label,
+    weight: 2,
+    earned: rng() < Math.min(0.97, quality ** 0.8 + (trap.resistedBy.includes(archId) ? 0.3 : 0)) ? 1 : 0,
+  }));
+  return [...grid, ...traps];
 }
 
 function scoreFrom(task: DemoTask, breakdown: ScoreItem[]): number {
@@ -539,44 +627,199 @@ function buildPhases(
 
   if (context.degradedCheck) {
     const reason = DEGRADED_REASON[context.degradedCheck];
-    const target = phases.find((phase) => phase.phase === reason?.phase) ?? phases[0];
-    if (target && reason) target.degraded = reason.degraded;
+    const target =
+      phases.find((phase) => phase.phase === reason?.phase) ??
+      phases.find((phase) => !TOOLLESS_PHASES.test(phase.phase)) ??
+      phases[0];
+    if (target && reason) {
+      // A tool server that never connected is the harness failing, not the
+      // strategy falling back, so it is not a degraded phase; the trace shows it.
+      if (context.degradedCheck !== 'harness.mcp-connected') target.degraded = reason.degraded;
+      if (reason.degraded === 'proposer-without-tools' || reason.degraded === 'mcp-failed') target.toolCalls = 0;
+    }
   }
   return phases;
 }
 
-/** A small but structurally honest trace: parallel phases interleave in time. */
+const WORLD_TOOLS: Record<string, { read: string[]; write: string[] }> = {
+  airline: {
+    read: ['get_reservation', 'get_passenger', 'get_fare_rules', 'get_refund_policy', 'get_ledger'],
+    write: ['cancel_reservation', 'issue_refund', 'record_non_refundable', 'charge_fee'],
+  },
+  ecommerce: {
+    read: ['get_order', 'get_customer', 'get_return_policy', 'get_inventory'],
+    write: ['refund_order', 'restock_item', 'apply_store_credit'],
+  },
+  support: {
+    read: ['get_ticket', 'list_tickets', 'search_kb', 'get_account'],
+    write: ['update_ticket', 'escalate_ticket', 'add_note'],
+  },
+  web: { read: ['web_search', 'fetch_page'], write: [] },
+};
+
+/** Phases that ask for structured output and are given no task tools. */
+const STRUCTURED_PHASES = /^(plan|decompose|select)$/;
+const TOOLLESS_PHASES = /^(plan|decompose|select|synthesize)$/;
+const READ_ONLY_PHASES = /^(propose|verify|review)/;
+const PARALLEL_PHASES = /^(worker|propose|review)-/;
+
+/**
+ * A structurally honest trace in the v1 shape: every event carries its call
+ * id, sessions report the tools and servers they were given, structured
+ * phases answer through the harness's `StructuredOutput` tool, parallel calls
+ * interleave on one clock, and a degraded phase shows how it degraded. The
+ * words are invented and say so.
+ */
 function buildTrace(record: RunRecord): TraceEvent[] {
+  const rng = makeRng(hash(record.runId));
   const t0 = Date.parse(record.startedAt) + (record.setupMs ?? 0);
+  const world = WORLD_TOOLS[record.taskWorld] ?? (WORLD_TOOLS.web as { read: string[]; write: string[] });
+  const qualify = (name: string) => `mcp__${record.taskWorld}__${name}`;
   const raw: Omit<TraceEvent, 'seq'>[] = [];
-  const parallel = /^(worker|propose|review)-/;
+  const last = record.phases.length - 1;
+  const mcpFailed = record.integrity?.checks.some((check) => check.id === 'harness.mcp-connected' && !check.ok) ?? false;
+  const firstToolPhase = record.phases.findIndex((phase) => !TOOLLESS_PHASES.test(phase.phase));
 
-  for (const phase of record.phases) {
-    const depth = parallel.test(phase.phase) ? 1 : 0;
-    const agent = depth > 0 ? phase.phase : undefined;
+  record.phases.forEach((phase, index) => {
+    const callId = `call-${index + 1}`;
+    const depth = PARALLEL_PHASES.test(phase.phase) ? 1 : 0;
+    const base = { phase: phase.phase, depth, callId, ...(depth > 0 ? { agent: phase.phase } : {}) };
     const start = phase.startedAtMs - t0;
-    const step = phase.durationMs / (phase.toolCalls * 2 + 3);
-    const base = { phase: phase.phase, depth, ...(agent ? { agent } : {}) };
-    let t = start;
+    const at = (fraction: number) => Math.round(start + phase.durationMs * fraction);
+    const toolless = TOOLLESS_PHASES.test(phase.phase);
+    const structured = STRUCTURED_PHASES.test(phase.phase);
+    const serverDown =
+      phase.degraded === 'proposer-without-tools' || (mcpFailed && index === firstToolPhase);
+    const structuredMissing = structured && phase.degraded !== undefined;
+    const apiFailure = record.failureMode === 'api_error' && index === last;
+    const names = READ_ONLY_PHASES.test(phase.phase) ? world.read : [...world.read, ...world.write];
+    const offered = toolless ? (structured ? ['StructuredOutput'] : []) : serverDown ? [] : names.map(qualify);
+    const expected = toolless ? [] : [record.taskWorld];
 
-    raw.push({ ...base, tMs: Math.round(t), kind: 'phase_start', text: phase.label });
-    t += step;
-    raw.push({ ...base, tMs: Math.round(t), kind: 'assistant_text', text: `[synthetic] ${phase.label}: reading the current state before acting.` });
-    for (let i = 0; i < phase.toolCalls; i++) {
-      const id = `${phase.phase}-tu${i + 1}`;
-      t += step;
-      raw.push({ ...base, tMs: Math.round(t), kind: 'tool_call', toolName: `mcp__world__${i % 2 === 0 ? 'get_record' : 'update_record'}`, toolUseId: id, toolInput: { id: `R-${100 + i}` } });
-      t += step;
-      raw.push({ ...base, tMs: Math.round(t), kind: 'tool_result', toolUseId: id, text: `[synthetic] record R-${100 + i}` });
+    raw.push({ ...base, tMs: at(0), kind: 'phase_start', text: phase.label });
+    raw.push({ ...base, tMs: at(0) + 2, kind: 'user', text: promptFor(record, phase.label) });
+    raw.push({
+      ...base,
+      tMs: at(0) + 650 + Math.round(rng() * 250),
+      kind: 'system_init',
+      meta: {
+        model: record.model,
+        tools: offered,
+        mcpServers: expected.map((name) => ({ name, status: serverDown ? 'failed' : 'connected' })),
+        permissionMode: 'dontAsk',
+      },
+    });
+
+    const calls = serverDown || toolless ? 0 : phase.toolCalls;
+    for (let i = 0; i < calls; i++) {
+      // Reads first, then the changes they justify.
+      const writes = READ_ONLY_PHASES.test(phase.phase) ? 0 : Math.min(world.write.length, Math.floor(calls / 3));
+      const pool = i >= calls - writes ? world.write : world.read;
+      const name = pool[i % pool.length] as string;
+      const id = `toolu_${record.runId.length}${index}${i}`;
+      const t = at(0.12 + (0.7 * (i + 0.5)) / calls);
+      const failedCall = rng() < 0.06;
+      raw.push({ ...base, tMs: t, kind: 'tool_call', toolName: qualify(name), toolUseId: id, toolInput: inputFor(name, i) });
+      raw.push({
+        ...base,
+        tMs: t + 40 + Math.round(rng() * 260),
+        kind: 'tool_result',
+        toolUseId: id,
+        isError: failedCall,
+        text: failedCall ? `[synthetic] ${name} failed: record not found` : `[synthetic] ${name}: record ${100 + i} as of the start of the run`,
+      });
     }
-    t += step;
-    raw.push({ ...base, tMs: Math.round(t), kind: 'result', costUsd: phase.costUsd, meta: { subtype: phase.subtype ?? 'success' } });
-    raw.push({ ...base, tMs: Math.round(phase.startedAtMs - t0 + phase.durationMs), kind: 'phase_end', meta: { subtype: phase.subtype ?? 'success' } });
-  }
+
+    if (structured && !structuredMissing) {
+      const id = `toolu_so_${index}`;
+      raw.push({ ...base, tMs: at(0.86), kind: 'tool_call', toolName: 'StructuredOutput', toolUseId: id, toolInput: structuredFor(phase.phase) });
+      raw.push({ ...base, tMs: at(0.86) + 6, kind: 'tool_result', toolUseId: id, text: 'Structured output provided successfully' });
+    }
+
+    const text = replyFor(phase.phase, phase.label, structuredMissing);
+    if (!structured || structuredMissing) raw.push({ ...base, tMs: at(0.93), kind: 'assistant_text', text });
+    const subtype = apiFailure ? 'error_during_execution' : (phase.subtype ?? 'success');
+    if (apiFailure) {
+      raw.push({ ...base, tMs: at(0.97), kind: 'error', isError: true, text: '[synthetic] API overloaded (HTTP 529); retried and gave up' });
+    } else {
+      raw.push({
+        ...base,
+        tMs: at(0.97),
+        kind: 'result',
+        ...(!structured || structuredMissing ? { text } : {}),
+        costUsd: phase.costUsd,
+        meta: { subtype, numTurns: phase.turns },
+      });
+    }
+    raw.push({
+      ...base,
+      tMs: at(1),
+      kind: 'phase_end',
+      costUsd: phase.costUsd,
+      meta: {
+        subtype,
+        turns: phase.turns,
+        toolCalls: calls + (structured && !structuredMissing ? 1 : 0),
+        durationMs: phase.durationMs,
+        mcpServersExpected: expected,
+        ...(structuredMissing ? { structuredMissing: true } : {}),
+        ...(phase.degraded ? { degraded: phase.degraded } : {}),
+        ...(apiFailure ? { apiError: { kind: 'overloaded', retryable: true, status: 529, message: '[synthetic] Overloaded' } } : {}),
+      },
+    });
+  });
 
   return raw
-    .sort((a, b) => a.tMs - b.tMs)
-    .map((event, seq) => ({ ...event, seq }));
+    .map((event, index) => ({ event, index }))
+    .sort((a, b) => a.event.tMs - b.event.tMs || a.index - b.index)
+    .map(({ event }, seq) => ({ ...event, seq }));
+}
+
+function promptFor(record: RunRecord, label: string): string {
+  return `[synthetic] <task>\n${record.taskTitle}.\n</task>\n\nThis is the ${label.toLowerCase()} call. The real prompt for this phase would appear here.`;
+}
+
+function inputFor(name: string, i: number): Record<string, unknown> {
+  if (name === 'web_search') return { query: `[synthetic] query ${i + 1}` };
+  if (name === 'fetch_page') return { url: `https://example.com/synthetic/${i + 1}` };
+  return { id: `R-${100 + i}` };
+}
+
+function structuredFor(phase: string): Record<string, unknown> {
+  if (phase === 'plan') {
+    return { steps: ['[synthetic] Read the record and the rules', '[synthetic] Decide what the rules allow', '[synthetic] Act and confirm'], rationale: '[synthetic] Read before acting.' };
+  }
+  if (phase === 'decompose') {
+    return { subtasks: [1, 2, 3].map((n) => ({ id: `part-${n}`, goal: `[synthetic] Part ${n} of the task` })) };
+  }
+  return { winnerIndex: 1, rationale: '[synthetic] The most grounded proposal.', mergedAnswer: '[synthetic] Proposal 1, with the check from proposal 3.' };
+}
+
+function replyFor(phase: string, label: string, structuredMissing: boolean): string {
+  if (structuredMissing) {
+    return `[synthetic] ${label}: I would start by reading the record, but I could not produce the structured reply this phase asked for.`;
+  }
+  if (phase.startsWith('propose')) {
+    return `### [synthetic] ${label}\n1. Read the record and the rules that apply to it.\n2. Change only what the rules allow, in that order.\n\n> Grounded in what the read-only tools returned.`;
+  }
+  if (phase.startsWith('verify')) {
+    return '**[synthetic] Verdict:** approved. The final state matches the task and every rule checked holds.';
+  }
+  if (phase.startsWith('review')) return '[synthetic] Approved: the call is within the policy.';
+  if (phase === 'synthesize') {
+    return '## [synthetic] Summary\n| Worker | Outcome |\n|---|---|\n| 1 | done |\n| 2 | done |\n| 3 | done |';
+  }
+  return '## [synthetic] Done\n- Read `R-100` before changing it\n- Applied the change the policy allows\n\n**Result:** the request is resolved.';
+}
+
+/** FNV-1a, for a per-run seed that does not disturb the record generator's stream. */
+function hash(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
 function clamp01(value: number): number {

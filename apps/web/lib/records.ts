@@ -80,11 +80,17 @@ export interface RunRecord extends Omit<CoreRunRecord, ContractKeys> {
   attempts?: number;
 }
 
+/**
+ * A documented way to fail a task (contract 5, as the tasks stream defines
+ * it). `caughtBy` names scorer items, not architectures: the assertions and
+ * forbidden rules that register the failure. A trap fired in a run when any
+ * listed rule's penalty was applied or any listed assertion earned less than
+ * full credit (`lib/traps.ts`).
+ */
 export interface TaskTrap {
   id: string;
   description: string;
-  /** Which architecture's mechanism is expected to catch it. */
-  caughtBy?: string;
+  caughtBy: string[];
 }
 
 export interface TaskInfo extends Omit<CoreTaskInfo, 'difficulty'> {
