@@ -3,7 +3,7 @@ import { singleStrategy } from './single';
 import { planExecuteStrategy } from './planExecute';
 import { orchestratorWorkersStrategy } from './orchestratorWorkers';
 import { planExecuteVerifyStrategy } from './planExecuteVerify';
-import { debateSelectStrategy } from './debateSelect';
+import { proposeSelectStrategy } from './proposeSelect';
 
 export type { StrategyDeps, LabeledSpec, PhaseNote, PhaseRunner } from './helpers';
 export {
@@ -33,7 +33,13 @@ export {
   planExecuteVerifyFidelityChecks,
   planExecuteVerifyStrategy,
 } from './planExecuteVerify';
-export { createDebateSelectStrategy, debateSelectStrategy } from './debateSelect';
+export {
+  PROPOSER_LENSES,
+  SELECT_SCHEMA,
+  createProposeSelectStrategy,
+  proposeSelectFidelityChecks,
+  proposeSelectStrategy,
+} from './proposeSelect';
 
 /**
  * The comparison set, in increasing order of structure.
@@ -47,14 +53,38 @@ export const STRATEGIES: Strategy[] = [
   planExecuteStrategy,
   orchestratorWorkersStrategy,
   planExecuteVerifyStrategy,
-  debateSelectStrategy,
+  proposeSelectStrategy,
 ];
 
+/**
+ * Ids architectures were published under before a rename, mapped to their
+ * current ids.
+ *
+ * `debate-select` held no debate — three proposers that never see one
+ * another, then a selector — so it is now `propose-select`. Run sets
+ * measured before a rename keep the old id in their records; this map is
+ * how a reader shows which current architecture an old record belongs to.
+ * It does not make the old runs comparable with new ones: they measured an
+ * earlier implementation and are never pooled with current results.
+ */
+export const LEGACY_STRATEGY_IDS: Readonly<Record<string, string>> = {
+  'debate-select': 'propose-select',
+};
+
+/** The current id for `id`, which may be one an architecture had before a rename. */
+export function canonicalStrategyId(id: string): string {
+  return LEGACY_STRATEGY_IDS[id] ?? id;
+}
+
+/**
+ * The strategies named by `ids`, in registry order. `all`, or nothing, is
+ * every strategy; a retired id selects the architecture it was renamed to.
+ */
 export function getStrategies(ids?: string[]): Strategy[] {
   if (ids === undefined || ids.length === 0 || ids.includes('all')) return [...STRATEGIES];
 
-  const wanted = new Set(ids);
-  const unknown = ids.filter((id) => !STRATEGIES.some((strategy) => strategy.id === id));
+  const wanted = new Set(ids.map(canonicalStrategyId));
+  const unknown = ids.filter((id) => !STRATEGIES.some((strategy) => strategy.id === canonicalStrategyId(id)));
   if (unknown.length > 0) {
     throw new Error(
       `Unknown strategy id(s): ${unknown.join(', ')}. ` +

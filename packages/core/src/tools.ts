@@ -17,7 +17,7 @@ export interface JournaledToolSpec {
    * True when the tool only inspects state.
    *
    * Architectures that explore several approaches before committing to one
-   * (`debate-select`) need to know which tools are safe to hand to a proposer
+   * (`propose-select`) need to know which tools are safe to hand to a proposer
    * that will be thrown away. Without this, running proposals in parallel would
    * have them all mutating the same world.
    */

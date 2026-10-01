@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: '%s · Agent Arena',
   },
   description:
-    'A benchmark of agent harness architectures — single agent, plan-execute, orchestrator with workers, plan-execute-verify, debate-select — on one task set, reported with score, cost, latency and bootstrap confidence intervals.',
+    'A benchmark of agent harness architectures — single agent, plan-execute, orchestrator with workers, plan-execute-verify, propose-select — on one task set, reported with score, cost, latency and bootstrap confidence intervals.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

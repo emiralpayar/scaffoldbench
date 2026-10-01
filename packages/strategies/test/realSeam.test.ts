@@ -26,7 +26,7 @@ import type {
   ToolCall,
 } from '@arena/core';
 import {
-  createDebateSelectStrategy,
+  createProposeSelectStrategy,
   createOrchestratorWorkersStrategy,
   createPlanExecuteStrategy,
   createPlanExecuteVerifyStrategy,
@@ -171,7 +171,7 @@ async function* proseOnly(text: string) {
 
 afterEach(() => resetFake());
 
-describe('debate-select through the real runQuery', () => {
+describe('propose-select through the real runQuery', () => {
   it('runs three grounded proposers, a selector that answers, and an executor', async () => {
     setScript(async function* (session) {
       const proposer = /You are proposer (\d)/.exec(session.prompt)?.[1];
@@ -189,8 +189,14 @@ describe('debate-select through the real runQuery', () => {
     });
     const env = makeEnv();
     const ctx = makeCtx(env);
+    const strategy = createProposeSelectStrategy();
 
-    const outcome = await createDebateSelectStrategy().run(ctx);
+    const outcome = await strategy.run(ctx);
+
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+    expect(checkNamed(fidelityOf(strategy, ctx, outcome), 'propose-select.selection').detail).toBe(
+      'proposal 2 chosen',
+    );
 
     const proposers = sessions().filter((s) => /You are proposer/.test(s.prompt));
     expect(proposers).toHaveLength(3);
@@ -225,6 +231,31 @@ describe('debate-select through the real runQuery', () => {
     // The proposers ran side by side, and their records say so.
     const starts = outcome.phases.filter((p) => p.phase.startsWith('propose-')).map((p) => p.startedAtMs);
     expect(Math.max(...starts) - Math.min(...starts)).toBeLessThan(10);
+  });
+
+  it('fails fidelity when the selector never answers through the schema', async () => {
+    setScript(async function* (session) {
+      const proposer = /You are proposer (\d)/.exec(session.prompt)?.[1];
+      if (proposer) {
+        yield* useTool(session, 'mcp__shop__get_order', 'O-1', `proposal ${proposer}: refund O-1`);
+      } else if (session.prompt.includes('You are the selector')) {
+        yield* proseOnly('Proposal 2 is the strongest.');
+      } else {
+        yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Refunded O-1.');
+      }
+    });
+    const ctx = makeCtx(makeEnv());
+    const strategy = createProposeSelectStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    // The run went on with proposal 1, and says so.
+    expect(sessions().at(-1)?.prompt).toContain('proposal 1: refund O-1');
+    expect(failures(strategy, ctx, outcome).map((check) => check.id)).toEqual([
+      HARNESS_CHECK.structuredOutput,
+      HARNESS_CHECK.notDegraded,
+      'propose-select.selection',
+    ]);
   });
 });
 

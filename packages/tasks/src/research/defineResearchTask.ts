@@ -138,7 +138,7 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
         createMcpServers,
         allowedTools,
         // Research has nothing to mutate, so every tool is safe to hand to a
-        // throwaway proposer. Equality here is what tells `debate-select` it can
+        // throwaway proposer. Equality here is what tells `propose-select` it can
         // skip a separate execute phase.
         readOnlyTools: [...allowedTools],
         state: { question: spec.question, requiredSources },

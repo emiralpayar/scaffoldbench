@@ -110,15 +110,15 @@ look worse than it was.
 `createMcpServers` is a factory, called by `runQuery` once per model call. An in-process MCP
 server accepts one session at a time, so a single instance shared by every phase left parallel
 phases after the first with no tools at all (the first published run set lost two of three
-`debate-select` proposers that way). Each call now gets new server instances whose handlers close
+`debate-select` proposers that way; the architecture is now `propose-select`). Each call now gets new server instances whose handlers close
 over the same world and journal, so state is still shared. The `only` filter limits a call to the
 tools it may use: a tool-less phase gets no task server, a read-only phase only the read-only tools.
 
-`readOnlyTools` exists because two architectures need it: `debate-select` hands only read-only
+`readOnlyTools` exists because two architectures need it: `propose-select` hands only read-only
 tools to its three parallel proposers, and `plan-execute-verify` hands only read-only tools to its
 verifier so it has to check the real state rather than the executor's account of it. When
 `readOnlyTools.length === allowedTools.length` the task has nothing to mutate, which is how
-`debate-select` knows to skip its execution phase on research tasks instead of burning a call.
+`propose-select` knows to skip its execution phase on research tasks instead of burning a call.
 
 Each attempt also gets its own scratch `cwd`, made with `mkdtemp` under the OS temp directory and
 removed in a `finally` block whatever happens, so concurrent runs never share one and nothing is
@@ -167,7 +167,7 @@ Phase names as they appear in traces and reports:
 | `plan-execute` | `plan` → `execute` |
 | `orchestrator-workers` | `decompose` → `worker-<id>` x N (parallel, depth 1) → `synthesize` |
 | `plan-execute-verify` | `plan` → `execute` → (`verify` → `revise-<n>`) x ≤2 |
-| `debate-select` | `propose-1..3` (parallel, depth 1) → `select` → `execute` |
+| `propose-select` | `propose-1..3` (parallel, depth 1) → `select` → `execute` |
 
 ## 4. `runQuery` — the choke point
 

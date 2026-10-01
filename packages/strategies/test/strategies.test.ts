@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SCHEMA_MIN_TURNS, emptyUsage } from '@arena/core';
 import type {
   BudgetLedger,
+  FidelityInput,
+  PhaseRecord,
   QueryOutcome,
   QuerySpec,
   RunContext,
@@ -15,17 +17,22 @@ import type {
 import {
   ACTING_INSTRUCTIONS,
   FINAL_ANSWER_INSTRUCTION,
+  LEGACY_STRATEGY_IDS,
   MAX_REVISIONS,
+  PROPOSER_LENSES,
   REASONING_TURNS,
   STRATEGIES,
   VERIFY_SCHEMA,
-  createDebateSelectStrategy,
-  createPhaseRunner,
+  canonicalStrategyId,
   createOrchestratorWorkersStrategy,
+  createPhaseRunner,
   createPlanExecuteStrategy,
   createPlanExecuteVerifyStrategy,
+  createProposeSelectStrategy,
   createSingleStrategy,
   getStrategies,
+  orchestratorWorkersFidelityChecks,
+  proposeSelectFidelityChecks,
 } from '@arena/strategies';
 import type { StrategyDeps } from '@arena/strategies';
 
@@ -246,7 +253,7 @@ const allFactories: { id: string; create: (deps: Partial<StrategyDeps>) => Strat
   { id: 'plan-execute', create: createPlanExecuteStrategy },
   { id: 'orchestrator-workers', create: createOrchestratorWorkersStrategy },
   { id: 'plan-execute-verify', create: createPlanExecuteVerifyStrategy },
-  { id: 'debate-select', create: createDebateSelectStrategy },
+  { id: 'propose-select', create: createProposeSelectStrategy },
 ];
 
 // ---------------------------------------------------------------------------
@@ -716,14 +723,14 @@ describe('plan-execute-verify', () => {
 });
 
 // ---------------------------------------------------------------------------
-// debate-select
+// propose-select
 // ---------------------------------------------------------------------------
 
-describe('debate-select', () => {
+describe('propose-select', () => {
   it('runs three read-only proposers, selects, then executes', async () => {
     const fake = createFake(genericScript);
     const ctx = makeCtx();
-    const outcome = await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(ctx);
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(ctx);
 
     expect(fake.phases()).toEqual(['propose-1', 'propose-2', 'propose-3', 'select', 'execute']);
     expect(outcome.subagentCount).toBe(3);
@@ -737,6 +744,28 @@ describe('debate-select', () => {
     }
     expect(fake.phase('select').allowedTools).toEqual([]);
     expect(fake.phase('execute').allowedTools).toBeUndefined();
+    expect(outcome.phases.find((phase) => phase.phase === 'select')?.meta).toEqual({
+      winnerIndex: 2,
+      source: 'schema',
+      mergedAnswer: true,
+    });
+    expect(outcome.phases.some((phase) => phase.degraded !== undefined)).toBe(false);
+  });
+
+  it('gives each proposer its own lens, and records which', async () => {
+    const fake = createFake(genericScript);
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(PROPOSER_LENSES.map((lens) => lens.id)).toEqual(['policy-first', 'state-first', 'outcome-first']);
+    PROPOSER_LENSES.forEach((lens, i) => {
+      const prompt = fake.phase(`propose-${i + 1}`).prompt;
+      expect(prompt).toContain(lens.instruction);
+      for (const other of PROPOSER_LENSES.filter((candidate) => candidate !== lens)) {
+        expect(prompt).not.toContain(other.instruction);
+      }
+      expect(outcome.phases[i]?.meta).toEqual({ lens: lens.id });
+      expect(outcome.phases[i]?.label).toBe(`Proposal ${i + 1} (${lens.id})`);
+    });
   });
 
   it('starts every proposer before any of them finishes', async () => {
@@ -747,7 +776,7 @@ describe('debate-select', () => {
       return { text: `${spec.phase} proposal` };
     });
 
-    const running = createDebateSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+    const running = createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
     await waitFor(() => fake.calls.length === 3, 'three proposers to start');
     expect(fake.resolved).toBe(0);
 
@@ -759,7 +788,7 @@ describe('debate-select', () => {
     const fake = createFake((spec) =>
       spec.phase.startsWith('propose-') ? { text: `${spec.phase} proposal` } : genericScript(spec, 0),
     );
-    await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+    await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     const select = fake.phase('select').prompt;
     expect(select).toContain('propose-1 proposal');
@@ -775,7 +804,7 @@ describe('debate-select', () => {
     const readOnly = ['mcp__web__search', 'mcp__web__fetch'];
     const ctx = makeCtx({ env: makeEnv({ allowedTools: readOnly, readOnlyTools: [...readOnly] }) });
     const fake = createFake(genericScript);
-    const outcome = await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(ctx);
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(ctx);
 
     expect(fake.phases()).toEqual(['propose-1', 'propose-2', 'propose-3', 'select']);
     expect(outcome.finalText).toBe('merged answer');
@@ -790,7 +819,7 @@ describe('debate-select', () => {
     { label: 'not a number', winnerIndex: 'second' },
   ];
 
-  it.each(clampCases)('clamps an out-of-range winnerIndex ($label)', async ({ winnerIndex }) => {
+  it.each(clampCases)('clamps an out-of-range winnerIndex, and records it ($label)', async ({ winnerIndex }) => {
     const fake = createFake((spec) => {
       if (spec.phase.startsWith('propose-')) return { text: `${spec.phase} proposal` };
       if (spec.phase === 'select') {
@@ -798,22 +827,56 @@ describe('debate-select', () => {
       }
       return { text: 'execute answer' };
     });
-    const outcome = await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(outcome.finalText).toBe('execute answer');
     expect(fake.phase('execute').prompt).toMatch(/propose-[123] proposal/);
+    expect(outcome.phases.find((phase) => phase.phase === 'select')?.degraded).toMatch(
+      /was not a proposal number/,
+    );
   });
 
-  it('still executes when the selector returns nothing usable', async () => {
+  it('still executes when the selector returns nothing usable, and records the default winner', async () => {
     const fake = createFake((spec) =>
       spec.phase.startsWith('propose-') ? { text: `${spec.phase} proposal` } : { text: '' },
     );
-    const outcome = await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(fake.phases()).toEqual(['propose-1', 'propose-2', 'propose-3', 'select', 'execute']);
+    expect(fake.phase('execute').prompt).toContain('propose-1 proposal');
+    const select = outcome.phases.find((phase) => phase.phase === 'select');
+    expect(select?.meta).toEqual({ winnerIndex: 1, source: 'none', mergedAnswer: false });
+    expect(select?.degraded).toBe('the selection could not be read; proposal 1 was used by default');
     // A proposal is a plan for the executor, never the answer: the executor
     // said nothing, so there is no answer.
     expect(outcome.finalText).toBe('');
+  });
+
+  it('records a read-only run whose selector wrote no merged answer', async () => {
+    const readOnly = ['mcp__web__search', 'mcp__web__fetch'];
+    const ctx = makeCtx({ env: makeEnv({ allowedTools: readOnly, readOnlyTools: [...readOnly] }) });
+    const fake = createFake((spec) =>
+      spec.phase === 'select'
+        ? { structured: { winnerIndex: 3, rationale: 'r', mergedAnswer: '' } }
+        : { text: `${spec.phase} proposal` },
+    );
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(ctx);
+
+    expect(outcome.finalText).toBe('propose-3 proposal');
+    expect(outcome.phases.at(-1)?.degraded).toBe(
+      'the selector wrote no merged answer; the winning proposal stands as the answer',
+    );
+  });
+
+  it('does not call a selection the run’s limits cut short degraded', async () => {
+    const fake = createFake((spec) =>
+      spec.phase === 'select'
+        ? { text: '', aborted: true, subtype: 'aborted', structuredMissing: true }
+        : { text: `${spec.phase} proposal` },
+    );
+    const outcome = await createProposeSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(outcome.phases.find((phase) => phase.phase === 'select')?.degraded).toBeUndefined();
   });
 });
 
@@ -932,6 +995,71 @@ describe('every strategy', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fan-out fidelity
+// ---------------------------------------------------------------------------
+
+describe('fan-out fidelity', () => {
+  const record = (phase: string, overrides: Partial<PhaseRecord> = {}): PhaseRecord => ({
+    phase,
+    label: phase,
+    startedAtMs: 0,
+    durationMs: 1,
+    costUsd: 0.01,
+    turns: 1,
+    toolCalls: 0,
+    model: 'm',
+    aborted: false,
+    subtype: 'success',
+    ...overrides,
+  });
+  const input = (phases: PhaseRecord[], subagentCount: number, stoppedBy?: 'cost'): FidelityInput => {
+    const env = makeEnv();
+    return {
+      task: makeTask(env),
+      env,
+      outcome: { finalText: 'x', subagentCount, phases },
+      trace: [],
+      ...(stoppedBy ? { stoppedBy } : {}),
+    };
+  };
+  const check = (checks: { id: string; ok: boolean; detail?: string }[], id: string) =>
+    checks.find((c) => c.id === id);
+
+  it('fails a fan-out in which one worker was starved while the others ran', () => {
+    const phases = [
+      record('decompose', { meta: { subtasks: 2, workers: 2, source: 'schema' } }),
+      record('worker-a'),
+      record('worker-b', { subtype: 'skipped', aborted: true }),
+      record('synthesize'),
+    ];
+    expect(check(orchestratorWorkersFidelityChecks(input(phases, 2)), 'orchestrator-workers.fan-out')).toEqual({
+      id: 'orchestrator-workers.fan-out',
+      ok: false,
+      detail: 'worker-b never started while the others ran',
+    });
+  });
+
+  it('fails a selection among proposals when one proposer was starved', () => {
+    const phases = [
+      record('propose-1', { meta: { lens: 'policy-first' } }),
+      record('propose-2', { meta: { lens: 'state-first' }, subtype: 'skipped', aborted: true }),
+      record('propose-3', { meta: { lens: 'outcome-first' } }),
+    ];
+    expect(check(proposeSelectFidelityChecks(input(phases, 3)), 'propose-select.proposals')).toMatchObject({
+      ok: false,
+      detail: 'propose-2 never started while the others ran',
+    });
+  });
+
+  it('excuses a fan-out the run’s budget stopped before it began', () => {
+    const phases = [record('decompose', { meta: { subtasks: 3, workers: 3, source: 'schema' } })];
+    expect(check(orchestratorWorkersFidelityChecks(input(phases, 0, 'cost')), 'orchestrator-workers.fan-out')).toMatchObject({
+      ok: true,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The phase runner
 // ---------------------------------------------------------------------------
 
@@ -998,7 +1126,7 @@ describe('STRATEGIES', () => {
       'plan-execute',
       'orchestrator-workers',
       'plan-execute-verify',
-      'debate-select',
+      'propose-select',
     ]);
   });
 
@@ -1018,14 +1146,21 @@ describe('getStrategies', () => {
   });
 
   it('returns the requested subset in registry order', () => {
-    expect(getStrategies(['debate-select', 'single']).map((s) => s.id)).toEqual([
+    expect(getStrategies(['propose-select', 'single']).map((s) => s.id)).toEqual([
       'single',
-      'debate-select',
+      'propose-select',
     ]);
   });
 
   it('deduplicates repeated ids', () => {
     expect(getStrategies(['single', 'single']).map((s) => s.id)).toEqual(['single']);
+  });
+
+  it('selects an architecture by the id it had before a rename', () => {
+    expect(LEGACY_STRATEGY_IDS).toEqual({ 'debate-select': 'propose-select' });
+    expect(canonicalStrategyId('debate-select')).toBe('propose-select');
+    expect(canonicalStrategyId('single')).toBe('single');
+    expect(getStrategies(['debate-select']).map((s) => s.id)).toEqual(['propose-select']);
   });
 
   it('throws for an unknown id and names the valid ones', () => {

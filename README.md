@@ -97,7 +97,7 @@ handling and the budget ceiling are therefore identical for every architecture. 
 | `plan-execute` | Plan then execute | A tool-less planning call writes an ordered list of steps; a second call executes them with the full toolset. |
 | `orchestrator-workers` | Orchestrator with parallel workers | An orchestrator splits the task into up to four independent subtasks, runs them concurrently in separate contexts, then synthesizes the answer from their reports. |
 | `plan-execute-verify` | Plan, execute, verify, revise | Plan and execute, then a verifier holding only the read-only tools checks the real state rather than the executor's account of it; anything it rejects goes back for revision, at most twice. |
-| `debate-select` | Parallel proposals, select, execute | Three proposers investigate in parallel with read-only tools, a selector picks the strongest and merges in what the others got right, and a final call applies it with the full toolset. |
+| `propose-select` | Parallel proposals, select, execute | Three proposers investigate in parallel with read-only tools, each starting from a different angle (policy, current state, the user's outcome); a selector picks the strongest and merges in what the others got right, and a final call applies it with the full toolset. Formerly `debate-select`: the proposers never see one another, so there was never a debate. |
 
 Strategies are pure orchestration: they never import the SDK, they take `runQuery` as an injected
 dependency, and every phase builds on the same base system prompt rather than replacing it. Phase
@@ -289,7 +289,7 @@ extend it with `arena report --markdown`, which writes `results/<runSetId>/REPOR
 
 | Strategy | n | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
 | --- | --- | --- | --- | --- | --- | --- |
-| `debate-select` | 18 | 1.000 [1.000, 1.000] | 100% | $0.187 | 1m10s | 5.3 |
+| `debate-select` (now `propose-select`) | 18 | 1.000 [1.000, 1.000] | 100% | $0.187 | 1m10s | 5.3 |
 | `single` | 18 | 0.990 [0.970, 1.000] | 94% | $0.050 | 22s | **19.7** |
 | `plan-execute` | 18 | 0.990 [0.970, 1.000] | 94% | $0.070 | 33s | 14.1 |
 | `plan-execute-verify` | 18 | 0.990 [0.970, 1.000] | 94% | $0.109 | 52s | 9.1 |
