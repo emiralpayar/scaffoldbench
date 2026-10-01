@@ -129,18 +129,16 @@ export function ActOne({ postmortem, createdAt }: { postmortem: Postmortem | nul
             So a run now has to prove that its architecture executed: each design declares checks such
             as &ldquo;the plan was not empty&rdquo; or &ldquo;the work fanned out&rdquo;, and a run that
             fails one is excluded from every ranking on this site and counted instead. The records
-            behind every number above stay in the repository
+            behind every number above stay in the repository, unchanged, as evidence
             {evidenceUrl ? (
               <>
-                {' '}
-                (
+                :{' '}
                 <a href={evidenceUrl} className="link">
                   <code className="code-inline">results/{postmortem?.runSetId}</code>
                 </a>
-                )
               </>
             ) : null}
-            , unchanged, as evidence.
+            .
           </p>
         </div>
       </div>

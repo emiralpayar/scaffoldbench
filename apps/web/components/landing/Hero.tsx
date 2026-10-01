@@ -19,7 +19,7 @@ export function Hero({ facts, note }: { facts: HeroFact[]; note?: string }) {
         <div className="min-w-0">
           <p className="eyebrow">An open benchmark of agent harness architectures</p>
           <h1 className="display mt-6 text-ink">
-            Does your agent scaffold <em className="italic text-ink">pay for itself?</em>
+            Does your agent scaffold <em className="italic text-ink">pay for itself<span className="kern-q">?</span></em>
           </h1>
           <p className="lede mt-7 max-w-[38rem]">
             Planners, verifiers, worker pools, selectors and gates all cost tokens and time.

@@ -17,7 +17,7 @@ export function ActTwo({ analysis, synthetic }: { analysis: SiteAnalysis | null;
         <div className="max-w-[46rem]">
           <p className="eyebrow">Act 2 · Scaffold or scale?</p>
           <h2 id="act-2-title" className="h1 mt-4 text-ink">
-            Does the extra structure pay for itself?
+            Does the extra structure pay for itself<span className="kern-q">?</span>
           </h2>
           <p className="lede mt-6">
             Every architecture against a plain single agent on the same model, the same tasks and the
@@ -60,7 +60,9 @@ function Charts({ analysis }: { analysis: SiteAnalysis }) {
       {analysis.models.length > 1 ? (
         <div className="mt-20 grid gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
           <div>
-            <h3 className="h2 text-ink">Or buy a bigger model?</h3>
+            <h3 className="h2 text-ink">
+              Or buy a bigger model<span className="kern-q">?</span>
+            </h3>
             <p className="prose-serif mt-4">
               Adding structure is one way to spend more per task. Moving a plain agent up a model
               tier is the other. Each ring is a single agent, labelled by model; spokes reach that

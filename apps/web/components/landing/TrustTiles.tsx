@@ -1,57 +1,7 @@
 import { sourceUrl } from '../../lib/site';
+import { TRUST_CLAIMS } from '../../lib/trust';
 
-interface Tile {
-  title: string;
-  body: string;
-  /** The file a reader can open to check the claim. */
-  source: string;
-  icon: keyof typeof ICONS;
-}
-
-/**
- * Why the numbers can be trusted, each claim pointing at the file that
- * enforces it. "Show me the line" is the only kind of trust an engineer
- * extends to a benchmark.
- */
-const TILES: Tile[] = [
-  {
-    title: 'Proof the design ran',
-    body: 'Each architecture declares what running as designed looks like: a non-empty plan, a real fan-out, a parsed verdict. A run that fails a check is excluded from rankings and counted, never scored.',
-    source: 'apps/web/lib/records.ts',
-    icon: 'check',
-  },
-  {
-    title: 'Same inputs for every design',
-    body: 'Every architecture gets the same model, tools, task prompt, domain policy and budget. Only the harness around the model changes.',
-    source: 'packages/core/src/systemPrompt.ts',
-    icon: 'equal',
-  },
-  {
-    title: 'Scored by state, not by vibes',
-    body: 'Tool-use tasks are graded by checking the final state of the world and the journal of tool calls. No language model decides who won.',
-    source: 'packages/tasks/src/defineToolUseTask.ts',
-    icon: 'grid',
-  },
-  {
-    title: 'A sandbox that says no',
-    body: 'A guard denies any tool outside the task’s toolset, before it runs, and every denial is written to the trace.',
-    source: 'packages/core/src/guard.ts',
-    icon: 'shield',
-  },
-  {
-    title: 'Paired, task-clustered statistics',
-    body: 'Architectures are compared on the same task and repeat, bootstrapped over tasks so repeats are not mistaken for independent evidence.',
-    source: 'apps/web/lib/analysis.ts',
-    icon: 'pair',
-  },
-  {
-    title: 'Outages are not failures',
-    body: 'A run lost to the API is never scored as the architecture failing. It is excluded from every ranking and reported in the health count.',
-    source: 'apps/web/lib/records.ts',
-    icon: 'pulse',
-  },
-];
-
+/** The trust claims as tiles, each linking to the file that enforces it. */
 export function TrustTiles() {
   return (
     <section aria-labelledby="trust-title" className="section border-t border-rule">
@@ -63,7 +13,7 @@ export function TrustTiles() {
           </h2>
         </div>
         <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {TILES.map((tile) => {
+          {TRUST_CLAIMS.map((tile) => {
             const href = sourceUrl(tile.source);
             return (
               <li key={tile.title} className="card flex flex-col p-6">

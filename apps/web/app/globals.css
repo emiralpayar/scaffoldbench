@@ -309,6 +309,19 @@ body {
     font-feature-settings: "tnum" 1;
   }
 
+  /*
+   * Newsreader's display cut leaves a wide gap before "?", which reads as a
+   * stray space at headline sizes. Close it by hand where a heading ends in one.
+   */
+  .kern-q {
+    margin-left: -0.06em;
+  }
+
+  /* Mono figures run large beside a serif's x-height; bring them in line. */
+  :where(.lede, .prose-serif) .num {
+    font-size: 0.88em;
+  }
+
   .code-inline {
     font-family: var(--font-mono);
     font-size: 0.88em;
