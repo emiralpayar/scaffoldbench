@@ -54,13 +54,20 @@ the key points at.
 ```bash
 npx tsx scripts/build-corpus.ts                  # refetch everything (one request at a time)
 npx tsx scripts/build-corpus.ts --only rfc9110   # refetch some documents, keep the rest
+npx tsx scripts/build-corpus.ts --verify         # refetch and compare with the snapshot; writes nothing
 npm run check
 ```
+
+`--verify` is the reproducibility check: it rebuilds every document from its source with the committed
+extractor and reports which no longer match the manifest checksum; it exits 1 if any differ. When
+version 2 was committed, all 26 documents rebuilt byte for byte. A difference later means a source page
+has changed since the snapshot, not that the corpus was edited (`Corpus.load` refuses an edited file).
 
 The source list, with each document's URL, licence and extraction rule, lives in
 `packages/tasks/src/research/sources.ts`. A rebuild is a new snapshot: standards and documentation
 change, so run the tests afterwards. If the sufficiency tests fail, a gold answer no longer matches the
-web it is graded against, and the task has to be re-keyed before it can be scored.
+web it is graded against, and the task has to be re-keyed before it can be scored. The script writes
+nothing until every fetch has succeeded, so a failed rebuild leaves the committed corpus intact.
 
 ## Licensing
 

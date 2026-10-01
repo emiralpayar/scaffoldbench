@@ -10,11 +10,20 @@
  *
  * This is the only part of ScaffoldBench that touches the network for
  * research, and it runs by hand, never during a benchmark. Requests go out one
- * at a time with a pause between them and an identifying User-Agent.
+ * at a time with a pause between them and an identifying User-Agent; a
+ * server's `Retry-After` is honoured. Nothing is written until every fetch has
+ * succeeded, so a failed rebuild leaves the committed corpus as it was.
  *
  *   npx tsx scripts/build-corpus.ts                 # rebuild everything
  *   npx tsx scripts/build-corpus.ts --only rfc9110  # refetch some documents, keep the rest
+ *   npx tsx scripts/build-corpus.ts --verify        # refetch and compare, write nothing
  *   npx tsx scripts/build-corpus.ts --notice        # regenerate NOTICE.md only, offline
+ *
+ * `--verify` is the reproducibility check: it rebuilds every document (or the
+ * `--only` ones) from its source and reports which no longer match the
+ * committed checksum, exiting 1 if any differ. A difference means the source
+ * has changed since the snapshot (or the extractor has), not that the corpus
+ * was edited — `Corpus.load` already refuses that.
  *
  * A rebuild is a new snapshot: answers graded against it can change, so run
  * the research tests afterwards — the sufficiency test fails when a gold
@@ -42,6 +51,8 @@ const USER_AGENT =
 const PAUSE_MS = 1_500;
 const TIMEOUT_MS = 30_000;
 const ATTEMPTS = 3;
+/** The longest `Retry-After` honoured; a server asking for more fails the build instead. */
+const MAX_RETRY_AFTER_MS = 120_000;
 /** A page that extracts to less than this is a broken extractor, not a short page. */
 const MIN_CHARS = 1_000;
 
@@ -56,15 +67,18 @@ async function main(): Promise<void> {
     return;
   }
 
+  const verify = process.argv.includes('--verify');
   const only = parseOnly(process.argv.slice(2));
-  if (only && !previous) throw new Error('--only needs an existing manifest to update.');
+  if ((only || verify) && !previous) throw new Error('--only and --verify need an existing manifest.');
 
   const unknown = [...(only ?? [])].filter((id) => !CORPUS_SOURCES.some((s) => s.id === id));
   if (unknown.length > 0) throw new Error(`Unknown source id(s): ${unknown.join(', ')}`);
 
-  await mkdir(path.join(corpusDir, 'docs'), { recursive: true });
+  // Fetch and extract everything first, in memory: a failure part-way through
+  // must not leave new documents next to an old manifest, which Corpus.load
+  // would then refuse.
   const records: CorpusDocumentRecord[] = [];
-
+  const texts = new Map<string, string>();
   let first = true;
   for (const source of CORPUS_SOURCES) {
     const kept = previous?.documents.find((record) => record.id === source.id);
@@ -82,7 +96,7 @@ async function main(): Promise<void> {
     const { text } = extractDocument(raw, source.extract);
     check(source, text);
 
-    await writeFile(documentFile(corpusDir, source.id), text, 'utf8');
+    texts.set(source.id, text);
     records.push({
       ...describe(source),
       fetchedFrom: fetchUrl,
@@ -90,8 +104,25 @@ async function main(): Promise<void> {
       sha256: sha256(text),
       chars: text.length,
     });
-    process.stdout.write(`${''.padEnd(36)} ${text.length.toLocaleString('en-US')} characters\n`);
+    const verdict = !verify ? '' : kept?.sha256 === sha256(text) ? ', identical to the snapshot' : ', DIFFERENT from the snapshot';
+    process.stdout.write(`${''.padEnd(36)} ${text.length.toLocaleString('en-US')} characters${verdict}\n`);
   }
+
+  if (verify) {
+    const changed = records.filter(
+      (record) => texts.has(record.id) && previous?.documents.find((old) => old.id === record.id)?.sha256 !== record.sha256,
+    );
+    process.stdout.write(
+      changed.length === 0
+        ? `\nAll ${texts.size} documents rebuild byte for byte from their sources.\n`
+        : `\n${changed.length} of ${texts.size} documents differ from the snapshot: ${changed.map((record) => record.id).join(', ')}.\n`,
+    );
+    process.exitCode = changed.length === 0 ? 0 : 1;
+    return;
+  }
+
+  await mkdir(path.join(corpusDir, 'docs'), { recursive: true });
+  for (const [id, text] of texts) await writeFile(documentFile(corpusDir, id), text, 'utf8');
 
   // Files from sources that have since been removed from the list.
   const wanted = new Set(records.map((record) => `${record.id}.txt`));
@@ -106,7 +137,7 @@ async function main(): Promise<void> {
   };
   await writeFile(path.join(corpusDir, CORPUS_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   await writeFile(path.join(FIXTURES_DIR, 'NOTICE.md'), renderNotice(manifest), 'utf8');
-  process.stdout.write(`\nWrote ${records.length} documents to ${path.relative(process.cwd(), corpusDir)}.\n`);
+  process.stdout.write(`\nWrote ${texts.size} of ${records.length} documents to ${path.relative(process.cwd(), corpusDir)}.\n`);
 }
 
 function describe(
@@ -141,6 +172,7 @@ function snapshotDate(records: readonly CorpusDocumentRecord[]): string {
 async function fetchText(url: string): Promise<string> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    let wait = PAUSE_MS * 2 ** attempt;
     try {
       const response = await fetch(url, {
         headers: {
@@ -154,12 +186,26 @@ async function fetchText(url: string): Promise<string> {
       if (response.ok) return await response.text();
       lastError = new Error(`HTTP ${response.status}`);
       if (response.status < 500 && response.status !== 429) break;
+      const asked = retryAfterMs(response.headers.get('retry-after'));
+      if (asked !== undefined) {
+        if (asked > MAX_RETRY_AFTER_MS) break;
+        wait = Math.max(wait, asked);
+      }
     } catch (error) {
       lastError = error;
     }
-    await sleep(PAUSE_MS * 2 ** attempt);
+    if (attempt < ATTEMPTS) await sleep(wait);
   }
   throw new Error(`Could not fetch ${url}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+/** A `Retry-After` header, in seconds or as an HTTP date, as milliseconds from now. */
+function retryAfterMs(header: string | null, now = Date.now()): number | undefined {
+  if (header === null || header.trim() === '') return undefined;
+  const seconds = Number(header.trim());
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1_000);
+  const date = Date.parse(header);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 }
 
 function renderNotice(manifest: CorpusManifest): string {
