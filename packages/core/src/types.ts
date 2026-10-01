@@ -221,6 +221,40 @@ export interface RunContext {
 }
 
 // ---------------------------------------------------------------------------
+// Model calls
+// ---------------------------------------------------------------------------
+
+export type ApiErrorKind =
+  | 'auth'
+  | 'rate_limit'
+  | 'overloaded'
+  | 'server'
+  | 'invalid_request'
+  | 'unknown';
+
+/** A call that failed at the API or in the infrastructure around it. See `apiErrors.ts`. */
+export interface ApiError {
+  kind: ApiErrorKind;
+  /** True when the same call could succeed if made again later. */
+  retryable: boolean;
+  message: string;
+  /** HTTP status, when the SDK reported one. */
+  status?: number;
+}
+
+/** One model's share of a call, as the SDK's `modelUsage` reports it. */
+export interface ModelSpend extends UsageTotals {
+  costUsd: number;
+}
+
+/** An MCP server as the session's init message reported it. */
+export interface McpServerStatus {
+  name: string;
+  /** `connected`, `failed`, `needs-auth`, `pending`, … as reported by the SDK. */
+  status: string;
+}
+
+// ---------------------------------------------------------------------------
 // Budget
 // ---------------------------------------------------------------------------
 
@@ -277,6 +311,12 @@ export interface TraceEvent {
   /** Milliseconds since the run started. */
   tMs: number;
   phase: string;
+  /**
+   * The `query()` call that produced this event (`QueryOutcome.callId`).
+   * Concurrent calls interleave in one trace, so this — not the event's
+   * position — is what ties an event to the call it belongs to.
+   */
+  callId?: string;
   /** 0 for the main thread, 1 for a subagent, and so on. */
   depth: number;
   agent?: string;

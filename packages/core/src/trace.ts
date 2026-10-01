@@ -1,4 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { apiErrorOfAssistant } from './apiErrors';
 import type { TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
 
 const MAX_TEXT = 8_000;
@@ -66,11 +67,13 @@ interface NormalizeContext {
   /** Depth for main-thread messages; subagent messages get `depth + 1`. */
   depth: number;
   agent?: string;
+  /** The call the message belongs to, stamped on every event. */
+  callId?: string;
 }
 
 type PartialEvent = Omit<TraceEvent, 'seq' | 'tMs'>;
 
-function usageFrom(raw: unknown): Partial<UsageTotals> | undefined {
+export function usageFrom(raw: unknown): Partial<UsageTotals> | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const u = raw as Record<string, unknown>;
   const num = (v: unknown) => (typeof v === 'number' ? v : 0);
@@ -91,10 +94,26 @@ function usageFrom(raw: unknown): Partial<UsageTotals> | undefined {
  */
 export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext): PartialEvent[] {
   const out: PartialEvent[] = [];
-  const base = { phase: ctx.phase, depth: ctx.depth, agent: ctx.agent };
+  const base = {
+    phase: ctx.phase,
+    depth: ctx.depth,
+    agent: ctx.agent,
+    ...(ctx.callId !== undefined ? { callId: ctx.callId } : {}),
+  };
 
   switch (message.type) {
     case 'system': {
+      if (message.subtype === 'api_retry') {
+        // Retried requests are invisible in the result; a run that crawled
+        // through a rate limit should say so in its trace.
+        out.push({
+          ...base,
+          kind: 'note',
+          text: `API request failed (${message.error_status ?? 'no response'}, ${message.error}); retry ${message.attempt} of ${message.max_retries}.`,
+          meta: { apiRetry: true, status: message.error_status, error: message.error },
+        });
+        break;
+      }
       if (message.subtype !== 'init') break;
       out.push({
         ...base,
@@ -112,6 +131,23 @@ export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext):
     case 'assistant': {
       const isSubagent = message.parent_tool_use_id != null;
       const depth = isSubagent ? ctx.depth + 1 : ctx.depth;
+
+      // A failed request arrives dressed as an assistant message. Recording
+      // it as an error keeps its text out of anything that reads the agent's
+      // words — the salvage path, the viewer's transcript, the answer.
+      const apiError = apiErrorOfAssistant(message);
+      if (apiError) {
+        out.push({
+          ...base,
+          depth,
+          kind: 'error',
+          isError: true,
+          text: truncate(apiError.message, 2_000),
+          meta: { apiError },
+        });
+        break;
+      }
+
       const content = message.message?.content;
       if (!Array.isArray(content)) break;
 
@@ -167,7 +203,18 @@ export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext):
           numTurns: message.num_turns,
           stopReason: message.stop_reason,
           permissionDenials: message.permission_denials?.length ?? 0,
+          ...(message.terminal_reason !== undefined ? { terminalReason: message.terminal_reason } : {}),
           ...(message.subtype !== 'success' ? { errors: message.errors } : {}),
+          ...(message.subtype === 'success' && message.api_error_status != null
+            ? { apiErrorStatus: message.api_error_status }
+            : {}),
+          ...(message.modelUsage
+            ? {
+                costByModel: Object.fromEntries(
+                  Object.entries(message.modelUsage).map(([model, u]) => [model, u.costUSD]),
+                ),
+              }
+            : {}),
         },
       });
       break;

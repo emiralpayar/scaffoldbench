@@ -214,6 +214,55 @@ describe('normalizeSdkMessage', () => {
     expect(events[0]?.meta?.errors).toEqual(['budget exhausted']);
   });
 
+  it('records a failed request as an error, never as the agent speaking', () => {
+    const events = normalizeSdkMessage(
+      asMessage({
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'authentication_failed',
+        message: {
+          model: '<synthetic>',
+          content: [{ type: 'text', text: 'Invalid API key · Please run /login' }],
+        },
+      }),
+      ctx,
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'error', isError: true });
+    expect(events[0]?.meta?.apiError).toMatchObject({ kind: 'auth', retryable: false });
+  });
+
+  it('notes a retried API request', () => {
+    const events = normalizeSdkMessage(
+      asMessage({
+        type: 'system',
+        subtype: 'api_retry',
+        attempt: 1,
+        max_retries: 10,
+        retry_delay_ms: 500,
+        error_status: 529,
+        error: 'overloaded',
+      }),
+      ctx,
+    );
+
+    expect(events[0]?.kind).toBe('note');
+    expect(events[0]?.meta).toMatchObject({ apiRetry: true, status: 529 });
+  });
+
+  it('stamps every event with the call it belongs to', () => {
+    const events = normalizeSdkMessage(
+      asMessage({
+        type: 'assistant',
+        parent_tool_use_id: null,
+        message: { content: [{ type: 'text', text: 'hello' }] },
+      }),
+      { ...ctx, callId: 'call-7' },
+    );
+    expect(events[0]?.callId).toBe('call-7');
+  });
+
   it('skips message types it does not model', () => {
     expect(normalizeSdkMessage(asMessage({ type: 'stream_event' }), ctx)).toEqual([]);
     expect(normalizeSdkMessage(asMessage({ type: 'assistant', message: {} }), ctx)).toEqual([]);
