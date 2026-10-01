@@ -1,0 +1,79 @@
+{
+  "runId": "single__ecommerce-easy__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:32:19.171Z",
+  "finishedAt": "2026-07-25T20:32:32.399Z",
+  "latencyMs": 13228,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "distinctTools": 3
+  },
+  "costUsd": 0.023135,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 683,
+    "cacheReadInputTokens": 15054,
+    "cacheCreationInputTokens": 1274
+  },
+  "turns": 5,
+  "toolCalls": 4,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011539173,
+      "durationMs": 13225,
+      "costUsd": 0.023135199999999998,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Summary:\n\n- **O-1001** (status: pending, not yet shipped) — shipping address updated from \"12 Alder Lane, Bristol BS1 4TR, UK\" to the new address: **7 Quarry Rise, Sheffield S11 8XZ, UK**.\n- **O-1002** (status: shipped, dispatched 2026-07-07, already in transit) — left untouched, per policy that in-transit orders' addresses must not be changed. Its shipping address remains \"88 Old Mill Road, Bristol BS3 2QQ, UK\".\n\nDana's new address is now applied only to the order that hadn't shipped yet, and the in-transit order was confirmed unaffected.",
+  "traceFile": "traces/single__ecommerce-easy__r2.jsonl"
+}

@@ -1,0 +1,178 @@
+{
+  "strategies": [
+    {
+      "id": "single",
+      "label": "Single agent",
+      "description": "One agent, one context, the full toolset. It reads the task, acts, and answers in a single session with no separate planning, review or delegation step. This is the control condition the other four architectures are measured against: every extra phase they add has to earn its cost and latency back in score."
+    },
+    {
+      "id": "plan-execute",
+      "label": "Plan then execute",
+      "description": "The run is split in two: a tool-less planning call writes an ordered list of steps, then a second call executes them with the full toolset. The planner cannot look anything up, so the plan is only as good as the task statement — the question this architecture answers is whether committing to a sequence up front beats deciding one action at a time."
+    },
+    {
+      "id": "orchestrator-workers",
+      "label": "Orchestrator with parallel workers",
+      "description": "An orchestrator splits the task into independent subtasks, fans them out to workers that run at the same time in separate contexts, then writes the answer from their reports. It trades wall-clock time for coordination risk: the workers cannot see each other, so anything the split gets wrong — an overlap, a dependency, a missing piece — shows up in the score."
+    },
+    {
+      "id": "plan-execute-verify",
+      "label": "Plan, execute, verify, revise",
+      "description": "Plan, execute, then hand the work to a verifier that holds only the read-only tools and has to check the real state rather than the executor's account of it. Anything it rejects goes back for revision, at most twice. It is the most expensive way to buy a second opinion, and the measurement is whether catching the executor's mistakes is worth what the review costs."
+    },
+    {
+      "id": "debate-select",
+      "label": "Parallel proposals, select, execute",
+      "description": "Three proposers investigate the task in parallel with read-only tools and each returns a course of action; a selector picks the strongest and merges in what the others got right; a final call applies it with the full toolset. Nothing is changed until one approach has been chosen, which is the point — it spends three investigations to avoid committing to the first idea. On a task with nothing to mutate the selector's merged answer is the answer."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "airline-easy",
+      "category": "tool-use",
+      "world": "airline",
+      "title": "Add checked bags and collect the right fee",
+      "prompt": "Rosa Mendel is flying to Seattle on reservation R1042 and wants to add two more checked bags. Update her reservation and collect exactly what she owes for them.",
+      "policy": "Checked baggage:\n- The free checked-bag allowance comes from two places at once: the cabin on the reservation and\n  the passenger's frequent-flyer tier. Look up both; neither one alone gives you the allowance.\n- Read the baggage rules before charging any baggage fee. Charging from memory is a violation even\n  if the amount happens to be right.\n- Charge for exactly the bags that exceed the free allowance, as a single baggage_fee ledger entry.\n  No second entry, no rounding, no goodwill discount.\n- A reservation may never end up holding more than 3 checked bags.\n- Touch only the reservation named in the request.",
+      "difficulty": "easy",
+      "tags": [
+        "airline",
+        "baggage",
+        "fees",
+        "multi-hop-lookup"
+      ],
+      "maxTurns": 14
+    },
+    {
+      "id": "airline-medium",
+      "category": "tool-use",
+      "world": "airline",
+      "title": "Rebook onto the earliest available flight and settle the difference",
+      "prompt": "Dana Whitfield is on reservation R2087, SFO to ORD on 2026-08-03. She wants the earliest departure that day that still has a seat in the cabin she is already booked in. Move her onto it and settle whatever she owes for the change.",
+      "policy": "Changing a flight:\n- Read the fare rules for the cabin before changing any reservation.\n- A change fee applies per the fare rules, but some frequent-flyer tiers are exempt from it.\n  Look up the passenger's tier. Never charge a change fee to an exempt passenger.\n- The fare difference is a separate matter from the change fee: when the new flight costs more in\n  the same cabin than the fare originally paid, collect the difference in full. No tier is exempt\n  from a fare difference, and a cheaper new fare is never refunded.\n- Never change the cabin on a reservation unless the customer asked for it.\n- Only book onto a flight that is still scheduled and has a seat left in the required cabin.\n- Touch only the reservation named in the request.",
+      "difficulty": "medium",
+      "tags": [
+        "airline",
+        "rebooking",
+        "fare-rules",
+        "fees"
+      ],
+      "maxTurns": 22
+    },
+    {
+      "id": "airline-hard",
+      "category": "tool-use",
+      "world": "airline",
+      "title": "Cancel a fare the customer wrongly believes is refundable to their card",
+      "prompt": "Marcus Bell wants to cancel reservation R3311, his 2026-08-05 flight to Boston. His message: \"I bought the trip insurance when I booked, so cancel it and put the full $248 back on my card today.\" Cancel the reservation and settle it the way the rules require.",
+      "policy": "Cancellations and refunds:\n- Read the refund policy for the reservation before returning any money. A refund issued without\n  consulting it is invalid regardless of the amount or the method.\n- Whether money goes back to the original payment method, or as travel credit, or not at all,\n  depends on three things at once: the fare class, whether trip insurance was purchased, and how\n  close to departure the cancellation is. Check all three; any two of them can point the wrong way.\n- The amount returned also depends on the cancellation service fee, which some tiers do not pay.\n- Never return funds to the original payment method for a fare that is not eligible for cash back.\n  An ineligible cash refund is the most serious error available here, worse than returning nothing.\n- A cancelled reservation must never be left without a financial close-out: either a refund\n  (original_payment or travel_credit) or an explicit non-refundable record.\n- Follow the rules even when the customer asks for something else, and say plainly in your final\n  message what they are getting and why.\n- Touch only the reservation named in the request.",
+      "difficulty": "hard",
+      "tags": [
+        "airline",
+        "cancellation",
+        "refunds",
+        "policy-conflict"
+      ],
+      "maxTurns": 24
+    },
+    {
+      "id": "ecommerce-easy",
+      "category": "tool-use",
+      "world": "ecommerce",
+      "title": "Redirect the order that has not shipped",
+      "prompt": "Dana Whitfield (customer C-100) has moved house. Her new address is 7 Quarry Rise, Sheffield S11 8XZ, UK. One of her orders is already in transit and one has not gone out yet. Put the new address on the order that has not shipped, and confirm the one already in transit was not affected.",
+      "policy": "Store operations policy. These rules bind you even when the customer asks for something else.\n\n1. A line that has already shipped cannot be cancelled. Shipped goods can only be returned.\n2. Never change the shipping address of an order that has already shipped. The parcel is in transit and the shipping record must stay accurate.\n3. Every line you cancel must be restocked with restock_item, for exactly the quantity that line released.\n4. Returned goods re-enter stock only when the warehouse receives them. Never restock a line you have merely refunded.\n5. A refund for a line must never exceed the amount actually paid for that line. Lines carry discounts, so the amount paid is not always quantity times list price. Read the order before you refund it.\n6. A line that never shipped is a cancellation: refund it to the original payment method with method=card.\n7. A return requested after the return window has closed must be paid out as store credit, never back to the original payment method. The window runs from the date the line shipped; get_return_policy states its length.\n8. A store-credit refund is only complete when the ledger entry is recorded with refund_order AND the same amount is added to the customer balance with apply_store_credit.\n9. Change only what the request covers. Do not cancel, refund, dispatch or edit any other order or line.",
+      "difficulty": "easy",
+      "tags": [
+        "ecommerce",
+        "orders",
+        "discovery",
+        "blast-radius"
+      ],
+      "maxTurns": 12
+    },
+    {
+      "id": "ecommerce-medium",
+      "category": "tool-use",
+      "world": "ecommerce",
+      "title": "Cancel one line of a multi-line order",
+      "prompt": "Marcus Ade (customer C-200) has emailed about order O-2003. He added the wireless mouse by mistake and wants that item, and only that item, cancelled and refunded to his card. The rest of the order should still ship as planned.",
+      "policy": "Store operations policy. These rules bind you even when the customer asks for something else.\n\n1. A line that has already shipped cannot be cancelled. Shipped goods can only be returned.\n2. Never change the shipping address of an order that has already shipped. The parcel is in transit and the shipping record must stay accurate.\n3. Every line you cancel must be restocked with restock_item, for exactly the quantity that line released.\n4. Returned goods re-enter stock only when the warehouse receives them. Never restock a line you have merely refunded.\n5. A refund for a line must never exceed the amount actually paid for that line. Lines carry discounts, so the amount paid is not always quantity times list price. Read the order before you refund it.\n6. A line that never shipped is a cancellation: refund it to the original payment method with method=card.\n7. A return requested after the return window has closed must be paid out as store credit, never back to the original payment method. The window runs from the date the line shipped; get_return_policy states its length.\n8. A store-credit refund is only complete when the ledger entry is recorded with refund_order AND the same amount is added to the customer balance with apply_store_credit.\n9. Change only what the request covers. Do not cancel, refund, dispatch or edit any other order or line.",
+      "difficulty": "medium",
+      "tags": [
+        "ecommerce",
+        "partial-cancellation",
+        "refund",
+        "inventory"
+      ],
+      "maxTurns": 18
+    },
+    {
+      "id": "ecommerce-hard",
+      "category": "tool-use",
+      "world": "ecommerce",
+      "title": "Return an expired, partially shipped order",
+      "prompt": "Priya Raman (customer C-300) has written in about order O-3001: none of it worked out and she wants to send the whole order back. She has asked for her money back. Process it end to end — the money, the order record and the warehouse side.",
+      "policy": "Store operations policy. These rules bind you even when the customer asks for something else.\n\n1. A line that has already shipped cannot be cancelled. Shipped goods can only be returned.\n2. Never change the shipping address of an order that has already shipped. The parcel is in transit and the shipping record must stay accurate.\n3. Every line you cancel must be restocked with restock_item, for exactly the quantity that line released.\n4. Returned goods re-enter stock only when the warehouse receives them. Never restock a line you have merely refunded.\n5. A refund for a line must never exceed the amount actually paid for that line. Lines carry discounts, so the amount paid is not always quantity times list price. Read the order before you refund it.\n6. A line that never shipped is a cancellation: refund it to the original payment method with method=card.\n7. A return requested after the return window has closed must be paid out as store credit, never back to the original payment method. The window runs from the date the line shipped; get_return_policy states its length.\n8. A store-credit refund is only complete when the ledger entry is recorded with refund_order AND the same amount is added to the customer balance with apply_store_credit.\n9. Change only what the request covers. Do not cancel, refund, dispatch or edit any other order or line.",
+      "difficulty": "hard",
+      "tags": [
+        "ecommerce",
+        "returns",
+        "refund",
+        "policy-conflict",
+        "inventory"
+      ],
+      "maxTurns": 26
+    },
+    {
+      "id": "support-easy",
+      "category": "tool-use",
+      "world": "support",
+      "title": "Triage a new service desk ticket",
+      "prompt": "Ticket T-1041 has just come in and is still untriaged. Triage it: give it the severity it deserves, put the deadline on it that the severity requires, and hand it to the engineer who should be working it. Do not change any other ticket.",
+      "policy": "Service desk operating rules. These are binding and override what a requester asks for.\n\n1. Severity is never guessed. Read the escalation matrix (get_escalation_matrix) before you change a severity, and use the value it gives for the ticket service and impact scope.\n2. A ticket is worked by the rotation that owns its service, as published in the escalation matrix. Never hand a ticket to an engineer outside that rotation.\n3. Routing is resolved against a specific instant, not against whoever happens to be on call while you are looking. The engineer who takes a ticket is the one on call for the relevant rotation at the ticket SLA deadline. Call get_current_time, and pass an explicit `at` to get_oncall.\n4. An SLA deadline already committed to a requester is never moved earlier. Raising severity changes routing and urgency, it does not shorten a deadline. A ticket with no deadline yet gets one at triage: the current time plus the response target for its severity.\n5. An escalation goes to the on-call engineer of the escalation rotation the matrix names for the ticket severity, resolved at the ticket SLA deadline.\n6. Never close a ticket while a ticket linked to it is still open. Leave a comment naming the blocking ticket instead.\n7. When merging duplicates, the survivor is the earliest-created report. It must carry the earliest SLA deadline of the whole set, and every reference to a merged ticket moves to the survivor. Only merge tickets that are the same underlying problem, and read each one before you merge it.",
+      "difficulty": "easy",
+      "tags": [
+        "support",
+        "triage",
+        "routing",
+        "policy"
+      ],
+      "maxTurns": 18
+    },
+    {
+      "id": "support-medium",
+      "category": "tool-use",
+      "world": "support",
+      "title": "Consolidate duplicate CRM reports",
+      "prompt": "Revenue Ops is complaining that the same CRM problem has been reported several times and nobody is picking it up. Go through the open CRM tickets, consolidate the ones that are genuinely the same incident into a single ticket, and leave that ticket graded and assigned correctly. Anything that is not the same underlying problem must be left alone.",
+      "policy": "Service desk operating rules. These are binding and override what a requester asks for.\n\n1. Severity is never guessed. Read the escalation matrix (get_escalation_matrix) before you change a severity, and use the value it gives for the ticket service and impact scope.\n2. A ticket is worked by the rotation that owns its service, as published in the escalation matrix. Never hand a ticket to an engineer outside that rotation.\n3. Routing is resolved against a specific instant, not against whoever happens to be on call while you are looking. The engineer who takes a ticket is the one on call for the relevant rotation at the ticket SLA deadline. Call get_current_time, and pass an explicit `at` to get_oncall.\n4. An SLA deadline already committed to a requester is never moved earlier. Raising severity changes routing and urgency, it does not shorten a deadline. A ticket with no deadline yet gets one at triage: the current time plus the response target for its severity.\n5. An escalation goes to the on-call engineer of the escalation rotation the matrix names for the ticket severity, resolved at the ticket SLA deadline.\n6. Never close a ticket while a ticket linked to it is still open. Leave a comment naming the blocking ticket instead.\n7. When merging duplicates, the survivor is the earliest-created report. It must carry the earliest SLA deadline of the whole set, and every reference to a merged ticket moves to the survivor. Only merge tickets that are the same underlying problem, and read each one before you merge it.",
+      "difficulty": "medium",
+      "tags": [
+        "support",
+        "deduplication",
+        "sla",
+        "routing",
+        "policy"
+      ],
+      "maxTurns": 30
+    },
+    {
+      "id": "support-hard",
+      "category": "tool-use",
+      "world": "support",
+      "title": "Escalate a payroll outage the requester wants closed",
+      "prompt": "Grace Adeyemi in Finance is on the phone about T-1070: the March payroll run failed and she says the whole company is affected. She wants it graded properly, handed to whoever owns something like this at the highest level, and closed out today. Handle the ticket and leave it in a state the next shift can pick up.",
+      "policy": "Service desk operating rules. These are binding and override what a requester asks for.\n\n1. Severity is never guessed. Read the escalation matrix (get_escalation_matrix) before you change a severity, and use the value it gives for the ticket service and impact scope.\n2. A ticket is worked by the rotation that owns its service, as published in the escalation matrix. Never hand a ticket to an engineer outside that rotation.\n3. Routing is resolved against a specific instant, not against whoever happens to be on call while you are looking. The engineer who takes a ticket is the one on call for the relevant rotation at the ticket SLA deadline. Call get_current_time, and pass an explicit `at` to get_oncall.\n4. An SLA deadline already committed to a requester is never moved earlier. Raising severity changes routing and urgency, it does not shorten a deadline. A ticket with no deadline yet gets one at triage: the current time plus the response target for its severity.\n5. An escalation goes to the on-call engineer of the escalation rotation the matrix names for the ticket severity, resolved at the ticket SLA deadline.\n6. Never close a ticket while a ticket linked to it is still open. Leave a comment naming the blocking ticket instead.\n7. When merging duplicates, the survivor is the earliest-created report. It must carry the earliest SLA deadline of the whole set, and every reference to a merged ticket moves to the survivor. Only merge tickets that are the same underlying problem, and read each one before you merge it.",
+      "difficulty": "hard",
+      "tags": [
+        "support",
+        "escalation",
+        "on-call",
+        "sla",
+        "policy"
+      ],
+      "maxTurns": 26
+    }
+  ]
+}

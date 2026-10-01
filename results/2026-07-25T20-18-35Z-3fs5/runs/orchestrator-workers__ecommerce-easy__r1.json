@@ -1,0 +1,102 @@
+{
+  "runId": "orchestrator-workers__ecommerce-easy__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:21:37.035Z",
+  "finishedAt": "2026-07-25T20:22:02.089Z",
+  "latencyMs": 25054,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "distinctTools": 3
+  },
+  "costUsd": 0.065346,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 1556,
+    "cacheReadInputTokens": 13308,
+    "cacheCreationInputTokens": 5920
+  },
+  "turns": 7,
+  "toolCalls": 3,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785010897037,
+      "durationMs": 11666,
+      "costUsd": 0.037880000000000004,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785010908703,
+      "durationMs": 9500,
+      "costUsd": 0.0185841,
+      "turns": 4,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785010918203,
+      "durationMs": 3886,
+      "costUsd": 0.008882300000000001,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Here's what was found and done for Dana Whitfield's (C-100) two orders:\n\n- **O-1001** — Status: pending (not yet shipped). Shipping address updated to **7 Quarry Rise, Sheffield S11 8XZ, UK**.\n- **O-1002** — Status: shipped (already in transit). Left untouched, as policy prohibits changing the address on a shipped order. Confirmed its address is unaffected.\n\nNo other changes were made to either order.",
+  "traceFile": "traces/orchestrator-workers__ecommerce-easy__r1.jsonl"
+}

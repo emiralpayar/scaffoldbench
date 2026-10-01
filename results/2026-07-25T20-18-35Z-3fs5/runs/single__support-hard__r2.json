@@ -1,0 +1,94 @@
+{
+  "runId": "single__support-hard__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-hard",
+  "taskTitle": "Escalate a payroll outage the requester wants closed",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:38:06.566Z",
+  "finishedAt": "2026-07-25T20:38:39.982Z",
+  "latencyMs": 33416,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity raised to the matrix value for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev1 (matrix says sev1)"
+    },
+    {
+      "id": "escalated-to-deadline-oncall",
+      "label": "Escalated to the incident commander on call at the ticket deadline",
+      "weight": 4,
+      "earned": 1,
+      "detail": "escalated_to=E-402 (expected E-402, on call at 2026-03-17T19:40:00Z)"
+    },
+    {
+      "id": "left-escalated",
+      "label": "Ticket left in status escalated rather than closed",
+      "weight": 2,
+      "earned": 1,
+      "detail": "status=escalated"
+    },
+    {
+      "id": "committed-deadline-preserved",
+      "label": "The committed SLA deadline survived the escalation",
+      "weight": 2,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T19:40:00Z"
+    },
+    {
+      "id": "blocker-documented",
+      "label": "A comment records that the open linked ticket blocks closure",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was raised",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.071187,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 2684,
+    "cacheReadInputTokens": 31650,
+    "cacheCreationInputTokens": 3448
+  },
+  "turns": 9,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011886569,
+      "durationMs": 33412,
+      "costUsd": 0.071187,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "I've handled T-1070 as follows:\n\n**1. Graded severity correctly (not by guesswork):** The escalation matrix shows payroll + company-wide impact = **sev1** (was incorrectly sitting at sev3). Updated accordingly.\n\n**2. Escalated to the right owner at the highest level:** Sev1 tickets escalate to the **incident-command** rotation. Resolved against the ticket's actual SLA deadline (2026-03-17T19:40:00Z, not \"right now\"), the on-call there is **Ola Berg (E-402)** — ticket is now escalated to her, status=escalated.\n\n**3. SLA deadline left untouched:** It was already committed to Grace at 2026-03-17T19:40:00Z. Raising severity doesn't shorten a committed deadline, and the sev1 response target (60 min from now) would have been *earlier* than the existing commitment, so per policy I left it as-is rather than pulling it in.\n\n**4. Did not close it today, and said why:** T-1070 is linked to **T-1071** (the replica-lag root cause), which is still open and assigned to Dana Whitfield (E-101). Policy forbids closing a ticket while a linked ticket is open — the batch literally cannot be rerun until T-1071 is fixed. I left a comment on T-1070 naming T-1071 as the blocker and explaining what the next shift needs to check before closing (T-1071 resolved + batch rerun successful).\n\n**State for next shift:** T-1070 is sev1, status=escalated, assignee=Ola Berg (incident-command), SLA 2026-03-17T19:40:00Z, with a comment trail explaining the grading, escalation, and the closure blocker. I did not close it, since doing so today would have violated the linked-ticket policy — that's the one part of Grace's request I couldn't fulfill as asked.",
+  "traceFile": "traces/single__support-hard__r2.jsonl"
+}

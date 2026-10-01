@@ -1,0 +1,117 @@
+{
+  "runId": "orchestrator-workers__support-hard__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-hard",
+  "taskTitle": "Escalate a payroll outage the requester wants closed",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:28:10.875Z",
+  "finishedAt": "2026-07-25T20:29:07.751Z",
+  "latencyMs": 56876,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity raised to the matrix value for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev1 (matrix says sev1)"
+    },
+    {
+      "id": "escalated-to-deadline-oncall",
+      "label": "Escalated to the incident commander on call at the ticket deadline",
+      "weight": 4,
+      "earned": 1,
+      "detail": "escalated_to=E-402 (expected E-402, on call at 2026-03-17T19:40:00Z)"
+    },
+    {
+      "id": "left-escalated",
+      "label": "Ticket left in status escalated rather than closed",
+      "weight": 2,
+      "earned": 1,
+      "detail": "status=escalated"
+    },
+    {
+      "id": "committed-deadline-preserved",
+      "label": "The committed SLA deadline survived the escalation",
+      "weight": 2,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T19:40:00Z"
+    },
+    {
+      "id": "blocker-documented",
+      "label": "A comment records that the open linked ticket blocks closure",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was raised",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.114379,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 16,
+    "outputTokens": 4393,
+    "cacheReadInputTokens": 39349,
+    "cacheCreationInputTokens": 5624
+  },
+  "turns": 12,
+  "toolCalls": 8,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011290877,
+      "durationMs": 14921,
+      "costUsd": 0.023093600000000002,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011305798,
+      "durationMs": 31831,
+      "costUsd": 0.0694052,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011337629,
+      "durationMs": 10121,
+      "costUsd": 0.0218799,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Here's the current status of **T-1070** (March payroll batch failure reported by Grace Adeyemi):\n\n**What was done:**\n1. **Severity corrected**: The ticket was mis-graded sev3. Since the payroll matrix rates company-wide impact as **sev1**, severity was updated to sev1.\n2. **SLA deadline preserved**: T-1070 already had a committed deadline (2026-03-17T19:40:00Z) with the requester. Per policy, raising severity never pulls a committed deadline earlier, so it was left as-is rather than tightened to sev1's response target.\n3. **Escalated to the correct owner**: Sev1 tickets escalate to the **incident-command** rotation, resolved at the ticket's SLA deadline (not \"whoever's on call now\"). The engineer covering that instant is **E-402 Ola Berg**, so the ticket was escalated to him — the highest-level owner for this class of incident, as Grace requested.\n4. **Not closed**: T-1070 is linked to **T-1071** (payroll reporting replica lag, sev2, still open). Policy prohibits closing a ticket while a linked ticket remains open, and practically the payroll batch can't be rerun until T-1071's root cause is fixed. Closing it today, as requested, would misrepresent the outage as resolved and would violate a binding rule — so it was left open.\n5. **Handoff comment posted** on T-1070 documenting the regrade, the escalation rationale/target, the T-1071 blocker, and a note to keep Grace updated given the upcoming payday.\n\n**Open items for the next shift:**\n- **T-1071** needs to be resolved (replica lag root cause) before the payroll batch can be rerun.\n- **Ola Berg (E-402)** now owns T-1070 via the incident-command escalation and should coordinate the rerun once T-1071 clears, then close T-1070.\n- Grace should be kept in the loop — she was told the ticket is escalated to the incident commander but could not be closed today due to the dependency on T-1071.\n\n**Bottom line:** T-1070 was graded correctly (sev1), routed to the correct top-level rotation (incident-command → Ola Berg), and left open with a clear, documented reason and a defined next step, since closing it today as Grace asked would have violated the no-close-while-linked-ticket-is-open rule.",
+  "traceFile": "traces/orchestrator-workers__support-hard__r1.jsonl"
+}

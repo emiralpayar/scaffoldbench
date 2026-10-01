@@ -1,0 +1,86 @@
+{
+  "runId": "single__ecommerce-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:33:11.473Z",
+  "finishedAt": "2026-07-25T20:33:22.507Z",
+  "latencyMs": 11034,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "no-collateral-damage",
+      "label": "No other order or product was affected",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "distinctTools": 4
+  },
+  "costUsd": 0.024621,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 742,
+    "cacheReadInputTokens": 15152,
+    "cacheCreationInputTokens": 1369
+  },
+  "turns": 5,
+  "toolCalls": 4,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011591475,
+      "durationMs": 11031,
+      "costUsd": 0.0246206,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "The wireless mouse line on order O-2003 has been handled:\n\n- **Cancelled** line L1 (P-MOU, qty 2) — it had not shipped.\n- **Restocked** 2 units of P-MOU back into inventory.\n- **Refunded** $73.50 (the actual amount paid for that line) to the original card payment.\n\nThe other two lines (P-HUB hub and P-CAB cables) remain untouched and pending, so the rest of the order will ship as planned.",
+  "traceFile": "traces/single__ecommerce-medium__r2.jsonl"
+}

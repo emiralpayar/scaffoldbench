@@ -1,0 +1,97 @@
+{
+  "runId": "orchestrator-workers__airline-medium__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:19:28.527Z",
+  "finishedAt": "2026-07-25T20:19:59.234Z",
+  "latencyMs": 30707,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 6
+  },
+  "costUsd": 0.070791,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 2140,
+    "cacheReadInputTokens": 29181,
+    "cacheCreationInputTokens": 4555
+  },
+  "turns": 10,
+  "toolCalls": 6,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785010768528,
+      "durationMs": 9335,
+      "costUsd": 0.0190494,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785010777863,
+      "durationMs": 15330,
+      "costUsd": 0.038788699999999995,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785010793193,
+      "durationMs": 6040,
+      "costUsd": 0.012953200000000002,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Dana Whitfield's reservation R2087 has been successfully updated:\n\n- **Reviewed candidate flights on 2026-08-03 (SFO→ORD):** UA88 (06:15) had no economy seats left; AA918 (07:30) is cancelled; AA204 (09:05) had economy seats available — this was the earliest qualifying option.\n- **Change made:** Moved R2087 from AA210 (17:40) to AA204 (09:05), keeping the same cabin (economy), as required.\n- **Fees/charges:** Dana is Gold tier, which is exempt from the $75 change fee, so no change fee was applied. The new flight's economy fare ($390.00) is $80.00 higher than what she originally paid ($310.00); that $80.00 fare difference was charged to the reservation, per policy that no tier is exempt from fare differences.\n\nNet result: Dana is now booked on AA204, the earliest scheduled flight that day with an available seat in her booked cabin, and she has been charged the $80.00 fare difference with no change fee. The reservation is fully settled — nothing further is owed.",
+  "traceFile": "traces/orchestrator-workers__airline-medium__r1.jsonl"
+}

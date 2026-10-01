@@ -1,0 +1,95 @@
+{
+  "runId": "single__support-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:36:13.458Z",
+  "finishedAt": "2026-07-25T20:37:06.814Z",
+  "latencyMs": 53356,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 1,
+      "detail": "assignee=E-201 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.127911,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 4881,
+    "cacheReadInputTokens": 47324,
+    "cacheCreationInputTokens": 6624
+  },
+  "turns": 14,
+  "toolCalls": 13,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011773459,
+      "durationMs": 53355,
+      "costUsd": 0.1279112,
+      "turns": 14,
+      "toolCalls": 13,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "## Summary\n\nI reviewed all 5 open CRM tickets to find the genuine duplicates behind Revenue Ops' complaint:\n\n- **T-1052** \"CRM search returns 500 error\" (created 07:05, sev3, team)\n- **T-1053** \"Cannot search accounts in CRM - server error\" (created 08:40, sev2, department-wide, assigned E-202)\n- **T-1054** \"CRM account search 500\" (created 09:02, sev3, team, already linked to T-1061)\n- **T-1055** \"CRM export to CSV produces an empty file\" — unrelated bug, left alone\n- **T-1061** \"CRM search index rebuild - engineering tracking ticket\" — an internal engineering tracking ticket for the fix, not a duplicate incident report, left alone (it remains linked to the survivor)\n\nT-1052, T-1053, and T-1054 all describe the exact same incident (CRM account search throwing HTTP 500 for all queries, all reported by Revenue Ops within ~2 hours of each other on 2026-03-17).\n\n**Actions taken:**\n1. **Merged** T-1053 and T-1054 into **T-1052** (earliest-created survivor), with the survivor carrying the earliest committed SLA deadline in the set (12:40Z, from T-1053) and the broadest impact scope (department, from T-1053).\n2. **Re-graded** severity to **sev2**, per the escalation matrix for crm/department impact (was sev3, inherited from the survivor's original team-scope grading).\n3. **Assigned** to **E-201 (Ines Kovac)**, the business-apps rotation engineer on call at the ticket's SLA deadline (2026-03-17T12:40:00Z) — the rotation that owns the crm service.\n4. Posted a comment on the survivor explaining the consolidation, grading, assignment, and why T-1061/T-1055 were left alone.\n\nT-1055 and T-1061 were not touched since they are not the same underlying problem as the search-500 incident.",
+  "traceFile": "traces/single__support-medium__r2.jsonl"
+}

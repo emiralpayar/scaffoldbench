@@ -1,0 +1,87 @@
+{
+  "runId": "single__support-easy__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-easy",
+  "taskTitle": "Triage a new service desk ticket",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:35:14.373Z",
+  "finishedAt": "2026-07-25T20:35:34.308Z",
+  "latencyMs": 19935,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity matches the escalation matrix for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev3 (matrix says sev3)"
+    },
+    {
+      "id": "deadline-from-response-target",
+      "label": "SLA deadline is the triage time plus the response target for that severity",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T17:20:00Z (expected 2026-03-17T17:20:00Z)"
+    },
+    {
+      "id": "assigned-to-oncall",
+      "label": "Assigned to the engineer on call for the owning rotation at the deadline",
+      "weight": 3,
+      "earned": 1,
+      "detail": "assignee=E-301 (expected E-301)"
+    },
+    {
+      "id": "ticket-opened",
+      "label": "Ticket left in status open",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was set",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 7,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.032702,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 996,
+    "cacheReadInputTokens": 22710,
+    "cacheCreationInputTokens": 1703
+  },
+  "turns": 8,
+  "toolCalls": 7,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011714375,
+      "durationMs": 19932,
+      "costUsd": 0.032701999999999995,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Ticket T-1041 has been triaged:\n\n- **Severity:** Set to **sev3** — vpn service with team-scope impact (Berlin sales floor, ~9 people) maps to sev3 per the escalation matrix.\n- **SLA deadline:** Set to **2026-03-17T17:20:00Z** — no prior deadline existed, so it was set to the triage time (09:20:00Z) plus the sev3 response target of 480 minutes.\n- **Assignment:** Assigned to **E-301 Yuki Sato**, who is on call for the `network-primary` rotation (which owns vpn) at the SLA deadline of 17:20:00Z. Ticket is now `open`.\n\nNo other tickets were touched.",
+  "traceFile": "traces/single__support-easy__r2.jsonl"
+}

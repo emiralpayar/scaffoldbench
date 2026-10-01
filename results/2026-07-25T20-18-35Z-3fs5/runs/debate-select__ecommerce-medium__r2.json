@@ -1,0 +1,131 @@
+{
+  "runId": "debate-select__ecommerce-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "debate-select",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:33:37.390Z",
+  "finishedAt": "2026-07-25T20:34:19.797Z",
+  "latencyMs": 42407,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "no-collateral-damage",
+      "label": "No other order or product was affected",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.113719,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 2020,
+    "outputTokens": 3897,
+    "cacheReadInputTokens": 30974,
+    "cacheCreationInputTokens": 5689
+  },
+  "turns": 12,
+  "toolCalls": 6,
+  "deniedToolCalls": 1,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1",
+      "startedAtMs": 1785011617392,
+      "durationMs": 14959,
+      "costUsd": 0.022696,
+      "turns": 3,
+      "toolCalls": 2,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2",
+      "startedAtMs": 1785011628292,
+      "durationMs": 4059,
+      "costUsd": 0.005245,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3",
+      "startedAtMs": 1785011620243,
+      "durationMs": 12108,
+      "costUsd": 0.0177,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "startedAtMs": 1785011632351,
+      "durationMs": 13712,
+      "costUsd": 0.0328759,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "startedAtMs": 1785011646063,
+      "durationMs": 13733,
+      "costUsd": 0.035202300000000006,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Summary of actions on order O-2003 (customer C-200):\n\n1. **Verified** L1 = Wireless Mouse (P-MOU), qty 2, status pending (never shipped), amount actually paid = $73.50 (discounted from $98.00 due to code MOUSE25).\n2. **Cancelled** line L1 only — L2 (hub) and L3 (cables) remain pending and will ship as planned.\n3. **Refunded** $73.50 to the original card payment method (policy #5/#6 — never shipped, so card refund, capped at amount actually paid, not list price).\n4. **Restocked** 2 units of P-MOU back into inventory (stock went 30 → 32), since the goods never left the warehouse.\n\nNo other lines, the shipping address, or any other order were touched, per policy #9.",
+  "traceFile": "traces/debate-select__ecommerce-medium__r2.jsonl"
+}

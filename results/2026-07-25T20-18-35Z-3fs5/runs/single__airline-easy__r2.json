@@ -1,0 +1,68 @@
+{
+  "runId": "single__airline-easy__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-easy",
+  "taskTitle": "Add checked bags and collect the right fee",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:29:07.755Z",
+  "finishedAt": "2026-07-25T20:29:27.597Z",
+  "latencyMs": 19842,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "baggage-updated",
+      "label": "Reservation holds three checked bags and is otherwise untouched",
+      "weight": 3,
+      "earned": 1,
+      "detail": "checked_bags=3, status=confirmed"
+    },
+    {
+      "id": "baggage-fee-exact",
+      "label": "Exactly one baggage fee, for the bags beyond the free allowance",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected 4500 cents for 1 chargeable bag(s), charged 4500"
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.030862,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 987,
+    "cacheReadInputTokens": 21839,
+    "cacheCreationInputTokens": 1468
+  },
+  "turns": 6,
+  "toolCalls": 5,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011347757,
+      "durationMs": 19839,
+      "costUsd": 0.030861700000000002,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Here's what I did for reservation R1042 (Rosa Mendel, SFO→SEA):\n\n1. **Checked the facts first:**\n   - Cabin: economy → 1 free bag\n   - Tier: silver → +1 free bag\n   - Total free allowance: **2 bags**\n   - Reservation had 1 bag already; she wanted to add 2 more → 3 total (exactly at the airline's 3-bag cap, so it's allowed).\n\n2. **Added the 2 bags** — bag count went from 1 → 3.\n\n3. **Calculated the fee:** 3 total bags − 2 free allowance = 1 chargeable bag → first chargeable bag rate = **$45.00**.\n\n4. **Charged exactly one baggage_fee ledger entry** of $45.00 (4500 cents) to R1042.\n\nRosa now has 3 checked bags on R1042 and owes/has been charged **$45.00** total for the two added bags.",
+  "traceFile": "traces/single__airline-easy__r2.jsonl"
+}

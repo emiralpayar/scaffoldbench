@@ -1,0 +1,110 @@
+{
+  "runId": "orchestrator-workers__ecommerce-hard__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:34:19.792Z",
+  "finishedAt": "2026-07-25T20:35:23.251Z",
+  "latencyMs": 63459,
+  "score": 0.8182,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 0,
+      "detail": "P-HUB=10 P-DOC=4 P-MON=6"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "wrong_answer",
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.12569,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 5138,
+    "cacheReadInputTokens": 25040,
+    "cacheCreationInputTokens": 6374
+  },
+  "turns": 14,
+  "toolCalls": 10,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011659794,
+      "durationMs": 16460,
+      "costUsd": 0.0169174,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011676254,
+      "durationMs": 39097,
+      "costUsd": 0.09125330000000001,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011715351,
+      "durationMs": 7899,
+      "costUsd": 0.017519299999999998,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Order O-3001 (Priya Raman, customer C-300) has been fully returned and refunded. Here's what was done:\n\n**Line-by-line:**\n- **L3 – P-HUB ×2 ($138.00), never shipped:** Cancelled as a not-yet-shipped line, refunded $138.00 to the original card, and 2 units restocked (goods had never left the warehouse).\n- **L1 – P-DOC ($219.00)** and **L2 – P-MON ($329.00)**, shipped 82 days ago: Since the 30-day return window had long closed, these were refunded as **store credit** ($548.00 total) via `refund_order`, then applied to Priya's balance via `apply_store_credit`. Both items were restocked as returned goods received by the warehouse.\n\n**Money:**\n- Card refund: $138.00\n- Store credit refund: $548.00\n- Total refunded: $686.00 — 100% of what was paid on the order\n\n**Records:**\n- Order O-3001 status: **returned**, fully refunded (68,600 of 68,600 cents)\n- Customer C-300 store credit balance: $5.00 → $553.00 (+$548.00)\n- Inventory: P-HUB +2, P-DOC +1, P-MON +1\n\nThis followed policy correctly: the unshipped line was cancelled/refunded to card, the shipped lines (past the return window) were refunded as store credit with both the ledger entry and balance application completed, and restocking was applied only to lines actually cancelled or received back. No other orders or customers were affected.\n\nOnly one worker handled this end-to-end and reported no blockers or conflicts, so I have no discrepancies to flag — the return is complete on the money, order, and warehouse sides.",
+  "traceFile": "traces/orchestrator-workers__ecommerce-hard__r2.jsonl"
+}

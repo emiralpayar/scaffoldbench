@@ -1,0 +1,87 @@
+{
+  "runId": "single__ecommerce-hard__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:33:51.572Z",
+  "finishedAt": "2026-07-25T20:34:19.791Z",
+  "latencyMs": 28219,
+  "score": 0.8182,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 0,
+      "detail": "P-HUB=10 P-DOC=4 P-MON=6"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "wrong_answer",
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.066536,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 2432,
+    "cacheReadInputTokens": 22870,
+    "cacheCreationInputTokens": 3742
+  },
+  "turns": 11,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011631574,
+      "durationMs": 28216,
+      "costUsd": 0.066536,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Order O-3001 has been fully processed as a whole-order return/cancellation for Priya Raman (C-300):\n\n**L3 (P-HUB x2, never shipped)** — treated as a cancellation:\n- Cancelled the line\n- Refunded $138.00 to her original payment method (card)\n- Restocked 2 units immediately (never left the warehouse)\n\n**L1 (P-DOC) and L2 (P-MON), shipped 82 days ago** — outside the 30-day return window, so per policy this had to be a store-credit return, not a card refund:\n- Recorded a $548.00 store-credit refund against both lines\n- Applied the $548.00 to her store credit balance (now $553.00, up from $5.00)\n- Restocked both units to reflect the warehouse receiving the returned goods\n\n**Result:** Order O-3001 status is now `returned`, fully refunded ($686.00 total: $138.00 to card + $548.00 as store credit), and all 4 units (P-HUB x2, P-DOC x1, P-MON x1) are back in inventory.",
+  "traceFile": "traces/single__ecommerce-hard__r2.jsonl"
+}

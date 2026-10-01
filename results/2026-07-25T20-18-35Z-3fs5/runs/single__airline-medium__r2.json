@@ -1,0 +1,74 @@
+{
+  "runId": "single__airline-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:30:19.907Z",
+  "finishedAt": "2026-07-25T20:30:43.820Z",
+  "latencyMs": 23913,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 6
+  },
+  "costUsd": 0.037337,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 1166,
+    "cacheReadInputTokens": 22817,
+    "cacheCreationInputTokens": 2043
+  },
+  "turns": 7,
+  "toolCalls": 6,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011419910,
+      "durationMs": 23909,
+      "costUsd": 0.0373371,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Summary:\n\n- Checked R2087: Dana Whitfield, economy cabin, originally on AA210 (dep 17:40, $310.00 fare).\n- Searched SFO→ORD on 2026-08-03 in economy: UA88 (06:15) had 0 seats left; AA918 (07:30) is cancelled; the earliest scheduled flight with an available economy seat was **AA204, departing 09:05** (4 seats left, fare $390.00).\n- Confirmed Dana's tier is **Gold**, which is exempt from the $75 change fee per economy fare rules — so no change fee was charged.\n- Moved reservation R2087 segment 0 from AA210 to AA204, keeping the same economy cabin (no cabin change).\n- Charged the fare difference of $80.00 ($390.00 − $310.00), since fare differences apply to all tiers regardless of exemption status.\n\nDana Whitfield is now booked on AA204 (SFO→ORD, 2026-08-03, 09:05, economy), and $80.00 has been charged to R2087 for the fare difference. No change fee was applied due to her Gold status.",
+  "traceFile": "traces/single__airline-medium__r2.jsonl"
+}

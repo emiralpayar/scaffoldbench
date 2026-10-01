@@ -1,0 +1,109 @@
+{
+  "runId": "orchestrator-workers__ecommerce-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:33:22.507Z",
+  "finishedAt": "2026-07-25T20:33:51.571Z",
+  "latencyMs": 29064,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "no-collateral-damage",
+      "label": "No other order or product was affected",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "distinctTools": 4
+  },
+  "costUsd": 0.048049,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 1604,
+    "cacheReadInputTokens": 17034,
+    "cacheCreationInputTokens": 2730
+  },
+  "turns": 8,
+  "toolCalls": 4,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011602508,
+      "durationMs": 8425,
+      "costUsd": 0.0106026,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011610933,
+      "durationMs": 14939,
+      "costUsd": 0.027430300000000005,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011625872,
+      "durationMs": 5699,
+      "costUsd": 0.010016299999999999,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. On order O-2003 for Marcus Ade (C-200), only the wireless mouse line (L1, P-MOU, qty 2) was touched:\n\n1. **Cancelled** the wireless mouse line (L1) — it had not yet shipped.\n2. **Refunded** $73.50 (7,350¢, the actual amount paid for that line) to the original card (method=card), per policy for unshipped lines.\n3. **Restocked** the 2 returned units of P-MOU into inventory (30 → 32), since goods never shipped.\n\nThe other lines on the order — the hub (L2) and cables (L3) — were left completely untouched and remain pending to ship as planned. No other orders or lines were modified.",
+  "traceFile": "traces/orchestrator-workers__ecommerce-medium__r2.jsonl"
+}

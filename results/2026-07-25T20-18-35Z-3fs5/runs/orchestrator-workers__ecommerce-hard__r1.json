@@ -1,0 +1,110 @@
+{
+  "runId": "orchestrator-workers__ecommerce-hard__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:23:14.280Z",
+  "finishedAt": "2026-07-25T20:24:14.937Z",
+  "latencyMs": 60657,
+  "score": 0.8182,
+  "passed": false,
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 0,
+      "detail": "P-HUB=10 P-DOC=4 P-MON=6"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "wrong_answer",
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.132358,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 5326,
+    "cacheReadInputTokens": 24376,
+    "cacheCreationInputTokens": 7072
+  },
+  "turns": 14,
+  "toolCalls": 10,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785010994283,
+      "durationMs": 13787,
+      "costUsd": 0.020608000000000005,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011008070,
+      "durationMs": 37330,
+      "costUsd": 0.0933915,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011045400,
+      "durationMs": 9536,
+      "costUsd": 0.0183583,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Order O-3001 has been fully processed as a whole-order return, per the single worker report:\n\n**Refunds issued (total $686.00 = full amount paid):**\n- L1 (P-DOC, $219.00) and L2 (P-MON, $329.00): shipped 82 days ago, outside the 30-day return window, so refunded as **store credit** ($548.00 total) via refund RF-1. Store credit was then applied to Priya's account, raising her balance from $5.00 to $553.00.\n- L3 (P-HUB ×2, $138.00): had never shipped, so treated as a cancellation and refunded **to the original card** via refund RF-2.\n\n**Order record:** O-3001 status updated to `returned`, with refunds totaling 68,600 of 68,600 cents (fully refunded).\n\n**Warehouse:**\n- P-DOC and P-MON restocked (+1 each) as returned goods received back.\n- P-HUB restocked (+2) as never-shipped/cancelled stock.\n\nAll three required legs — money (refund + store-credit application), order status, and inventory — were completed for every line on the order, consistent with policy (unshipped line refunded to card; shipped-and-past-window lines refunded as store credit with the balance actually credited). No conflicts or gaps were reported by the worker, so the return/refund for O-3001 is complete.",
+  "traceFile": "traces/orchestrator-workers__ecommerce-hard__r1.jsonl"
+}

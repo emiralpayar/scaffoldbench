@@ -1,0 +1,97 @@
+{
+  "runId": "orchestrator-workers__airline-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:30:43.821Z",
+  "finishedAt": "2026-07-25T20:31:22.094Z",
+  "latencyMs": 38273,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 6
+  },
+  "costUsd": 0.074436,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 2746,
+    "cacheReadInputTokens": 30248,
+    "cacheCreationInputTokens": 3580
+  },
+  "turns": 10,
+  "toolCalls": 6,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011443823,
+      "durationMs": 9459,
+      "costUsd": 0.012748800000000001,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011453282,
+      "durationMs": 16424,
+      "costUsd": 0.0400484,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011469706,
+      "durationMs": 12387,
+      "costUsd": 0.0216392,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Here is the outcome of the task based on the worker's report:\n\n**Reservation R2087 — Dana Whitfield, SFO→ORD, 2026-08-03**\n\n- The worker checked all economy-cabin flights on that route/date in departure order: UA88 (06:15, sold out), AA918 (07:30, cancelled), AA204 (09:05, scheduled, 4 seats), DL512 (12:30), and AA210 (17:40) — both later options with seats.\n- AA204 (09:05) was identified as the earliest scheduled flight with an available seat in Dana's booked cabin (economy).\n- The reservation was moved to AA204, keeping the cabin unchanged.\n- Fare rules for economy: $75 change fee applies, but Dana's Gold tier is exempt, so no change fee was charged.\n- Fare difference: new fare $390.00 vs. original fare $310.00 → $80.00 charged as a fare_difference fee.\n\n**A discrepancy to flag:** the report states the reservation was moved \"from AA210 (17:40) to AA204,\" but the same report also lists AA210 as one of the later flights found during the search (implying it was *not* her original flight, just a later alternative). This is inconsistent — the report never clearly states what Dana's original flight actually was before the change. I cannot confirm from the report alone whether the correct original segment was the one changed, or whether \"AA210\" was mistakenly cited as the \"from\" flight. If this matters, it would be worth verifying the reservation's flight history directly.\n\nAside from that inconsistency, the worker reports the task as complete: Dana was moved to AA204 (09:05, economy, earliest valid option), no change fee was charged (Gold tier exemption applied correctly), and the $80.00 fare difference was charged. No other reservations were touched.",
+  "traceFile": "traces/orchestrator-workers__airline-medium__r2.jsonl"
+}

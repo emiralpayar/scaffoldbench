@@ -1,0 +1,118 @@
+{
+  "runId": "orchestrator-workers__support-medium__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:36:52.338Z",
+  "finishedAt": "2026-07-25T20:38:06.563Z",
+  "latencyMs": 74225,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 1,
+      "detail": "assignee=E-201 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.152486,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 18,
+    "outputTokens": 5863,
+    "cacheReadInputTokens": 52181,
+    "cacheCreationInputTokens": 7659
+  },
+  "turns": 17,
+  "toolCalls": 13,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011812339,
+      "durationMs": 13500,
+      "costUsd": 0.0179601,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011825839,
+      "durationMs": 52153,
+      "costUsd": 0.1126963,
+      "turns": 14,
+      "toolCalls": 13,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011877992,
+      "durationMs": 8571,
+      "costUsd": 0.0218299,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Here's what was done to resolve the Revenue Ops CRM complaint:\n\n## Duplicate consolidation\n\nThree open CRM tickets were confirmed to describe the same incident (CRM account search returning 500 errors, all reported the morning of 2026-03-17 by Revenue Ops staff):\n\n- **T-1052** — \"CRM search returns 500 error\" (earliest, 07:05) → chosen as **survivor**\n- **T-1053** — \"Cannot search accounts in CRM - server error\" (08:40, impact=department)\n- **T-1054** — \"CRM account search 500\" (09:02)\n\n**Actions taken:**\n1. Merged T-1053 and T-1054 into survivor **T-1052**, carrying forward the earliest committed SLA deadline (12:40 UTC, from T-1053) and the broadest impact scope (department).\n2. Corrected severity on the survivor to **sev2**, per the escalation matrix (crm + department impact = sev2) — the merge itself hadn't auto-adjusted it.\n3. Resolved the business-apps rotation (which owns CRM) on-call **at the ticket's SLA deadline (12:40 UTC)** and assigned T-1052 to **E-201 (Ines Kovac)**.\n4. Posted a comment on T-1052 documenting the consolidation, grading rationale, and routing decision.\n\n## Left untouched (correctly, per policy)\n\n- **T-1061** — \"CRM search index rebuild\" — an internal engineering tracking ticket, not a duplicate user report. Its link to T-1054 now automatically points to survivor T-1052 as a result of the merge; it was not merged or reassigned itself.\n- **T-1055** — \"CRM export to CSV produces an empty file\" — a distinct problem (export bug, single-user impact), left alone.\n\n## Net result\n\nRevenue Ops now has a single, correctly-graded (**sev2**) and correctly-assigned (**E-201**, business-apps on-call) ticket — **T-1052** — tracking the CRM search outage, replacing three scattered, partly-unassigned reports.\n\n**Note on verification:** This summary reflects the one worker report provided to me as orchestrator; I have no independent tool access to re-verify the ticket states, so I'm relying on that report as given. No conflicting reports were received.",
+  "traceFile": "traces/orchestrator-workers__support-medium__r2.jsonl"
+}

@@ -1,0 +1,95 @@
+{
+  "runId": "single__support-medium__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:25:12.592Z",
+  "finishedAt": "2026-07-25T20:25:55.806Z",
+  "latencyMs": 43214,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 1,
+      "detail": "assignee=E-201 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.095973,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 3283,
+    "cacheReadInputTokens": 42139,
+    "cacheCreationInputTokens": 5556
+  },
+  "turns": 14,
+  "toolCalls": 13,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785011112594,
+      "durationMs": 43211,
+      "costUsd": 0.0959727,
+      "turns": 14,
+      "toolCalls": 13,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Consolidation complete. Summary:\n\n**Reviewed all open CRM tickets:**\n- T-1052 \"CRM search returns 500 error\" (created 07:05, U-502)\n- T-1053 \"Cannot search accounts in CRM\" (created 08:40, U-503, department-wide impact)\n- T-1054 \"CRM account search 500\" (created 09:02, U-504)\n- T-1061 \"CRM search index rebuild - engineering tracking ticket\" (internal tracking artifact, not a user-reported duplicate)\n- T-1055 \"CRM export to CSV produces an empty file\" (unrelated single-user bug)\n\n**Determined that T-1052, T-1053, and T-1054 are the same incident** (the CRM account search 500 error, all reported within ~2 hours of each other by different Revenue Ops users), and merged them:\n- **Survivor:** T-1052 (earliest created, 07:05)\n- **Duplicates folded in:** T-1053, T-1054\n- Survivor inherited the broadest impact scope (department-wide, from T-1053) and the earliest SLA deadline of the set (2026-03-17T12:40:00Z, from T-1053) per merge policy.\n- T-1061's link (previously pointing at T-1054) was automatically repointed to the survivor by the merge.\n\n**Graded and assigned the survivor:**\n- Set severity to **sev2** per the escalation matrix (crm + department impact = sev2).\n- Assigned to **E-201 (Ines Kovac)**, the business-apps rotation engineer on call at the ticket's SLA deadline (12:40Z, 2026-03-17) — CRM is owned by the business-apps rotation.\n- Left a comment documenting the merge, severity change, and assignment rationale.\n\n**Left alone (not the same problem):**\n- T-1061 — a distinct engineering tracking ticket for the index rebuild, not a duplicate incident report.\n- T-1055 — an unrelated single-user CSV export defect.",
+  "traceFile": "traces/single__support-medium__r1.jsonl"
+}

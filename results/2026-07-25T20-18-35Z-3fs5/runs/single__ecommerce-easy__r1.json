@@ -1,0 +1,79 @@
+{
+  "runId": "single__ecommerce-easy__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:21:09.375Z",
+  "finishedAt": "2026-07-25T20:21:18.552Z",
+  "latencyMs": 9177,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "distinctTools": 3
+  },
+  "costUsd": 0.035934,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 481,
+    "cacheReadInputTokens": 7142,
+    "cacheCreationInputTokens": 4307
+  },
+  "turns": 4,
+  "toolCalls": 3,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785010869378,
+      "durationMs": 9173,
+      "costUsd": 0.0359336,
+      "turns": 4,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "I've updated Dana Whitfield's (C-100) address on the order that hadn't shipped yet:\n\n- **O-1001** (pending, placed 2026-07-20): Shipping address updated to **7 Quarry Rise, Sheffield S11 8XZ, UK**.\n- **O-1002** (already shipped 2026-07-07, in transit): Confirmed unaffected — shipping address remains **88 Old Mill Road, Bristol BS3 2QQ, UK**, as required by policy since parcels already in transit must not have their address changed.",
+  "traceFile": "traces/single__ecommerce-easy__r1.jsonl"
+}

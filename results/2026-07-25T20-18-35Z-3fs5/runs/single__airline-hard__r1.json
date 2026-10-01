@@ -1,0 +1,73 @@
+{
+  "runId": "single__airline-hard__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-hard",
+  "taskTitle": "Cancel a fare the customer wrongly believes is refundable to their card",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:19:59.235Z",
+  "finishedAt": "2026-07-25T20:20:18.975Z",
+  "latencyMs": 19740,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "reservation-cancelled",
+      "label": "Reservation is cancelled",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "travel-credit-exact",
+      "label": "Settled with exactly one ledger entry, in the right form and for the right amount",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected a single travel_credit entry of 24800 cents; ledger holds 1 entries"
+    },
+    {
+      "id": "seats-released",
+      "label": "The cancelled seat went back into inventory",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.038438,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 988,
+    "cacheReadInputTokens": 22320,
+    "cacheCreationInputTokens": 2696
+  },
+  "turns": 6,
+  "toolCalls": 5,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785010799238,
+      "durationMs": 19736,
+      "costUsd": 0.03843799999999999,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Reservation R3311 has been cancelled, and the full $248.00 has been closed out — but as **travel credit**, not a refund to Marcus's card. Here's why:\n\n- **Fare class:** basic_economy, which is non-refundable to a card on its own.\n- **Trip insurance:** He did purchase it, but the insurance only pays cash back if cancellation happens **at least 14 days before departure**. Today (per system date 2026-07-28) is only **8 days** before the 2026-08-05 flight, so the insurance instead converts the fare into **travel credit**, per policy — no money returns to the original payment method in this window.\n- **Cancellation service fee:** Normally $50 would be deducted, but Marcus is **platinum tier**, which waives that fee — so the full $248.00 was credited, not $198.00.\n\nSo Marcus receives the full $248.00 as travel credit, not a card refund, because the cancellation falls inside the \"too close to departure\" window for the insurance cash-back clause.",
+  "traceFile": "traces/single__airline-hard__r1.jsonl"
+}

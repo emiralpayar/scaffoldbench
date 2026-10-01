@@ -1,0 +1,91 @@
+{
+  "runId": "orchestrator-workers__airline-easy__r2",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-easy",
+  "taskTitle": "Add checked bags and collect the right fee",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-07-25T20:29:36.410Z",
+  "finishedAt": "2026-07-25T20:30:07.226Z",
+  "latencyMs": 30816,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "baggage-updated",
+      "label": "Reservation holds three checked bags and is otherwise untouched",
+      "weight": 3,
+      "earned": 1,
+      "detail": "checked_bags=3, status=confirmed"
+    },
+    {
+      "id": "baggage-fee-exact",
+      "label": "Exactly one baggage fee, for the bags beyond the free allowance",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected 4500 cents for 1 chargeable bag(s), charged 4500"
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.056343,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 1855,
+    "cacheReadInputTokens": 29194,
+    "cacheCreationInputTokens": 2877
+  },
+  "turns": 9,
+  "toolCalls": 5,
+  "deniedToolCalls": 1,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "startedAtMs": 1785011376412,
+      "durationMs": 8750,
+      "costUsd": 0.0102082,
+      "turns": 2,
+      "toolCalls": 1,
+      "model": "claude-sonnet-5",
+      "aborted": false,
+      "error": "Claude Code returned an error result: Reached maximum number of turns (1)"
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "startedAtMs": 1785011385162,
+      "durationMs": 16165,
+      "costUsd": 0.0334796,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "startedAtMs": 1785011401327,
+      "durationMs": 5898,
+      "costUsd": 0.012655400000000002,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "I've completed the request to add two checked bags to Rosa Mendel's reservation (R1042). Here's the summary based on the work done:\n\n- **Reservation:** R1042 — Rosa Mendel, SFO→SEA, economy cabin\n- **Free baggage allowance determined:** 1 free bag (economy cabin) + 1 free bag (Silver tier) = **2 free checked bags**\n- **Bags added:** 2 (existing 1 bag → new total of 3, which is at the reservation's 3-bag maximum)\n- **Bags exceeding free allowance:** 1 bag (3 total − 2 free = 1 chargeable)\n- **Fee charged:** $45.00 (4500 cents) as a single `baggage_fee` ledger entry, per the fee schedule for the first bag beyond the allowance\n\n**Result:** Rosa's reservation now shows 3 checked bags, and she was charged exactly $45.00 — the correct amount for the one bag exceeding her combined cabin+tier allowance. No other reservations were touched, and only one baggage fee entry was recorded, consistent with policy.",
+  "traceFile": "traces/orchestrator-workers__airline-easy__r2.jsonl"
+}

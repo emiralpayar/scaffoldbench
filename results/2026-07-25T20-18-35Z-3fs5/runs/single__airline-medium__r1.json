@@ -1,0 +1,74 @@
+{
+  "runId": "single__airline-medium__r1",
+  "runSetId": "2026-07-25T20-18-35Z-3fs5",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-07-25T20:19:09.386Z",
+  "finishedAt": "2026-07-25T20:19:28.526Z",
+  "latencyMs": 19140,
+  "score": 1,
+  "passed": true,
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "failureMode": "none",
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 6
+  },
+  "costUsd": 0.042601,
+  "judgeCostUsd": 0,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 1152,
+    "cacheReadInputTokens": 21848,
+    "cacheCreationInputTokens": 3003
+  },
+  "turns": 7,
+  "toolCalls": 6,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "startedAtMs": 1785010749388,
+      "durationMs": 19138,
+      "costUsd": 0.0426014,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5",
+      "aborted": false
+    }
+  ],
+  "finalText": "Done. Summary:\n\n- **Checked flights** SFO→ORD on 2026-08-03 in economy (Dana's booked cabin). The earliest departure with an available economy seat was **AA204 at 09:05** (UA88 at 06:15 had 0 seats left; AA918 at 07:30 is cancelled).\n- **Moved reservation R2087** from AA210 (17:40) to AA204 (09:05), keeping the economy cabin unchanged.\n- **Checked Dana's tier**: Gold — exempt from the $75 economy change fee, so no change fee was charged.\n- **Fare difference**: AA204's economy fare ($390.00) is $80.00 more than the original fare paid ($310.00). Since no tier is exempt from fare differences, I charged **$80.00 (8000 cents)** as a fare_difference fee to R2087.\n\nDana is now confirmed on AA204, SFO→ORD, departing 2026-08-03 at 09:05, economy cabin, with $80.00 owed and charged for the fare difference.",
+  "traceFile": "traces/single__airline-medium__r1.jsonl"
+}
