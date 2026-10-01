@@ -620,3 +620,62 @@ describe('phase-scoped accounting', () => {
     }
   });
 });
+
+describe('reviewed tool calls', () => {
+  it('holds a call for a reviewer that may make a model call of its own', async () => {
+    setScript(async function* (session) {
+      if (session.prompt === 'review') {
+        // The reviewer reads state, then answers through its schema.
+        const read = await session.callTool('mcp__shop__get_order', { id: 'O-1' });
+        yield toolUse('mcp__shop__get_order', { id: 'O-1' });
+        yield toolResult(read);
+        const verdict = { allow: false };
+        const call = await session.callTool(STRUCTURED_OUTPUT_TOOL, verdict);
+        yield toolUse(STRUCTURED_OUTPUT_TOOL, verdict);
+        yield toolResult(call);
+        yield success({ structured: verdict, costUsd: 0.02 });
+        return;
+      }
+      const refund = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+      yield toolUse('mcp__shop__refund', { id: 'O-1' });
+      yield toolResult(refund);
+      yield assistant(refund.text);
+      yield success({ text: refund.text, costUsd: 0.01 });
+    });
+    const env = makeEnv();
+    const ctx = makeCtx({ env });
+    const reviewed: string[] = [];
+
+    const outcome = await runQuery(ctx, {
+      phase: 'execute',
+      prompt: 'refund O-1',
+      maxBudgetUsd: 0.5,
+      reviewToolCall: async (call, { signal }) => {
+        reviewed.push(call.toolName);
+        const review = await runQuery(
+          { ...ctx, signal: AbortSignal.any([ctx.signal, signal]) },
+          {
+            phase: 'review-1',
+            prompt: 'review',
+            allowedTools: [...env.readOnlyTools],
+            outputSchema: { type: 'object' },
+            depth: 1,
+          },
+        );
+        return (review.structured as { allow?: boolean } | undefined)?.allow === true
+          ? { allow: true }
+          : { allow: false, reason: 'Denied by the reviewer: O-1 was already refunded.' };
+      },
+    });
+
+    // The reviewer's own read went through: it holds the read-only tools.
+    // Its read is not sent for review, because it is a separate call.
+    expect(reviewed).toEqual(['mcp__shop__refund']);
+    expect(env.journal.map((entry) => entry.name)).toEqual(['get_order']);
+    expect(outcome.text).toBe('Denied by the reviewer: O-1 was already refunded.');
+    expect(outcome.deniedToolCalls).toBe(0);
+    expect(ctx.trace.events.some((e) => e.kind === 'tool_denied')).toBe(false);
+    // Both calls are charged to the run.
+    expect(ctx.budget.spentUsd).toBeCloseTo(0.03, 10);
+  });
+});

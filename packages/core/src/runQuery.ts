@@ -3,6 +3,7 @@ import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { apiErrorOfAssistant, assistantText } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
+import type { ToolCallReviewer } from './guard';
 import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
 import { CallMeter } from './meter';
 import { normalizeSdkMessage } from './trace';
@@ -65,6 +66,13 @@ export interface QuerySpec {
   model?: string;
   depth?: number;
   agentLabel?: string;
+  /**
+   * Review each permitted tool call before it runs (see `ToolCallReviewer`).
+   * A denial reaches the model as the tool's result, so it can adapt. The
+   * reviewer may make model calls of its own through `runQuery`; they are
+   * separate calls, traced and charged to the run like any other.
+   */
+  reviewToolCall?: ToolCallReviewer;
 }
 
 export interface QueryOutcome {
@@ -240,6 +248,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
         onDenied: () => {
           deniedToolCalls += 1;
         },
+        ...(spec.reviewToolCall ? { review: spec.reviewToolCall } : {}),
       }),
     },
     ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),

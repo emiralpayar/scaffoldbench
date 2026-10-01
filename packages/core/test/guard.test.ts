@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { SANDBOX_DENYLIST, TraceCollector, createSandboxGuard } from '@arena/core';
+import {
+  REVIEW_HOOK_TIMEOUT_SECONDS,
+  SANDBOX_DENYLIST,
+  STRUCTURED_OUTPUT_TOOL,
+  TraceCollector,
+  createSandboxGuard,
+} from '@arena/core';
+import type { PendingToolCall, ToolCallReviewer } from '@arena/core';
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk';
 
 const preToolUse = (toolName: string, input: unknown = {}): HookInput =>
@@ -107,5 +114,86 @@ describe('createSandboxGuard', () => {
     await invoke(hook, preToolUse('Bash'));
     await invoke(hook, preToolUse('Read'));
     expect(denied).toEqual(['Bash', 'Bash', 'Read']);
+  });
+});
+
+describe('createSandboxGuard with a reviewer', () => {
+  function makeReviewedGuard(allowedTools: string[], review: ToolCallReviewer) {
+    const trace = new TraceCollector();
+    const denied: string[] = [];
+    const matchers = createSandboxGuard({
+      allowedTools,
+      trace,
+      phase: 'execute',
+      depth: 0,
+      onDenied: (name) => denied.push(name),
+      review,
+    });
+    const hook = matchers[0]?.hooks[0];
+    if (!hook) throw new Error('guard produced no hook');
+    return { matchers, hook, trace, denied };
+  }
+
+  it('asks the reviewer about a permitted call and lets an allowed one run', async () => {
+    const seen: PendingToolCall[] = [];
+    const { hook } = makeReviewedGuard(['mcp__shop__refund'], async (call) => {
+      seen.push(call);
+      return { allow: true };
+    });
+
+    expect(await invoke(hook, preToolUse('mcp__shop__refund', { id: 'O-1' }))).toEqual({});
+    expect(seen).toEqual([{ toolName: 'mcp__shop__refund', toolInput: { id: 'O-1' }, toolUseId: 'tu_1' }]);
+  });
+
+  it('returns a denial with the reviewer’s reason, without calling it a sandbox violation', async () => {
+    const { hook, trace, denied } = makeReviewedGuard(['mcp__shop__refund'], async () => ({
+      allow: false,
+      reason: 'The order is not eligible for a refund.',
+    }));
+
+    const result = await invoke(hook, preToolUse('mcp__shop__refund'));
+
+    expect(result).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'The order is not eligible for a refund.',
+      },
+    });
+    expect(denied).toEqual([]);
+    expect(trace.countOf('tool_denied')).toBe(0);
+  });
+
+  it('denies a call whose review throws, since the CLI would run it unreviewed', async () => {
+    const { hook } = makeReviewedGuard(['mcp__shop__refund'], async () => {
+      throw new Error('reviewer offline');
+    });
+
+    const result = (await invoke(hook, preToolUse('mcp__shop__refund'))) as {
+      hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
+    };
+    expect(result.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(result.hookSpecificOutput.permissionDecisionReason).toContain('reviewer offline');
+  });
+
+  it('never sends a call outside the allowlist, or a harness tool, for review', async () => {
+    const seen: string[] = [];
+    const { hook, denied } = makeReviewedGuard(['mcp__shop__refund', STRUCTURED_OUTPUT_TOOL], async (call) => {
+      seen.push(call.toolName);
+      return { allow: true };
+    });
+
+    await invoke(hook, preToolUse('Bash'));
+    expect(await invoke(hook, preToolUse(STRUCTURED_OUTPUT_TOOL))).toEqual({});
+
+    expect(seen).toEqual([]);
+    expect(denied).toEqual(['Bash']);
+  });
+
+  it('keeps the CLI’s hook timeout out of a review’s way', () => {
+    const { matchers } = makeReviewedGuard([], async () => ({ allow: true }));
+    expect(matchers[0]?.timeout).toBe(REVIEW_HOOK_TIMEOUT_SECONDS);
+    const plain = createSandboxGuard({ allowedTools: [], trace: new TraceCollector(), phase: 'p', depth: 0 });
+    expect(plain[0]?.timeout).toBeUndefined();
   });
 });
