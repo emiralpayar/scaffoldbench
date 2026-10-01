@@ -12,6 +12,7 @@ import {
   citedUrls,
   openedDocuments,
   parseEvidence,
+  parseJsonBlock,
   readAnswerBlock,
   trimUrl,
 } from '../src/research/index';
@@ -138,6 +139,29 @@ describe('readAnswerBlock', () => {
   });
 });
 
+describe('parseJsonBlock', () => {
+  it('parses valid JSON as it is', () => {
+    expect(parseJsonBlock(' {"a": "say \\"hi\\""} ')).toEqual({ value: { a: 'say "hi"' }, repaired: false });
+  });
+
+  it('escapes a quote mark copied into a string without its backslash', () => {
+    const raw = '{"quote": "use KBA (e.g., "What was the name of your first pet?") or questions.", "url": "u"}';
+    expect(parseJsonBlock(raw)).toEqual({
+      value: { quote: 'use KBA (e.g., "What was the name of your first pet?") or questions.', url: 'u' },
+      repaired: true,
+    });
+  });
+
+  it('repairs a raw line break inside a string', () => {
+    expect(parseJsonBlock('{"a": "one\ntwo"}')).toEqual({ value: { a: 'one\ntwo' }, repaired: true });
+  });
+
+  it('gives up rather than guess when a stray quote precedes a comma', () => {
+    expect(parseJsonBlock('{"a": "he said "yes", then left"}')).toBeUndefined();
+    expect(parseJsonBlock('not json')).toBeUndefined();
+  });
+});
+
 describe('parseEvidence', () => {
   it('keeps well-formed entries and drops the rest', () => {
     const answer = answerWithBlock('The answer.', {
@@ -163,7 +187,7 @@ describe('parseEvidence', () => {
   });
 
   it('reports a missing block', () => {
-    expect(parseEvidence('No block here.')).toEqual({ entries: [], prose: 'No block here.', found: false });
+    expect(parseEvidence('No block here.')).toEqual({ entries: [], prose: 'No block here.', found: false, repaired: false });
   });
 });
 

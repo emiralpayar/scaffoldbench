@@ -28,6 +28,8 @@ export interface AnswerBlock<T> {
   value: T;
   /** The answer with the block removed: what a reader sees as prose. */
   prose: string;
+  /** True when the block only parsed after `parseJsonBlock` repaired it. */
+  repaired: boolean;
 }
 
 const FENCE = /(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n[ \t]*\2[ \t]*(?=\n|$)/g;
@@ -46,11 +48,11 @@ export function readAnswerBlock<T>(
 ): AnswerBlock<T> | undefined {
   const fenced = [...answer.matchAll(FENCE)].reverse();
   for (const match of fenced) {
-    const value = parseJson(match[3] ?? '');
-    if (accept(value)) {
+    const parsed = parseJsonBlock(match[3] ?? '');
+    if (parsed && accept(parsed.value)) {
       const start = (match.index ?? 0) + (match[1] ?? '').length;
       const end = (match.index ?? 0) + match[0].length;
-      return { value, prose: `${answer.slice(0, start)}${answer.slice(end)}`.trim() };
+      return { value: parsed.value, prose: `${answer.slice(0, start)}${answer.slice(end)}`.trim(), repaired: parsed.repaired };
     }
   }
 
@@ -60,20 +62,70 @@ export function readAnswerBlock<T>(
     const start = (line.index ?? 0) + (line[1] ?? '').length;
     const end = answer.lastIndexOf('}');
     if (end <= start) continue;
-    const value = parseJson(answer.slice(start, end + 1));
-    if (accept(value)) {
-      return { value, prose: `${answer.slice(0, start)}${answer.slice(end + 1)}`.trim() };
+    const parsed = parseJsonBlock(answer.slice(start, end + 1));
+    if (parsed && accept(parsed.value)) {
+      return { value: parsed.value, prose: `${answer.slice(0, start)}${answer.slice(end + 1)}`.trim(), repaired: parsed.repaired };
     }
   }
   return undefined;
 }
 
-function parseJson(text: string): unknown {
+/**
+ * Parse a JSON block, repairing the one slip models make in otherwise valid
+ * blocks: a double quote copied into a string without its backslash. Quotes
+ * are copied from pages, and a page that says `(e.g., “What was the name of
+ * your first pet?”)` is re-typed with straight quotes; one such character
+ * would otherwise void every entry in the block, which grades JSON escaping
+ * rather than research. Raw line breaks inside strings are repaired too.
+ */
+export function parseJsonBlock(text: string): { value: unknown; repaired: boolean } | undefined {
+  const trimmed = text.trim();
   try {
-    return JSON.parse(text.trim());
+    return { value: JSON.parse(trimmed), repaired: false };
+  } catch {
+    // Fall through to the repair.
+  }
+  const repaired = escapeStrayQuotes(trimmed);
+  if (repaired === trimmed) return undefined;
+  try {
+    return { value: JSON.parse(repaired), repaired: true };
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Inside a string, a double quote ends the string only when what follows it
+ * can follow a string (`,` `:` `}` `]`, or nothing); any other is escaped as
+ * a literal character. A stray quote that happens to precede a comma is left
+ * alone, and then the block simply does not parse.
+ */
+function escapeStrayQuotes(text: string): string {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i] as string;
+    if (!inString) {
+      out += char;
+      if (char === '"') inString = true;
+    } else if (char === '\\') {
+      out += char + (text[i + 1] ?? '');
+      i += 1;
+    } else if (char === '"') {
+      let j = i + 1;
+      while (j < text.length && /\s/.test(text[j] as string)) j += 1;
+      const next = text[j];
+      if (next === undefined || ',:}]'.includes(next)) {
+        out += char;
+        inString = false;
+      } else {
+        out += '\\"';
+      }
+    } else {
+      out += char === '\n' ? '\\n' : char;
+    }
+  }
+  return out;
 }
 
 export interface EvidenceEntry {
@@ -87,6 +139,8 @@ export interface ParsedEvidence {
   prose: string;
   /** False when the answer has no evidence block at all. */
   found: boolean;
+  /** True when the block only parsed after repair (see `parseJsonBlock`). */
+  repaired: boolean;
 }
 
 function isEvidenceBlock(value: unknown): value is { evidence: unknown[] } {
@@ -100,7 +154,7 @@ function isEvidenceBlock(value: unknown): value is { evidence: unknown[] } {
 /** The `{"evidence": [{claim, quote, url}]}` block a research answer ends with. */
 export function parseEvidence(answer: string): ParsedEvidence {
   const block = readAnswerBlock(answer, isEvidenceBlock);
-  if (!block) return { entries: [], prose: answer.trim(), found: false };
+  if (!block) return { entries: [], prose: answer.trim(), found: false, repaired: false };
 
   const entries: EvidenceEntry[] = [];
   for (const raw of block.value.evidence) {
@@ -114,7 +168,7 @@ export function parseEvidence(answer: string): ParsedEvidence {
     });
     if (entries.length === MAX_EVIDENCE_ENTRIES) break;
   }
-  return { entries, prose: block.prose, found: true };
+  return { entries, prose: block.prose, found: true, repaired: block.repaired };
 }
 
 // ---------------------------------------------------------------------------

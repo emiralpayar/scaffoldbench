@@ -438,6 +438,17 @@ describe('defineBreadthTask', () => {
     expect(score.penalties[0]?.multiplier).toBe(0.5);
   });
 
+  it('reads a block whose quote kept the page’s quotation marks unescaped', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    // Valid JSON would be \"cacheable\"; models often re-type a page's “…” as bare quotes.
+    const answer = breadthAnswer(BLUE, RED).replace('"Blue widgets are cacheable by default"', '"Blue widgets are "cacheable" by default"');
+    expect(answer).toContain('are "cacheable" by');
+    const score = await breadthTask.score(run.input(noJudge, answer));
+    expect(score.score).toBe(1);
+    expect(score.metadata).toMatchObject({ answerBlock: true, answerBlockRepaired: true });
+  });
+
   it('scores an unanswered item, or an answer without the block, zero', async () => {
     const run = session(breadthTask);
     await run.fetch(SPEC_URL);

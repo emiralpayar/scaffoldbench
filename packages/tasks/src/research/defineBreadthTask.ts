@@ -118,7 +118,8 @@ function answerFormat(spec: BreadthTaskSpec): string {
     JSON.stringify({ answers: [example] }),
     '```',
     '',
-    'Quotes are checked against the text of the page at their URL, so copy them exactly.',
+    'Quotes are checked against the text of the page at their URL, so copy them exactly. The block must be',
+    'valid JSON: write a double quote inside a string as \\".',
   ].join('\n');
 }
 
@@ -222,6 +223,7 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
 
       const metadata = researchMetadata(corpus, opened, audit);
       metadata.answerBlock = block !== undefined;
+      metadata.answerBlockRepaired = block?.repaired === true;
       metadata.itemsAnswered = spec.items.filter((item) => findEntry(entries, item.key)).length;
       metadata.itemCount = spec.items.length;
       metadata.fieldAccuracy = fieldsCorrect / (spec.items.length * spec.fields.length);

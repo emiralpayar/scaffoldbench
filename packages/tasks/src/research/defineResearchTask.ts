@@ -205,7 +205,8 @@ export const EVIDENCE_FORMAT = [
   '```',
   '',
   'Every quote is checked against the text of the page at its URL. A paraphrase, or a quote from a',
-  'page you did not open with fetch_page, does not count as evidence.',
+  'page you did not open with fetch_page, does not count as evidence. The block must be valid JSON:',
+  'write a double quote inside a string as \\".',
 ].join('\n');
 
 /** Effort the judge is asked to grade at. Grading is reading, not reasoning. */
@@ -280,6 +281,7 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
       const metadata: Record<string, unknown> = researchMetadata(corpus, opened, audit);
       const verifiedQuotes = checks.filter((check) => check.ok).length;
       metadata.evidenceBlock = evidence.found;
+      metadata.evidenceBlockRepaired = evidence.repaired;
       metadata.evidenceCount = evidence.entries.length;
       metadata.verifiedQuoteCount = verifiedQuotes;
       metadata.verifiedQuoteRate = evidence.entries.length === 0 ? 0 : verifiedQuotes / evidence.entries.length;
