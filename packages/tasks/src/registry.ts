@@ -3,7 +3,7 @@ import type { Task, TaskCategory } from '@arena/core';
 import { researchTasks } from './research';
 import { airlineExpertTasks, airlineTasks } from './worlds/airline';
 import { ecommerceExpertTasks, ecommerceTasks } from './worlds/ecommerce';
-import { supportTasks } from './worlds/support';
+import { supportExpertTasks, supportTasks } from './worlds/support';
 
 /**
  * The task set, in the order everything renders in.
@@ -18,6 +18,7 @@ export const ALL_TASKS: Task[] = [
   ...ecommerceTasks,
   ...ecommerceExpertTasks,
   ...supportTasks,
+  ...supportExpertTasks,
   ...researchTasks,
 ];
 
