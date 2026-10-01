@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { JournaledToolSpec, ToolReply } from '@arena/core';
 import {
-  daysSinceShipped,
   findCustomer,
   findLine,
   findOrder,
@@ -19,9 +18,8 @@ import {
 
 export const ECOMMERCE_INSTRUCTIONS = [
   'Back-office order management for an online store.',
-  'All money is in integer cents. Ids are exact and case-sensitive.',
-  'Nothing cascades: cancelling a line does not restock it, and refunding store credit does not',
-  'add it to the customer balance. Each step is its own call.',
+  'All money is in integer cents. Dates are YYYY-MM-DD. Ids are exact and case-sensitive.',
+  'Reads never change anything; every mutating tool reports exactly what it changed.',
 ].join(' ');
 
 /**
@@ -53,7 +51,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     {
       name: 'list_orders',
       description:
-        'List orders, optionally filtered by customerId and/or status (pending, partially_shipped, shipped, returned, cancelled). Use it to find which of a customer orders is still open.',
+        'List orders, optionally filtered by customerId and/or status (pending, partially_shipped, shipped, returned, cancelled).',
       schema: { customerId: z.string().optional(), status: z.string().optional() },
       readOnly: true,
       handler: (args: { customerId?: unknown; status?: unknown }) => {
@@ -219,28 +217,18 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
         for (const line of targets) line.status = 'cancelled';
         order.status = recomputeOrderStatus(order);
 
-        const released = new Map<string, number>();
-        for (const line of targets) {
-          released.set(line.productId, (released.get(line.productId) ?? 0) + line.quantity);
-        }
-        const paid = targets.reduce((acc, line) => acc + line.paidCents, 0);
-
         return [
           `cancelled ${targets.length} line(s) on order ${order.id}${readString(args.reason) ? ` (reason: ${readString(args.reason)})` : ''}`,
-          ...targets.map(
-            (line) =>
-              `  ${line.id} product=${line.productId} qty=${line.quantity} paidCents=${line.paidCents}`,
-          ),
+          ...targets.map((line) => `  ${line.id} product=${line.productId} qty=${line.quantity}`),
           `order ${order.id} status is now ${order.status}`,
-          `released, awaiting restock: ${[...released].map(([productId, qty]) => `${productId} x${qty}`).join(', ')} — call restock_item for each`,
-          `no money moved: use refund_order for the amount actually paid for these lines (${paid} cents in total)`,
+          'No refund was issued and no stock was moved.',
         ].join('\n');
       },
     },
     {
       name: 'refund_order',
       description:
-        'Refund named lines of an order. amountCents is the total for those lines and is split across them in proportion to what each one paid. method=card returns the money to the original payment method, method=store_credit only records the ledger entry — apply_store_credit still has to add it to the balance. A line must be cancelled or shipped before it can be refunded.',
+        'Refund named lines of an order. amountCents is the total for those lines and is split across them in proportion to what each one paid. method=card returns the money to the original payment method; method=store_credit records the refund against the order but does not change the customer store-credit balance. A line must be cancelled or shipped before it can be refunded.',
       schema: {
         orderId: z.string(),
         lineIds: z.array(z.string()).min(1),
@@ -324,17 +312,14 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
           `order ${order.id} refunded ${refundedTotal(world, order.id)} of ${order.paidCents} cents paid, status is now ${order.status}`,
         ];
         if (method === 'store_credit') {
-          lines.push(
-            `store credit is recorded in the ledger only — customer ${order.customerId} balance is unchanged. Call apply_store_credit for ${amountCents} cents to complete it.`,
-          );
+          lines.push(`customer ${order.customerId} store-credit balance is unchanged`);
         }
         return lines.join('\n');
       },
     },
     {
       name: 'restock_item',
-      description:
-        'Put units of a product back into stock and record an inventory movement. Use it for goods that never left the warehouse, or for a return the warehouse has actually received.',
+      description: 'Put units of a product back into stock and record an inventory movement.',
       schema: {
         productId: z.string(),
         quantity: z.number().int().positive(),
@@ -376,8 +361,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     },
     {
       name: 'update_shipping_address',
-      description:
-        'Overwrite the shipping address of an order. The reply states the order status so you can tell whether the parcel has already left.',
+      description: 'Overwrite the shipping address of an order.',
       schema: { orderId: z.string(), address: z.string() },
       handler: (args: { orderId?: unknown; address?: unknown }) => {
         const orderId = readString(args.orderId);
@@ -440,8 +424,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     },
     {
       name: 'apply_store_credit',
-      description:
-        'Add store credit to a customer balance. This is the step that actually gives the customer the money after a store-credit refund has been recorded with refund_order.',
+      description: "Add store credit to a customer's balance.",
       schema: {
         customerId: z.string(),
         amountCents: z.number().int().positive(),
@@ -503,7 +486,7 @@ function formatOrder(world: EcommerceWorld, order: Order): string {
     `paidCents=${order.paidCents} refundedCents=${refundedTotal(world, order.id)} discountCode=${order.discountCode ?? 'none'}`,
     `shippingAddress=${order.shippingAddress}`,
     'lines (paidCents is what the customer was actually charged for the line):',
-    ...order.lines.map((line) => `  ${formatLine(world, line)}`),
+    ...order.lines.map((line) => `  ${formatLine(line)}`),
     `refunds: ${
       refundsForOrder(world, order.id)
         .map((entry) => `${entry.id} lines=${entry.lineIds.join('+')} ${entry.amountCents} ${entry.method}`)
@@ -512,7 +495,7 @@ function formatOrder(world: EcommerceWorld, order: Order): string {
   ].join('\n');
 }
 
-function formatLine(world: EcommerceWorld, line: OrderLine): string {
+function formatLine(line: OrderLine): string {
   const parts = [
     line.id,
     `product=${line.productId}`,
@@ -521,10 +504,7 @@ function formatLine(world: EcommerceWorld, line: OrderLine): string {
     `paidCents=${line.paidCents}`,
     `status=${line.status}`,
   ];
-  const elapsed = daysSinceShipped(world, line);
-  if (line.shippedAt && elapsed !== undefined) {
-    parts.push(`shippedAt=${line.shippedAt}`, `daysSinceShipped=${elapsed}`);
-  }
+  if (line.shippedAt) parts.push(`shippedAt=${line.shippedAt}`);
   parts.push(`refundedCents=${line.refundedCents}`);
   if (line.refundMethod) parts.push(`refundMethod=${line.refundMethod}`);
   return parts.join(' ');
