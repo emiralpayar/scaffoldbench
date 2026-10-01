@@ -1,100 +1,231 @@
 /**
- * Canary for the tool layer.
+ * Canary for the model-call path.
  *
- * Starts a real Agent SDK session against an in-process MCP server built the
- * same way every task builds one, and stops at the init message. It needs no
- * API key, because the SDK reports the connected servers and registered tools
- * before it authenticates — which makes this a cheap way to catch the class of
- * breakage an SDK upgrade causes: the server object shape changing, tool names
- * no longer being registered, or the MCP handshake failing.
+ * Starts real Agent SDK sessions through the real `runQuery` — the sandbox
+ * guard, the per-call MCP servers, the hermetic options, the budget leases —
+ * against an in-process MCP server built the way every task builds one. Four
+ * calls run at the same time on one environment:
  *
- *   npm run check:wiring
+ *   tools-a, tools-b  the full toolset; each must connect its own server and,
+ *                     with a model, use it
+ *   read-only         must be shown only the read-only tool
+ *   structured        no task tools and a JSON schema; must be shown no task
+ *                     server and, with a model, answer through the
+ *                     structured-output tool without being denied
  *
- * Exits non-zero with a description of what was missing.
+ * Every session must list only the MCP servers it was given, so an operator's
+ * claude.ai connectors leaking into a run fail the check.
+ *
+ *   npm run check:wiring                    # real model calls, a few cents
+ *   npm run check:wiring -- --init-only     # free: stops each session at start-up
+ *   npm run check:wiring -- --model claude-sonnet-5-5 --max-cost 0.5
+ *
+ * `--init-only` needs no credentials, because a session reports its servers
+ * and tools before it authenticates. Exits non-zero with a description of
+ * what was wrong.
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import { createJournaledToolServer } from '@arena/core';
-import type { ToolCall } from '@arena/core';
+import {
+  BudgetTracker,
+  STRUCTURED_OUTPUT_TOOL,
+  TraceCollector,
+  createJournaledToolServer,
+  runQuery,
+} from '@arena/core';
+import type { QueryOutcome, QuerySpec, RunContext, Task, ToolCall, TraceEvent } from '@arena/core';
 
-const INIT_TIMEOUT_MS = 60_000;
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_MAX_COST_USD = 0.4;
+const TIMEOUT_MS = 120_000;
+const SERVER = 'wiringcheck';
+const READ_TOOL = `mcp__${SERVER}__read_thing`;
+const WRITE_TOOL = `mcp__${SERVER}__write_thing`;
+
+interface Args {
+  model: string;
+  initOnly: boolean;
+  maxCostUsd: number;
+}
+
+function parseArgs(argv: readonly string[]): Args {
+  const args: Args = { model: DEFAULT_MODEL, initOnly: false, maxCostUsd: DEFAULT_MAX_COST_USD };
+  for (let i = 0; i < argv.length; i++) {
+    const flag = argv[i];
+    if (flag === '--init-only') args.initOnly = true;
+    else if (flag === '--model') args.model = argv[++i] ?? args.model;
+    else if (flag === '--max-cost') args.maxCostUsd = Number(argv[++i] ?? args.maxCostUsd);
+    else throw new Error(`unknown argument: ${flag}`);
+  }
+  if (!Number.isFinite(args.maxCostUsd) || args.maxCostUsd <= 0) {
+    throw new Error('--max-cost must be a positive number of USD');
+  }
+  return args;
+}
 
 async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
   const journal: ToolCall[] = [];
-  const { createMcpServers, serverName, allowedTools, readOnlyTools } = createJournaledToolServer({
-    name: 'wiringcheck',
+  const server = createJournaledToolServer({
+    name: SERVER,
     instructions: 'Canary server.',
     journal,
     tools: [
       {
         name: 'read_thing',
-        description: 'Read a thing',
+        description: 'Read a thing by id',
         schema: { id: z.string() },
         readOnly: true,
-        handler: (args: { id: string }) => `thing ${args.id}`,
+        handler: (input: { id: string }) => `thing ${input.id} is blue`,
       },
       {
         name: 'write_thing',
         description: 'Write a thing',
         schema: { id: z.string(), value: z.string() },
-        handler: (args: { id: string; value: string }) => `wrote ${args.id}=${args.value}`,
+        handler: (input: { id: string; value: string }) => `wrote ${input.id}=${input.value}`,
       },
     ],
   });
 
   const problems: string[] = [];
-
-  if (readOnlyTools.length !== 1 || readOnlyTools[0] !== 'mcp__wiringcheck__read_thing') {
-    problems.push(`read-only filtering is wrong: ${JSON.stringify(readOnlyTools)}`);
+  if (server.readOnlyTools.join() !== READ_TOOL) {
+    problems.push(`read-only filtering is wrong: ${JSON.stringify(server.readOnlyTools)}`);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), INIT_TIMEOUT_MS);
-
-  let init: { tools?: string[]; mcp_servers?: { name: string; status: string }[] } | undefined;
-
-  try {
-    for await (const message of query({
-      prompt: 'noop',
-      options: {
-        model: 'claude-sonnet-5',
-        systemPrompt: 'canary',
-        allowedTools,
-        mcpServers: createMcpServers(),
-        permissionMode: 'dontAsk',
-        settingSources: [],
-        persistSession: false,
-        maxTurns: 1,
-        maxBudgetUsd: 0.05,
-        abortController: controller,
+  const specs: QuerySpec[] = [
+    {
+      phase: 'tools-a',
+      prompt: 'Call the read_thing tool with id "alpha", then reply with exactly the text it returned.',
+    },
+    {
+      phase: 'tools-b',
+      prompt: 'Call the read_thing tool with id "beta", then reply with exactly the text it returned.',
+    },
+    {
+      phase: 'read-only',
+      prompt: 'Reply with the word "ready".',
+      allowedTools: [...server.readOnlyTools],
+    },
+    {
+      phase: 'structured',
+      prompt: 'What is 2 + 3? Give the number as the answer.',
+      allowedTools: [],
+      outputSchema: {
+        type: 'object',
+        properties: { answer: { type: 'integer' } },
+        required: ['answer'],
+        additionalProperties: false,
       },
-    }) as AsyncIterable<SDKMessage>) {
-      if (message.type === 'system' && message.subtype === 'init') {
-        init = { tools: message.tools, mcp_servers: message.mcp_servers };
-        break;
-      }
-      if (message.type === 'result') break;
-    }
-  } catch (error) {
-    problems.push(`session failed before init: ${error instanceof Error ? error.message : error}`);
+    },
+  ];
+
+  // In --init-only mode, stop every session once all of them have started.
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
+  let inits = 0;
+  const trace = new TraceCollector({
+    onAppend: (event) => {
+      if (event.kind === 'system_init' && ++inits === specs.length && args.initOnly) stop.abort();
+    },
+  });
+  const budget = new BudgetTracker({ maxCostUsd: args.maxCostUsd, maxWallClockMs: TIMEOUT_MS });
+
+  const ctx: RunContext = {
+    runId: 'wiring-check',
+    task: { id: 'wiring-check', maxTurns: 4 } as Task,
+    strategyId: 'wiring-check',
+    model: args.model,
+    effort: 'low',
+    env: {
+      createMcpServers: server.createMcpServers,
+      allowedTools: server.allowedTools,
+      readOnlyTools: server.readOnlyTools,
+      state: {},
+      journal,
+    },
+    cwd: process.cwd(),
+    signal: stop.signal,
+    budget,
+    trace,
+    systemPrompt: 'You are a wiring canary. Do exactly what the user asks and nothing else.',
+  };
+
+  // Equal shares, as `runAll` hands out to concurrent phases.
+  const share = budget.availableUsd / specs.length;
+  let outcomes: QueryOutcome[];
+  try {
+    outcomes = await Promise.all(specs.map((spec) => runQuery(ctx, { ...spec, maxBudgetUsd: share })));
   } finally {
     clearTimeout(timer);
-    controller.abort();
   }
 
-  if (!init) {
-    problems.push('never received an init message');
-  } else {
-    const connected = init.mcp_servers?.find((s) => s.name === serverName);
-    if (connected?.status !== 'connected') {
-      problems.push(`MCP server did not connect: ${JSON.stringify(init.mcp_servers)}`);
+  const initOf = (outcome: QueryOutcome): TraceEvent | undefined =>
+    trace.events.find((e) => e.kind === 'system_init' && e.callId === outcome.callId);
+  const toolsOf = (outcome: QueryOutcome): string[] =>
+    ((initOf(outcome)?.meta?.tools as string[] | undefined) ?? []).filter(
+      (name) => name.startsWith(`mcp__${SERVER}__`) || name === STRUCTURED_OUTPUT_TOOL,
+    );
+
+  for (const [index, outcome] of outcomes.entries()) {
+    const phase = specs[index]?.phase ?? '?';
+    if (!initOf(outcome)) {
+      problems.push(`${phase}: never received an init message (${outcome.error ?? outcome.subtype})`);
+      continue;
     }
-    for (const expected of allowedTools) {
-      if (!init.tools?.includes(expected)) {
-        problems.push(`tool not registered with the session: ${expected}`);
+    // Hermeticity: nothing but the servers this call was given.
+    const unexpected = outcome.mcpServers.filter((s) => !outcome.mcpServersExpected.includes(s.name));
+    if (unexpected.length > 0) {
+      problems.push(`${phase}: unexpected MCP servers loaded: ${JSON.stringify(unexpected)}`);
+    }
+    for (const name of outcome.mcpServersExpected) {
+      const status = outcome.mcpServers.find((s) => s.name === name)?.status;
+      if (status !== 'connected') problems.push(`${phase}: MCP server ${name} is ${status ?? 'missing'}`);
+    }
+  }
+
+  const [toolsA, toolsB, readOnly, structured] = outcomes as [
+    QueryOutcome,
+    QueryOutcome,
+    QueryOutcome,
+    QueryOutcome,
+  ];
+
+  for (const outcome of [toolsA, toolsB]) {
+    const shown = toolsOf(outcome);
+    if (!shown.includes(READ_TOOL) || !shown.includes(WRITE_TOOL)) {
+      problems.push(`a full-toolset call was shown ${JSON.stringify(shown)}`);
+    }
+  }
+  if (toolsOf(readOnly).join() !== READ_TOOL) {
+    problems.push(`the read-only call was shown ${JSON.stringify(toolsOf(readOnly))}`);
+  }
+  if (structured.mcpServersExpected.length > 0 || toolsOf(structured).join() !== STRUCTURED_OUTPUT_TOOL) {
+    problems.push(
+      `the tool-less structured call was shown ${JSON.stringify(toolsOf(structured))} ` +
+        `with servers ${JSON.stringify(structured.mcpServersExpected)}`,
+    );
+  }
+
+  if (!args.initOnly) {
+    for (const [index, outcome] of outcomes.entries()) {
+      const phase = specs[index]?.phase ?? '?';
+      if (outcome.apiError) {
+        problems.push(
+          `${phase}: the model call failed (${outcome.apiError.kind}): ${outcome.apiError.message}` +
+            (outcome.apiError.kind === 'auth' ? ' — run with --init-only to check without credentials' : ''),
+        );
+      } else if (outcome.subtype !== 'success') {
+        problems.push(`${phase}: ended ${outcome.subtype}${outcome.error ? `: ${outcome.error}` : ''}`);
       }
+      if (outcome.deniedToolCalls > 0) problems.push(`${phase}: ${outcome.deniedToolCalls} tool call(s) denied`);
+    }
+    const answer = (structured.structured as { answer?: unknown } | undefined)?.answer;
+    if (structured.structuredMissing || answer !== 5) {
+      problems.push(`structured output missing or wrong: ${JSON.stringify(structured.structured)}`);
+    }
+    const ids = journal.map((entry) => entry.args.id).sort();
+    if (JSON.stringify(ids) !== JSON.stringify(['alpha', 'beta'])) {
+      problems.push(`the concurrent calls did not both use their tools: journal ids ${JSON.stringify(ids)}`);
     }
   }
 
@@ -104,10 +235,19 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  console.log('Wiring check OK');
-  console.log(`  server    : ${serverName} (connected)`);
-  console.log(`  tools     : ${allowedTools.join(', ')}`);
-  console.log(`  read-only : ${readOnlyTools.join(', ')}`);
+  console.log(`Wiring check OK${args.initOnly ? ' (init only)' : ''}`);
+  console.log(`  model      : ${args.model}`);
+  const served = outcomes.filter((o) => o.mcpServersExpected.includes(SERVER)).length;
+  console.log(
+    `  concurrent : ${outcomes.length} sessions at once; the ${served} given a ${SERVER} server each connected its own`,
+  );
+  console.log(`  read-only  : shown ${toolsOf(readOnly).join(', ')}`);
+  console.log(`  structured : shown ${toolsOf(structured).join(', ')}`);
+  if (!args.initOnly) {
+    console.log(`  tool calls : ${journal.map((entry) => `${entry.name}(${String(entry.args.id)})`).join(', ')}`);
+    console.log(`  structured : ${JSON.stringify(structured.structured)}`);
+    console.log(`  cost       : $${budget.spentUsd.toFixed(4)}`);
+  }
   return 0;
 }
 
