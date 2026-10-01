@@ -337,6 +337,7 @@ const BREADTH: BreadthTaskSpec = {
   maxTurns: 10,
   corpus: { primary: ['spec'], superseded: ['old'], secondary: ['guide'] },
   key: { name: 'colour', label: 'widget colour' },
+  quoteFrom: 'the section of the specification that defines that colour',
   fields: [
     { name: 'shape', kind: 'text', description: 'its shape' },
     { name: 'section', kind: 'section', description: 'the defining section' },
@@ -369,13 +370,15 @@ function breadthAnswer(...entries: Array<Record<string, unknown>>): string {
 }
 
 const BLUE = { colour: 'blue', shape: 'Round', section: 'Section 1.', cacheable: true, quote: 'Blue widgets are cacheable by default', url: SPEC_URL };
-const RED = { colour: 'Red', shape: 'a square', section: '§2', cacheable: 'no', quote: 'A red widget is square and must be painted twice before shipping.', url: SPEC_URL };
+const RED = { colour: 'Red widgets', shape: 'a square', section: '§2', cacheable: 'no', quote: 'A red widget is square and must be painted twice before shipping.', url: SPEC_URL };
 
 describe('defineBreadthTask', () => {
   it('lists every item and the exact answer shape in the prompt', () => {
     expect(breadthTask.prompt).toContain('- blue\n- red');
     expect(breadthTask.prompt).toContain('"answers":[{"colour":"blue"');
-    expect(breadthTask.prompt).toMatch(/copied word for word/);
+    expect(breadthTask.prompt).toContain(
+      '- quote: a sentence from the section of the specification that defines that colour, copied word for word',
+    );
   });
 
   it('refuses an item without a gold value for every field', () => {

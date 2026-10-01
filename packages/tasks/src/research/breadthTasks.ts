@@ -51,6 +51,9 @@ export const statusCodesSpec: BreadthTaskSpec = {
     distractor: ['rfc9111'],
   },
   key: { name: 'code', label: 'status code' },
+  quoteFrom:
+    'the numbered section of the specification that defines that status code (its own section, not an ' +
+    'overview list or the table of contents)',
   fields: [
     { name: 'reason', kind: 'text', description: 'the reason phrase exactly as the current specification gives it' },
     {
@@ -150,6 +153,7 @@ export const headerFieldsSpec: BreadthTaskSpec = {
     superseded: ['rfc7231', 'rfc7232', 'rfc7234'],
   },
   key: { name: 'field', label: 'header field' },
+  quoteFrom: 'the section of that RFC that defines the field',
   fields: [
     { name: 'rfc', kind: 'integer', description: 'the number of the RFC that currently defines the field' },
     {
@@ -240,6 +244,7 @@ export const nistPasswordRulesSpec: BreadthTaskSpec = {
     superseded: ['nist-sp800-63b-3'],
   },
   key: { name: 'topic', label: 'topic' },
+  quoteFrom: 'the current revision of SP 800-63B that states the requirement',
   fields: [
     {
       name: 'keyword',

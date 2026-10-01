@@ -86,6 +86,13 @@ export interface BreadthTaskSpec extends ResearchTaskBase {
   /** The answer field that names the item, e.g. `{ name: 'code', label: 'status code' }`. */
   key: { name: string; label: string };
   fields: BreadthField[];
+  /**
+   * Where each item's quote must come from, in the words the prompt uses —
+   * e.g. "the numbered section of the specification that defines the status
+   * code". It must describe `source` exactly: the scorer accepts a quote only
+   * from there, so a vaguer instruction would fail answers that followed it.
+   */
+  quoteFrom: string;
   items: BreadthItem[];
 }
 
@@ -96,13 +103,13 @@ const ANSWER_FIELD_URL = 'url';
 function answerFormat(spec: BreadthTaskSpec): string {
   const example: Record<string, unknown> = { [spec.key.name]: spec.items[0]?.key ?? '…' };
   for (const field of spec.fields) example[field.name] = placeholder(field);
-  example[ANSWER_FIELD_QUOTE] = '<a sentence from the source that states it, copied word for word>';
+  example[ANSWER_FIELD_QUOTE] = '<a sentence copied word for word>';
   example[ANSWER_FIELD_URL] = '<the URL of that page, as you opened it>';
 
   return [
     `Report, for every ${spec.key.label}:`,
     ...spec.fields.map((field) => `- ${field.name}: ${field.description}`),
-    `- ${ANSWER_FIELD_QUOTE}: the sentence from the source that establishes it, copied word for word (at least six words).`,
+    `- ${ANSWER_FIELD_QUOTE}: a sentence from ${spec.quoteFrom}, copied word for word (at least six words).`,
     `- ${ANSWER_FIELD_URL}: the URL of the page the quote comes from, which you opened with fetch_page.`,
     '',
     `Write whatever explanation you like, then end the answer with one fenced JSON block of exactly this shape, with one entry per ${spec.key.label}:`,
@@ -180,7 +187,7 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
       let grounded = 0;
       const misses: Record<string, number> = {};
       const breakdown: ScoreItem[] = spec.items.map((item) => {
-        const entry = entries.get(normalizeKey(item.key));
+        const entry = findEntry(entries, item.key);
         if (!entry) {
           return { id: item.key, label: itemLabel(spec, item), weight: 1, earned: 0, detail: 'Not answered.' };
         }
@@ -215,7 +222,7 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
 
       const metadata = researchMetadata(corpus, opened, audit);
       metadata.answerBlock = block !== undefined;
-      metadata.itemsAnswered = spec.items.filter((item) => entries.has(normalizeKey(item.key))).length;
+      metadata.itemsAnswered = spec.items.filter((item) => findEntry(entries, item.key)).length;
       metadata.itemCount = spec.items.length;
       metadata.fieldAccuracy = fieldsCorrect / (spec.items.length * spec.fields.length);
       metadata.groundedItems = grounded;
@@ -231,6 +238,24 @@ function isAnswersBlock(value: unknown): value is { answers: unknown[] } {
   return (
     typeof value === 'object' && value !== null && Array.isArray((value as { answers?: unknown }).answers)
   );
+}
+
+/**
+ * The answer entry for an item: keyed exactly, or keyed with the item's name
+ * followed by more words (`"308 Permanent Redirect"` for `308`), which is a
+ * formatting choice, not a different answer.
+ */
+function findEntry(
+  entries: ReadonlyMap<string, Record<string, unknown>>,
+  key: string,
+): Record<string, unknown> | undefined {
+  const wanted = normalizeKey(key);
+  const exact = entries.get(wanted);
+  if (exact) return exact;
+  for (const [candidate, entry] of entries) {
+    if (candidate.startsWith(`${wanted} `)) return entry;
+  }
+  return undefined;
 }
 
 function itemLabel(spec: BreadthTaskSpec, item: BreadthItem): string {
