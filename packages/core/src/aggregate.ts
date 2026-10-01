@@ -15,6 +15,7 @@ import type { FailureMode, RunRecord, TaskCategory } from './types';
 
 export * from './analysis';
 export * from './analysisInference';
+export * from './analysisPower';
 export { uncertainFrontier } from './analysisPareto';
 export type { FrontierCandidate, FrontierResult } from './analysisPareto';
 
