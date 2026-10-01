@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BudgetTracker, emptyUsage } from '@arena/core';
+import { BudgetTracker, TotalBudget, emptyUsage } from '@arena/core';
 
 const usage = (input: number, output: number) => ({
   inputTokens: input,
@@ -124,5 +124,112 @@ describe('BudgetTracker', () => {
     b.charge({ costUsd: 0, turns: 0, usage: { inputTokens: 5 } });
     expect(b.usage.inputTokens).toBe(5);
     expect(b.usage.outputTokens).toBe(0);
+  });
+});
+
+describe('TotalBudget', () => {
+  it('reserves a run only while its whole cap fits beside spend and other reservations', () => {
+    const total = new TotalBudget(2.5);
+    const a = total.tryReserve(1);
+    const b = total.tryReserve(1);
+
+    expect(a?.amountUsd).toBe(1);
+    expect(b?.amountUsd).toBe(1);
+    // A third run would fit beside what is spent ($0) but not beside what the
+    // two in flight may still spend.
+    expect(total.tryReserve(1)).toBeUndefined();
+    expect(total.inFlight).toBe(2);
+    expect(total.reservedUsd).toBe(2);
+
+    a?.settle(0.25);
+    expect(total.spentUsd).toBe(0.25);
+    expect(total.reservedUsd).toBe(1);
+    expect(total.tryReserve(1)).toBeDefined();
+  });
+
+  it('counts a settlement once', () => {
+    const total = new TotalBudget(10);
+    const lease = total.tryReserve(1);
+    lease?.settle(0.5);
+    lease?.settle(0.5);
+
+    expect(total.spentUsd).toBe(0.5);
+    expect(total.inFlight).toBe(0);
+    expect(total.reservedUsd).toBe(0);
+  });
+
+  it('lets a waiting run start when one in flight settles under its cap', async () => {
+    const total = new TotalBudget(2.5);
+    const first = total.tryReserve(1);
+    const second = total.tryReserve(1);
+
+    let started = false;
+    const waiting = total.acquire(1).then((lease) => {
+      started = true;
+      return lease;
+    });
+    await Promise.resolve();
+    expect(started).toBe(false);
+
+    // $0.10 spent + $1 still reserved + the new $1 cap fits in $2.50.
+    first?.settle(0.1);
+    const third = await waiting;
+    expect(third?.amountUsd).toBe(1);
+    expect(total.inFlight).toBe(2);
+    second?.settle(0);
+  });
+
+  it('keeps a run waiting while what is spent and reserved leaves no room for its cap', async () => {
+    const total = new TotalBudget(2);
+    const first = total.tryReserve(1);
+    const second = total.tryReserve(1);
+
+    let outcome: string | undefined;
+    const waiting = total.acquire(1).then((lease) => {
+      outcome = lease ? 'started' : 'gave up';
+    });
+
+    // $0.10 spent + $1 reserved + $1 is over $2: still waiting.
+    first?.settle(0.1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(outcome).toBeUndefined();
+
+    // Nothing in flight and still no room: the budget is spent.
+    second?.settle(1);
+    await waiting;
+    expect(outcome).toBe('gave up');
+  });
+
+  it('gives up when nothing is in flight to free room', async () => {
+    const total = new TotalBudget(1.5);
+    total.tryReserve(1)?.settle(1);
+
+    expect(await total.acquire(1)).toBeUndefined();
+    expect(total.closed).toBe(false);
+  });
+
+  it('never starts a run whose cap exceeds the whole budget', async () => {
+    expect(await new TotalBudget(0.5).acquire(1)).toBeUndefined();
+  });
+
+  it('releases every waiter when closed, and refuses further reservations', async () => {
+    const total = new TotalBudget(1);
+    const holder = total.tryReserve(1);
+    const waiting = total.acquire(1);
+
+    total.close();
+    expect(await waiting).toBeUndefined();
+    expect(total.closed).toBe(true);
+
+    holder?.settle(0);
+    expect(total.tryReserve(0.1)).toBeUndefined();
+  });
+
+  it('tolerates floating-point residue at the boundary', () => {
+    const total = new TotalBudget(0.3);
+    total.tryReserve(0.1)?.settle(0.1);
+    total.tryReserve(0.1)?.settle(0.1);
+    // 0.1 + 0.1 + 0.1 is 0.30000000000000004.
+    expect(total.tryReserve(0.1)).toBeDefined();
   });
 });
