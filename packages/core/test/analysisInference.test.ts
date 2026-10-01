@@ -236,10 +236,20 @@ describe('pairedTest', () => {
     const test = pairedTest(diffs, 0.05, settings, { cellDiffs });
     expect(test.caveat).toBe('few-informative-tasks');
     expect(test.pEquivalence).toBe(1);
-    // A task whose repeats cancel out still counts as having differed.
-    const cancelling = Array.from({ length: 6 }, () => [0.1, -0.1]);
-    const counted = pairedTest([0, 0, 0, 0, 0, 0.01], 0.05, settings, { cellDiffs: [...cancelling.slice(0, 5), [0.02, 0]] });
-    expect(counted.caveat).toBeUndefined();
+  });
+
+  it('counts a few large differences among many tiny ones as a few', () => {
+    // 70 tasks: three lost half a point, the rest differ only by noise of
+    // ±0.002. Every task differed, but three carry the spread. A true gap of
+    // 0.05 arriving as such losses shows three or fewer of them 7% of the
+    // time, yet without this guard the TOST calls this equivalent (p = 0.02).
+    const diffs = Array.from({ length: 70 }, (_, i) => (i < 3 ? 0.5 : 0.002 * ((i % 5) - 2)));
+    const lumpy = pairedTest(diffs, 0.05, settings);
+    expect(lumpy.caveat).toBe('few-informative-tasks');
+    expect(lumpy.pEquivalence).toBe(1);
+    // Spread evenly over the tasks, about the same mean passes the guard.
+    const even = Array.from({ length: 70 }, (_, i) => 0.0214 + 0.01 * ((i % 7) - 3));
+    expect(pairedTest(even, 0.05, settings).pEquivalence).toBeLessThan(0.001);
   });
 
   it('holds a pass/fail equivalence test to the binary variance floor', () => {

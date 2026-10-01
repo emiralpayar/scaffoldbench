@@ -36,7 +36,7 @@ export type ContrastVerdict = 'better' | 'worse' | 'equivalent' | 'inconclusive'
  * the minimum, so no verdict. `no-variation`: every task moved by the same
  * amount, so there is no interval and no equivalence; a difference can
  * still be shown if that amount is not zero. `few-informative-tasks`: too
- * few tasks on which the arms differed to show equivalence.
+ * few tasks carry the spread of the difference to show equivalence.
  */
 export type ContrastCaveat = 'too-few-tasks' | 'no-variation' | 'few-informative-tasks';
 
@@ -358,7 +358,7 @@ export interface PairedTestOptions {
    * The paired cell differences behind each task's difference, in the order
    * of `taskDiffs`. Used to count tasks where any repeat differed, and the
    * repeats per task for the binary floor. Without them a task counts as
-   * informative when its mean difference is non-zero.
+   * differing when its mean difference is non-zero.
    */
   cellDiffs?: readonly (readonly number[])[];
   /**
@@ -382,12 +382,17 @@ export interface PairedTestOptions {
  * is weakest — few tasks, most of them tied. Taking the larger of valid
  * p-values keeps the test valid; it only costs power.
  *
- * Equivalence also needs `minClusters` informative tasks (tasks where the
- * arms differed in some repeat). The spread of the difference is learned
- * only from those; from a handful of lumpy differences the bootstrap
- * understates it and calls equivalence too readily. The difference test
- * needs no such rule: with k informative tasks the sign-flip p is at least
- * 2/2^k, so it cannot reject below six of them at α = 0.05.
+ * Equivalence also needs the spread of the difference to rest on at least
+ * `minClusters` tasks. From a handful of lumpy differences the bootstrap
+ * understates the spread and calls equivalence too readily, so two counts
+ * must reach the minimum: the tasks on which the arms differed in some
+ * repeat, and the effective number of tasks carrying the spread,
+ * (Σ eₜ²)² / Σ eₜ⁴ with eₜ the deviation of task t's difference from the
+ * mean (Kish's effective sample size, weighting each task by its squared
+ * deviation). The second counts k large differences among many tiny ones as
+ * about k, however many tiny ones there are. The difference test needs no
+ * such rule: with k tasks that differ the sign-flip p is at least 2/2^k, so
+ * it cannot reject below six of them at α = 0.05.
  */
 export function pairedTest(
   taskDiffs: readonly number[],
@@ -431,9 +436,18 @@ export function pairedTest(
   }
 
   const cells = options.cellDiffs?.length === tasks ? options.cellDiffs : undefined;
-  const informative = cells
+  const differing = cells
     ? cells.filter((c) => c.some((d) => Math.abs(d) > tolerance)).length
     : taskDiffs.filter((d) => Math.abs(d) > tolerance).length;
+  let ss = 0;
+  let ss2 = 0;
+  for (const d of taskDiffs) {
+    const w = (d - estimate) ** 2;
+    ss += w;
+    ss2 += w * w;
+  }
+  const carrying = ss2 > 0 ? (ss * ss) / ss2 : 0;
+  const informative = Math.min(differing, carrying);
 
   const flips = signFlipTest(taskDiffs, margin, settings.iterations, settings.seed);
   const atZero = bootstrapPValues(replicates, 0, tasks, tolerance);
@@ -452,8 +466,6 @@ export function pairedTest(
     const repeats = cells ? cells.map((c) => c.length) : taskDiffs.map(() => 1);
     const meanInverseRepeats = repeats.reduce((acc, r) => acc + 1 / Math.max(1, r), 0) / tasks;
     const floor = (margin * (1 - margin) * meanInverseRepeats) / tasks;
-    let ss = 0;
-    for (const d of taskDiffs) ss += (d - estimate) ** 2;
     const se = Math.sqrt(Math.max(ss / (tasks - 1) / tasks, floor));
     pAboveLower = Math.max(pAboveLower, 1 - studentTCdf((estimate + margin) / se, tasks - 1));
     pBelowUpper = Math.max(pBelowUpper, studentTCdf((estimate - margin) / se, tasks - 1));

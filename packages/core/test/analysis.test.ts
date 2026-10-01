@@ -348,10 +348,10 @@ describe('contrasts', () => {
     const rng = makeRng(17);
     const records = grid({
       strategies: ['single', 'gain', 'same'],
-      tasks: 12,
+      tasks: 20,
       repeats: 2,
       cell: ({ strategyId, task }) => {
-        const base = 0.3 + 0.05 * task;
+        const base = 0.3 + 0.025 * task;
         const shift = strategyId === 'gain' ? 0.12 : 0;
         const noise = strategyId === 'single' ? 0 : (rng() - 0.5) * 0.02;
         const score = Math.min(1, base + shift + noise);
@@ -451,10 +451,10 @@ describe('frontier', () => {
     const rng = makeRng(31);
     const records = grid({
       strategies: ['single', 'pricey-same', 'pricey-better', 'noisy'],
-      tasks: 12,
+      tasks: 20,
       repeats: 2,
       cell: ({ strategyId, task }) => {
-        const base = 0.3 + 0.04 * task;
+        const base = 0.3 + 0.02 * task;
         const cost = 0.05 * (1 + 0.1 * task) * (1 + (rng() - 0.5) * 0.1);
         switch (strategyId) {
           case 'single':
@@ -465,7 +465,11 @@ describe('frontier', () => {
             return { score: base + 0.2 + (rng() - 0.5) * 0.02, passed: false, costUsd: cost * 3 };
           default:
             // Slightly lower on average but far too noisy to separate; slightly dearer.
-            return { score: base - 0.02 + (rng() - 0.5) * 0.6, passed: false, costUsd: cost * (1.05 + (rng() - 0.5) * 0.4) };
+            return {
+              score: Math.max(0, base - 0.02 + (rng() - 0.5) * 0.6),
+              passed: false,
+              costUsd: cost * (1.05 + (rng() - 0.5) * 0.4),
+            };
         }
       },
     });

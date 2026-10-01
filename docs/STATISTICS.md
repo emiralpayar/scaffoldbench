@@ -28,7 +28,7 @@ Two layers live in [`packages/core`](../packages/core/src):
 | Which interval? | A **cluster bootstrap with Hesterberg's expanded percentile interval**: 10,000 replicates, seeded. |
 | What can a contrast conclude? | **better**, **worse**, **equivalent** (within a stated margin), or **inconclusive**. |
 | Multiplicity? | **Holm** within each family (one metric, one kind of contrast, every model). |
-| When is no verdict given? | Fewer than 5 tasks; every task tied; or, for equivalence, fewer than 5 tasks on which the arms differed at all. |
+| When is no verdict given? | Fewer than 5 tasks; every task tied; or, for equivalence, fewer than 5 tasks behind the spread of the difference. |
 | What is left out? | Runs whose `integrity.ok` is false and runs that hit an `api_error`. They are counted under `health`, not ranked. |
 | Quality metrics | Score (partial credit) and pass rate, compared as differences. |
 | Resource metrics | Cost and latency, compared as geometric-mean ratios. |
@@ -220,12 +220,28 @@ margin. Each one-sided $p$ is the larger of the bootstrap and the shifted sign-f
 every guard here, that can only make equivalence harder to reach. The shifted sign-flip tests
 assume differences symmetric about $\pm m$. They are a guard, never the only basis. Two more exist
 because simulation showed the bootstrap TOST claiming equivalence too readily when a true gap of
-exactly the margin arrives as rare, large jumps (8–10% instead of 5% before these guards):
+exactly the margin arrives as rare, large jumps: 8–10% of the time instead of 5% in the
+run-level scenarios of [§8](#8-validation), and up to 13% when a few whole tasks carry the gap,
+with neither guard in place:
 
-- **Informative tasks.** Equivalence also needs at least `minTasks` tasks on which the two arms
-  differed in some repeat. The spread of the difference is learned only from those. From a
-  handful of lumpy values the bootstrap understates it. This mirrors what the sign-flip guard
-  already demands of a difference verdict.
+- **Informative tasks.** Equivalence also needs the spread of the difference to rest on at least
+  `minTasks` tasks, because from a handful of lumpy values the bootstrap understates it. Two counts
+  must reach the minimum: the tasks on which the two arms differed in some repeat, and the
+  effective number of tasks carrying the spread,
+
+  ```math
+  n_{\text{spread}} = \frac{\big(\sum_t e_t^2\big)^2}{\sum_t e_t^4}, \qquad e_t = D_t - \hat{\theta}
+  ```
+
+  which is Kish's (1965) effective sample size with each task weighted by its squared deviation.
+  Three tasks that lost half a point among 67 that differ only by judge noise count as about three,
+  not 70. Without this second count, a true gap of exactly the margin carried by a few whole tasks
+  was called equivalent 6–12% of the time at 70 tasks; with it, 0.1% and 1.9% in the two such
+  scenarios of [§8](#8-validation). The price is power at small task counts. Normal differences
+  put about a third of the tasks behind the spread, so near-identical arms that the bootstrap
+  alone would show equivalent about 95% of the time are shown equivalent half the time at 12
+  tasks, 90% of the time at 20 and 95% at 30. The sign-flip guard already demands at least six
+  differing tasks of a difference verdict.
 - **Binary variance floor (pass only).** A run-level difference of two pass/fail outcomes lies in
   $\{-1, 0, 1\}$. If the true mean difference were $\pm m$, its variance would be at least
   $m(1-m)$ (put mass $m$ on 1 and the rest on 0). So
@@ -380,8 +396,8 @@ repeat count.
 
 [`analysisSimulation.test.ts`](../packages/core/test/analysisSimulation.test.ts) checks
 coverage and error rates on seeded simulations. CI runs a few hundred trials per scenario. The
-table below is the same file at 2,000 trials with the default 10,000 replicates (about two
-minutes):
+table below is the same file at 2,000 trials with the default 10,000 replicates (about two and a
+half minutes):
 
 ```sh
 ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts --testTimeout=1200000
@@ -399,13 +415,20 @@ ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.
 | 95% interval, 9 tasks × 2, task means far apart: task bootstrap | 0.95 | 0.950 |
 | … the legacy bootstrap over runs | 0.95 | 0.801 |
 | `better`/`worse` when there is no effect, 20 tasks × 3 | ≤ 0.05 | 0.048 |
-| `equivalent` when the gap equals the margin, 20 tasks × 3 | ≤ 0.05 | 0.050 |
+| `equivalent` when the gap equals the margin, 20 tasks × 3 | ≤ 0.05 | 0.047 |
 | … gap arrives as rare pass/fail failures, 60 tasks × 3 | ≤ 0.05 | 0.000 |
 | … rare 0.5-point losses, 30 tasks × 3 | ≤ 0.05 | 0.041 |
 | … rare 0.25-point losses, 9 tasks × 2 | ≤ 0.05 | 0.000 |
-| `equivalent` (±5 points) for identical arms at 95% pass, 60 tasks × 3 | power | 0.376 |
+| … whole tasks lose 0.5 points, plus run noise, 70 tasks × 3 | ≤ 0.05 | 0.001 |
+| … whole tasks lose 1 point, plus run noise, 70 tasks × 3 | ≤ 0.05 | 0.019 |
+| `equivalent` (±5 points) for identical arms, score, 12 tasks × 3 | power | 0.499 |
+| … 20 tasks × 3 | power | 0.898 |
+| … 30 tasks × 3 | power | 0.946 |
+| `equivalent` (±5 points) for identical arms at 95% pass, 60 tasks × 3 | power | 0.375 |
 | … 100 tasks × 3 | power | 0.732 |
 | `better` for a 10-point effect, 20 tasks × 3 | power | 0.988 |
+| 95% pass-rate interval, 9 tasks × 2, the task decides every outcome: Wilson over tasks at 0%/100% | 0.95 | 0.986 |
+| … Wilson over runs at 0%/100% (the previous rule) | 0.95 | 0.847 |
 | Run sets with any false winner: five identical strategies, 9 tasks × 2, paired + Holm | ≤ 0.05 | 0.000 |
 | … the legacy overlap rule | ≤ 0.05 | 0.212 |
 

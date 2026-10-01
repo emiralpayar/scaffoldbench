@@ -13,7 +13,7 @@
  *   ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts \
  *     --testTimeout=1200000
  *
- * (about two minutes, most of it the leaderboard simulation).
+ * (about two and a half minutes, most of it the leaderboard simulation).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -99,6 +99,18 @@ function lumpyCells(rng: () => number, tasks: number, repeats: number, penalty: 
   return Array.from({ length: tasks }, () =>
     Array.from({ length: repeats }, () => (rng() < 0.05 / penalty ? penalty : 0)),
   );
+}
+
+/**
+ * The same gap carried by whole tasks: with probability 0.05 / penalty a task
+ * is one B loses `penalty` on in every repeat, and every run also carries a
+ * little judge-like noise, so every task differs a bit.
+ */
+function taskLumpCells(rng: () => number, normal: () => number, tasks: number, repeats: number, penalty: number): number[][] {
+  return Array.from({ length: tasks }, () => {
+    const lost = rng() < 0.05 / penalty ? penalty : 0;
+    return Array.from({ length: repeats }, () => lost + 0.02 * normal());
+  });
 }
 
 describe('interval coverage', () => {
@@ -235,6 +247,49 @@ describe('error rates of the four-way verdict', () => {
       const label = `false equivalence, lumpy gap = margin (penalty ${penalty}), ${tasks} tasks x ${repeats}`;
       expect(report(label, falseEquivalence / trials)).toBeLessThan(0.08);
     }
+  });
+
+  it('holds it when the gap is carried by a few whole tasks among small noise', () => {
+    // Every task differs a little, so counting tasks that differed at all
+    // would not stop a TOST that learned its spread from three lost tasks.
+    const rng = makeRng(616);
+    const normal = gaussian(rng);
+    const trials = trialsOr(300);
+    for (const [penalty, tasks] of [
+      [0.5, 70],
+      [1, 70],
+    ] as const) {
+      let falseEquivalence = 0;
+      for (let s = 0; s < trials; s++) {
+        if (verdictOf(taskLumpCells(rng, normal, tasks, 3, penalty), 0.05) === 'equivalent') falseEquivalence += 1;
+      }
+      const label = `false equivalence, gap = margin in whole tasks (penalty ${penalty}) + noise, ${tasks} tasks x 3`;
+      expect(report(label, falseEquivalence / trials)).toBeLessThan(0.08);
+    }
+  });
+
+  it('shows near-identical arms equivalent from about 20 tasks up', () => {
+    // The price of that guard: the spread has to rest on five effective
+    // tasks, and normal differences put about a third of the tasks behind it.
+    // Task effects sd 0.03 and run noise sd 0.05, tight enough that without
+    // the guard about 95% of these run sets are shown equivalent at any size.
+    const normal = gaussian(makeRng(626));
+    const trials = trialsOr(200);
+    const rates: number[] = [];
+    for (const tasks of [12, 20, 30]) {
+      let shown = 0;
+      for (let s = 0; s < trials; s++) {
+        const cells = Array.from({ length: tasks }, () => {
+          const effect = 0.03 * normal();
+          return Array.from({ length: 3 }, () => effect + 0.05 * normal());
+        });
+        if (verdictOf(cells, 0.05) === 'equivalent') shown += 1;
+      }
+      rates.push(report(`power to show score equivalence (±5 points), identical arms, ${tasks} tasks x 3`, shown / trials));
+    }
+    expect(rates[0]).toBeLessThan(0.75);
+    expect(rates[1]).toBeGreaterThan(rates[0]!);
+    expect(rates[2]).toBeGreaterThan(0.9);
   });
 
   it('needs on the order of 100 tasks to show 5-point pass equivalence, even for identical arms', () => {
