@@ -180,7 +180,9 @@ export interface PairedResult {
   pEquivalenceAdjusted: number | null;
   /**
    * `better`: a beats b (higher score or pass, lower cost or latency).
-   * `equivalent`: no difference shown, and the interval rules out one as large as the margin.
+   * `equivalent`: no difference shown, and the equivalence test (TOST) rules out one as
+   * large as the margin. Unadjusted, that is the 1 − 2·alpha interval inside the margin; `ci`
+   * is the 1 − alpha one and may reach slightly past it.
    */
   verdict: ContrastVerdict;
   caveat?: ContrastCaveat;
