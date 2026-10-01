@@ -538,6 +538,71 @@ describe('determinism and output', () => {
     expect(analyzeRunSet(all, fast).health.duplicates).toBe(1);
   });
 
+  it('stays finite and self-consistent on ragged run sets', () => {
+    // Random grids with missing cells, re-runs, excluded runs, zero costs,
+    // one to three models and one to nine tasks: every number must survive
+    // JSON, every p lie in [0, 1], every verdict rest on its adjusted p, and
+    // every interval hold its estimate, whatever order the records come in.
+    for (let seed = 1; seed <= 40; seed++) {
+      const rng = makeRng(seed);
+      const models = ['claude-haiku-4-5-20251001', 'claude-sonnet-5-5', 'claude-opus-5-5'].slice(0, 1 + Math.floor(rng() * 3));
+      const strategies = ['single', 'a', 'b', 'c'].slice(0, 2 + Math.floor(rng() * 3));
+      const ragged = grid({
+        models,
+        strategies,
+        tasks: 1 + Math.floor(rng() * 9),
+        repeats: 1 + Math.floor(rng() * 3),
+        cell: () => {
+          const passed = rng() < 0.7;
+          return {
+            passed,
+            score: rng() < 0.5 ? (passed ? 1 : 0) : rng(),
+            costUsd: rng() < 0.05 ? 0 : 0.05 * Math.exp(rng()),
+            latencyMs: 1_000 * Math.exp(rng()),
+            failureMode: rng() < 0.08 ? 'api_error' : passed ? 'none' : 'wrong_answer',
+            finishedAt: rng() < 0.5 ? '2026-10-01T00:00:10.000Z' : '2026-10-01T00:00:20.000Z',
+            ...(rng() < 0.3 ? { integrity: { ok: rng() < 0.85, checks: [] } } : {}),
+          };
+        },
+      }).filter(() => rng() > 0.15);
+      const records = [...ragged, ...ragged.filter(() => rng() < 0.05).map((r) => ({ ...r, runId: `${r.runId}-again` }))];
+      const options = { iterations: 200, seed, minTasks: 2 + Math.floor(rng() * 4) };
+      const analysis = analyzeRunSet(records, options);
+
+      expect(JSON.parse(JSON.stringify(analysis))).toEqual(analysis);
+      expect(analyzeRunSet([...records].reverse(), options)).toEqual(analysis);
+      const { health } = analysis;
+      expect(health.included + health.excluded + health.duplicates).toBe(health.runs);
+      const contrasts = [
+        ...analysis.models.flatMap((m) => [...m.vsBaseline, ...m.pairwise]),
+        ...analysis.scaffoldOrScale,
+        ...analysis.frontierContrasts,
+        ...analysis.interactions,
+      ];
+      for (const c of contrasts) {
+        expect(Number.isFinite(c.estimate)).toBe(true);
+        for (const p of [c.pValue, c.pAdjusted, c.pEquivalence, c.pEquivalenceAdjusted]) {
+          if (p !== null) expect(p >= 0 && p <= 1).toBe(true);
+        }
+        if (c.pValue !== null) expect(c.pAdjusted!).toBeGreaterThanOrEqual(c.pValue);
+        if (c.verdict === 'better' || c.verdict === 'worse') expect(c.pAdjusted!).toBeLessThanOrEqual(0.05);
+        if (c.verdict === 'equivalent') expect(c.pEquivalenceAdjusted!).toBeLessThanOrEqual(0.05);
+        if (c.ci) {
+          const slack = 1e-9 * Math.max(1, Math.abs(c.estimate));
+          expect(c.ci.low).toBeLessThanOrEqual(c.estimate + slack);
+          expect(c.ci.high).toBeGreaterThanOrEqual(c.estimate - slack);
+        }
+      }
+      for (const s of analysis.models.flatMap((m) => m.strategies)) {
+        for (const e of [s.score, s.passRate, s.costUsd, s.latencyMs, ...s.passHatK]) {
+          expect(Number.isFinite(e.value)).toBe(true);
+          if (e.ci) expect(e.ci.low <= e.value + 1e-9 && e.value - 1e-9 <= e.ci.high).toBe(true);
+        }
+        expect(s.cells.included + s.cells.excluded + s.cells.missing).toBe(s.cells.expected);
+      }
+    }
+  });
+
   it('serializes to JSON without losing anything', () => {
     const analysis = analyzeRunSet(records, fast);
     expect(JSON.parse(JSON.stringify(analysis))).toEqual(analysis);

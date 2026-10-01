@@ -452,8 +452,8 @@ class PairedTestCache {
       cells: hit.cells,
       test: {
         ...test,
-        estimate: -test.estimate,
-        ci: test.ci ? { low: -test.ci.high, high: -test.ci.low } : null,
+        estimate: negate(test.estimate),
+        ci: test.ci ? { low: negate(test.ci.high), high: negate(test.ci.low) } : null,
       },
     };
   }
@@ -694,6 +694,11 @@ export function analyzeRunSet(
     frontierContrasts,
     health,
   };
+}
+
+/** −x, but never −0: a mirrored tie should print as 0, not "-0". */
+function negate(x: number): number {
+  return x === 0 ? 0 : -x;
 }
 
 function mirror(verdict: ContrastVerdict): ContrastVerdict {

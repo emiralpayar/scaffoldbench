@@ -245,13 +245,19 @@ export function cellAccounting(
   return { expected, included, excluded, missing: expected - included - excluded };
 }
 
-/** Per-task mean of `metric` over the arm's healthy repeats, in task order. */
+/**
+ * Per-task mean of `metric` over the arm's healthy repeats, in task order.
+ * Repeats are summed in repeat order, so the floating-point result does not
+ * depend on the order the records arrived in.
+ */
 export function taskMeans(arm: ArmCells, metric: AnalysisMetric): number[] {
   const out: number[] = [];
   for (const taskId of [...arm.cells.keys()].sort()) {
     const byRepeat = arm.cells.get(taskId) as Map<number, RunRecord>;
     let total = 0;
-    for (const record of byRepeat.values()) total += metricValue(record, metric);
+    for (const repeat of [...byRepeat.keys()].sort((x, y) => x - y)) {
+      total += metricValue(byRepeat.get(repeat) as RunRecord, metric);
+    }
     out.push(total / byRepeat.size);
   }
   return out;
