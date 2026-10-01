@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import type { JournaledToolSpec, ToolReply } from '@arena/core';
-import type { CorpusDocument, TaskCorpus } from './corpus';
+import type { JournaledToolSpec, ToolCall, ToolReply } from '@arena/core';
+import type { CorpusDocument, SearchHit, TaskCorpus } from './corpus';
+import type { TextRange } from './text';
 
 /**
  * The agent's only door to the web: `search` and `fetch_page` over the task's
@@ -50,14 +51,14 @@ export function createWebTools(options: WebToolsOptions): JournaledToolSpec[] {
         .optional()
         .describe(`Maximum results to return (default ${DEFAULT_SEARCH_LIMIT}).`),
     },
-    handler(args: { query?: unknown; limit?: unknown }): ToolReply {
-      const query = typeof args.query === 'string' ? args.query.trim() : '';
+    handler(args: Record<string, unknown>): ToolReply {
+      const query = searchQuery(args);
       if (query === '') return error('search requires a non-empty `query`.');
 
       const hits = corpus.search(query);
       if (hits.length === 0) return `No results found for "${query}".`;
 
-      const shown = hits.slice(0, clampLimit(args.limit));
+      const shown = shownHits(hits, args);
       const lines = shown.map(
         (hit, index) =>
           `${index + 1}. ${hit.document.title}\n   ${hit.document.url}\n   ${hit.snippet}` +
@@ -88,18 +89,16 @@ export function createWebTools(options: WebToolsOptions): JournaledToolSpec[] {
         .optional()
         .describe('Instead of reading, list the offsets where this phrase occurs in the page (case-insensitive).'),
     },
-    handler(args: { url?: unknown; offset?: unknown; find?: unknown }): ToolReply {
-      const raw = typeof args.url === 'string' ? args.url.trim() : '';
-      if (!isHttpUrl(raw)) return error(`\`${raw}\` is not an absolute http(s) URL.`);
+    handler(args: Record<string, unknown>): ToolReply {
+      const request = pageRequest(args);
+      if (!isHttpUrl(request.url)) return error(`\`${request.url}\` is not an absolute http(s) URL.`);
 
-      const document = corpus.resolve(raw);
-      if (!document) return error(`HTTP 404 Not Found: ${raw}`);
+      const document = corpus.resolve(request.url);
+      if (!document) return error(`HTTP 404 Not Found: ${request.url}`);
 
-      if (typeof args.find === 'string' && args.find.trim() !== '') {
-        return renderFind(document, args.find.trim(), corpus);
-      }
+      if (request.find !== undefined) return renderFind(document, request.find, corpus);
 
-      const offset = typeof args.offset === 'number' && Number.isFinite(args.offset) ? Math.floor(args.offset) : 0;
+      const { offset } = request;
       if (offset < 0 || offset >= document.text.length) {
         return error(
           `offset ${offset} is outside this page, which has ${document.text.length.toLocaleString('en-US')} characters.`,
@@ -110,6 +109,92 @@ export function createWebTools(options: WebToolsOptions): JournaledToolSpec[] {
   };
 
   return [search, fetchPage];
+}
+
+// ---------------------------------------------------------------------------
+// arguments, read the same way by the tools and by the scorer
+// ---------------------------------------------------------------------------
+
+function searchQuery(args: Record<string, unknown>): string {
+  return typeof args.query === 'string' ? args.query.trim() : '';
+}
+
+/** The results a search reply lists: the first `limit` hits. */
+function shownHits(hits: SearchHit[], args: Record<string, unknown>): SearchHit[] {
+  return hits.slice(0, clampLimit(args.limit));
+}
+
+interface PageRequest {
+  url: string;
+  /** Set when the call asks to locate a phrase instead of reading a window. */
+  find?: string;
+  offset: number;
+}
+
+function pageRequest(args: Record<string, unknown>): PageRequest {
+  const url = typeof args.url === 'string' ? args.url.trim() : '';
+  const find = typeof args.find === 'string' ? args.find.trim() : '';
+  const offset = typeof args.offset === 'number' && Number.isFinite(args.offset) ? Math.floor(args.offset) : 0;
+  return find === '' ? { url, offset } : { url, find, offset };
+}
+
+// ---------------------------------------------------------------------------
+// what the tools displayed
+// ---------------------------------------------------------------------------
+
+/**
+ * Every stretch of every document that the run's tool calls displayed, merged
+ * per document and given in document offsets: the windows `fetch_page` read,
+ * the contexts its `find` listed, and the snippets `search` returned.
+ *
+ * Recomputed from the journal rather than recorded by the handlers, so the
+ * journal stays the one record the scorer reads: the tools are deterministic
+ * functions of their arguments over a frozen corpus, and this replays them.
+ * `pageChars` must be the window size the tools were created with.
+ */
+export function displayedPassages(
+  journal: readonly ToolCall[],
+  corpus: TaskCorpus,
+  pageChars = DEFAULT_PAGE_CHARS,
+): Map<string, TextRange[]> {
+  const displayed = new Map<string, TextRange[]>();
+  const add = (document: CorpusDocument, range: TextRange): void => {
+    let ranges = displayed.get(document.id);
+    if (!ranges) displayed.set(document.id, (ranges = []));
+    ranges.push(range);
+  };
+
+  for (const entry of journal) {
+    if (!entry.ok) continue;
+    if (entry.name === 'search') {
+      const query = searchQuery(entry.args);
+      if (query === '') continue;
+      for (const hit of shownHits(corpus.search(query), entry.args)) add(hit.document, hit.shown);
+    } else if (entry.name === 'fetch_page') {
+      const request = pageRequest(entry.args);
+      const document = corpus.resolve(request.url);
+      if (!document) continue;
+      if (request.find !== undefined) {
+        for (const hit of corpus.find(document, request.find).slice(0, MAX_FIND_HITS)) add(document, hit.shown);
+      } else if (request.offset >= 0 && request.offset < document.text.length) {
+        add(document, pageWindow(document.text, request.offset, pageChars));
+      }
+    }
+  }
+
+  for (const [id, ranges] of displayed) displayed.set(id, mergeRanges(ranges));
+  return displayed;
+}
+
+/** Overlapping and touching ranges joined, in order. */
+export function mergeRanges(ranges: readonly TextRange[]): TextRange[] {
+  const merged: TextRange[] = [];
+  for (const range of [...ranges].sort((a, b) => a.start - b.start || a.end - b.end)) {
+    const last = merged.at(-1);
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  return merged;
 }
 
 // ---------------------------------------------------------------------------

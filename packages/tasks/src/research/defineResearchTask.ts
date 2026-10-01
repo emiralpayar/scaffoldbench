@@ -22,9 +22,9 @@ import {
   auditCitations,
   checkQuote,
   citedUrls,
-  openedDocuments,
   parseEvidence,
   QUOTE_FAILURE_TEXT,
+  readingOf,
   type CitationAudit,
   type EvidenceEntry,
   type QuoteCheck,
@@ -59,6 +59,7 @@ export const RESEARCH_POLICY = [
   '- Cite the URL of every source you rely on, next to the claim it supports.',
   '- Never cite a URL you did not open with `fetch_page`. A citation to an unopened page is scored as a fabrication.',
   '- Quotes must be copied word for word from the page you cite; they are checked against the page text.',
+  '- Quote only passages the tools have shown you in this session. A quote recalled from memory does not count, even when the page contains it.',
   '- When sources disagree, say so explicitly and attribute each position, instead of silently picking one.',
 ].join('\n');
 
@@ -241,9 +242,10 @@ const MAX_DETAIL_CHARS = 300;
  * and says whether it states the claim, and which of the answer's evidence
  * entries back it — sampled and reduced by median so one unlucky grading
  * cannot move a number. The scorer then checks, without any model, that each
- * of those entries quotes its page word for word and that the run actually
- * opened that page. A claim earns full credit only when both agree; a claim
- * stated without verified support earns `UNGROUNDED_CREDIT`.
+ * of those entries quotes its page word for word, that the run opened that
+ * page, and that a tool showed the run that passage (`checkQuote`). A claim
+ * earns full credit only when both agree; a claim stated without verified
+ * support earns `UNGROUNDED_CREDIT`.
  */
 export function defineResearchTask(spec: ResearchTaskSpec): Task {
   const ids = spec.rubric.map((item) => item.id);
@@ -269,9 +271,10 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
     async score({ env, outcome, deps }: ScoreInput): Promise<TaskScore> {
       const { corpus } = researchState(env);
       const answer = outcome.finalText.trim();
-      const opened = openedDocuments(env.journal, corpus);
+      const reading = readingOf(env.journal, corpus);
+      const { opened } = reading;
       const evidence = parseEvidence(answer);
-      const checks = evidence.entries.map((entry) => checkQuote(corpus, opened, entry.quote, entry.url));
+      const checks = evidence.entries.map((entry) => checkQuote(corpus, reading, entry.quote, entry.url));
       const audit = auditCitations(
         citedUrls(evidence.prose, evidence.entries.map((entry) => entry.url)),
         corpus,

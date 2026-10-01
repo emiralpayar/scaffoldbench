@@ -2,7 +2,15 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Bm25Index, chunkDocument } from './bm25';
-import { locateQuote, normalizeForMatch, searchTerms, wordOccurrences, type TextRange } from './text';
+import {
+  locateQuote,
+  normalizedOffsets,
+  normalizeForMatch,
+  searchTerms,
+  wordOccurrences,
+  type QuoteMatch,
+  type TextRange,
+} from './text';
 
 /**
  * The frozen web the research tasks run against.
@@ -173,11 +181,15 @@ export interface SearchHit {
   /** Offset of the best-matching passage, so the agent can open the page there. */
   offset: number;
   snippet: string;
+  /** The stretch of the document the snippet shows, in document offsets. */
+  shown: TextRange;
 }
 
 export interface FindHit {
   offset: number;
   context: string;
+  /** The stretch of the document the context shows, in document offsets. */
+  shown: TextRange;
 }
 
 const SNIPPET_CHARS = 240;
@@ -194,6 +206,7 @@ export class TaskCorpus {
   readonly #index: Bm25Index;
   readonly #normalized = new Map<string, string>();
   readonly #flattened = new Map<string, { flat: string; offsets: number[] }>();
+  readonly #offsetMaps = new Map<string, Int32Array | undefined>();
 
   constructor(corpus: Corpus, selection: CorpusSelection) {
     this.corpus = corpus;
@@ -257,11 +270,13 @@ export class TaskCorpus {
       seen.add(passage.docId);
       const document = this.documents.find((candidate) => candidate.id === passage.docId);
       if (!document) continue;
+      const snippet = snippetOf(passage.text, terms);
       hits.push({
         document,
         score,
         offset: passage.offset,
-        snippet: snippetOf(passage.text, terms),
+        snippet: snippet.text,
+        shown: { start: passage.offset + snippet.start, end: passage.offset + snippet.end },
       });
     }
     return hits;
@@ -281,11 +296,9 @@ export class TaskCorpus {
     for (let at = flat.indexOf(needle); at !== -1; at = flat.indexOf(needle, at + 1)) {
       const offset = offsets[at] ?? 0;
       const { from, to } = wholeWords(flat, at - FIND_CONTEXT_CHARS / 2, at + needle.length + FIND_CONTEXT_CHARS / 2);
-      const context = document.text
-        .slice(offsets[from] ?? 0, offsets[to] ?? document.text.length)
-        .replace(/\s+/g, ' ')
-        .trim();
-      hits.push({ offset, context: `${from > 0 ? '…' : ''}${context}${to < flat.length ? '…' : ''}` });
+      const shown = { start: offsets[from] ?? 0, end: offsets[to] ?? document.text.length };
+      const context = document.text.slice(shown.start, shown.end).replace(/\s+/g, ' ').trim();
+      hits.push({ offset, context: `${from > 0 ? '…' : ''}${context}${to < flat.length ? '…' : ''}`, shown });
     }
     return hits;
   }
@@ -301,8 +314,17 @@ export class TaskCorpus {
   }
 
   /** Where a quote occurs in a document, in normalized coordinates. */
-  locate(document: CorpusDocument, quote: string): TextRange[] {
+  locate(document: CorpusDocument, quote: string): QuoteMatch[] {
     return locateQuote(this.normalized(document), quote);
+  }
+
+  /** A document offset in normalized coordinates: where `text.slice(0, offset)` ends once normalized. */
+  toNormalized(document: CorpusDocument, offset: number): number {
+    if (!this.#offsetMaps.has(document.id)) this.#offsetMaps.set(document.id, normalizedOffsets(document.text));
+    const map = this.#offsetMaps.get(document.id);
+    const clamped = Math.max(0, Math.min(document.text.length, offset));
+    // No exact map (see `normalizedOffsets`): normalizing the prefix is slower but exact.
+    return map ? (map[clamped] as number) : normalizeForMatch(document.text.slice(0, clamped)).length;
   }
 
   /**
@@ -373,15 +395,14 @@ function flattenWhitespace(text: string): { flat: string; offsets: number[] } {
 /**
  * The window of a passage that holds the most distinct query terms, so the
  * snippet shows why the page matched rather than wherever a common word first
- * appears.
+ * appears. Returns the snippet and the stretch of `text` it shows.
  */
-function snippetOf(text: string, terms: ReadonlySet<string>): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  const lower = flat.toLowerCase();
+function snippetOf(text: string, terms: ReadonlySet<string>): { text: string } & TextRange {
+  const { flat, offsets } = flattenWhitespace(text);
   const hits: Array<{ at: number; term: string }> = [];
   for (const term of terms) {
     const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(term)}`, 'gu');
-    for (const match of lower.matchAll(pattern)) hits.push({ at: match.index ?? 0, term });
+    for (const match of flat.matchAll(pattern)) hits.push({ at: match.index ?? 0, term });
   }
 
   let best = 0;
@@ -394,8 +415,11 @@ function snippetOf(text: string, terms: ReadonlySet<string>): string {
     }
   }
 
-  const { from: start, to: end } = wholeWords(flat, best - 40, best - 40 + SNIPPET_CHARS);
-  return `${start > 0 ? '…' : ''}${flat.slice(start, end).trim()}${end < flat.length ? '…' : ''}`;
+  const { from, to } = wholeWords(flat, best - 40, best - 40 + SNIPPET_CHARS);
+  const start = offsets[from] ?? 0;
+  const end = offsets[to] ?? text.length;
+  const shown = text.slice(start, end).replace(/\s+/g, ' ').trim();
+  return { text: `${from > 0 ? '…' : ''}${shown}${to < flat.length ? '…' : ''}`, start, end };
 }
 
 /**

@@ -12,11 +12,14 @@ import {
   auditCitations,
   checkQuote,
   citedUrls,
-  openedDocuments,
+  MIN_QUOTE_WORDS,
   QUOTE_FAILURE_TEXT,
   readAnswerBlock,
+  readingOf,
+  wordsInside,
+  type Reading,
 } from './citations';
-import type { CorpusDocument, TaskCorpus } from './corpus';
+import type { TaskCorpus } from './corpus';
 import {
   citationPenalty,
   createResearchEnvironment,
@@ -74,6 +77,13 @@ export interface BreadthItem {
   /** Other answers that are equally right, per field. */
   alsoAccept?: Record<string, GoldValue[]>;
   source: QuoteSource;
+  /**
+   * Other places in the corpus that state the item just as authoritatively,
+   * so a quote from them answers the prompt's `quoteFrom` too. Without this,
+   * an answer that followed the instruction to the letter could still lose
+   * its grounding for picking the other sentence.
+   */
+  alsoSource?: QuoteSource[];
   /**
    * A sentence from `source` that establishes the item. Not used for scoring;
    * the sufficiency test checks it lies inside the source span, which proves
@@ -169,7 +179,8 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
     async score({ env, outcome }: ScoreInput): Promise<TaskScore> {
       const { corpus } = researchState(env);
       const answer = outcome.finalText.trim();
-      const opened = openedDocuments(env.journal, corpus);
+      const reading = readingOf(env.journal, corpus);
+      const { opened } = reading;
       const block = readAnswerBlock(answer, isAnswersBlock);
       const entries = new Map<string, Record<string, unknown>>();
       for (const raw of block?.value.answers ?? []) {
@@ -207,7 +218,7 @@ export function defineBreadthTask(spec: BreadthTaskSpec): Task {
         }
         fieldsCorrect += correct;
 
-        const grounding = groundItem(corpus, opened, item, entry);
+        const grounding = groundItem(corpus, reading, item, entry);
         if (grounding.ok) grounded += 1;
         notes.push(grounding.note);
 
@@ -266,14 +277,16 @@ function itemLabel(spec: BreadthTaskSpec, item: BreadthItem): string {
 
 /**
  * Whether the item's quote comes from where the gold answer says it should:
- * a page the run opened, word for word, in the expected document and inside
- * the expected section or sentence. A true sentence from the wrong section —
- * or from the obsolete RFC — does not count: the point is to show the answer
- * was read where it is defined.
+ * a passage the run opened and was shown, word for word, in the expected
+ * document and inside the expected section or sentence — at least
+ * `MIN_QUOTE_WORDS` of its words in there, so a quote from the neighbouring
+ * section that strays a word across the heading does not count. A true
+ * sentence from the wrong section, or from the obsolete RFC, does not count
+ * either: the point is to show the answer was read where it is defined.
  */
 export function groundItem(
   corpus: TaskCorpus,
-  opened: ReadonlyMap<string, CorpusDocument>,
+  reading: Reading,
   item: BreadthItem,
   entry: Record<string, unknown>,
 ): { ok: boolean; note: string } {
@@ -283,17 +296,24 @@ export function groundItem(
     return { ok: false, note: 'no quote' };
   }
 
-  const check = checkQuote(corpus, opened, quote, url);
+  const check = checkQuote(corpus, reading, quote, url);
   if (!check.ok) return { ok: false, note: `quote not verified: ${QUOTE_FAILURE_TEXT[check.reason]}` };
-  if (check.document.id !== item.source.doc) {
+
+  const sources = [item.source, ...(item.alsoSource ?? [])];
+  const inDocument = sources.filter((source) => source.doc === check.document.id);
+  if (inDocument.length === 0) {
     return { ok: false, note: `quote is from ${check.document.id}, expected ${item.source.doc}` };
   }
 
-  const spans = corpus.spans(check.document, item.source.from, item.source.to);
-  const inside = check.ranges.some((range) => spans.some((span) => range.start < span.end && range.end > span.start));
+  const normalized = corpus.normalized(check.document);
+  const inside = inDocument.some((source) =>
+    corpus
+      .spans(check.document, source.from, source.to)
+      .some((span) => check.ranges.some((match) => wordsInside(normalized, match, span) >= MIN_QUOTE_WORDS)),
+  );
   return inside
-    ? { ok: true, note: `quote verified in ${item.source.doc}` }
-    : { ok: false, note: `quote is from ${item.source.doc} but outside the part that defines this item` };
+    ? { ok: true, note: `quote verified in ${check.document.id}` }
+    : { ok: false, note: `quote is from ${check.document.id} but outside the part that defines this item` };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,9 @@
 /**
- * Text normalization shared by search, `find`, and the quote checker.
+ * Text normalization for search and the quote checker.
  *
- * One rule for all three, so a phrase an agent finds with the tools is a
- * phrase the scorer will also find.
+ * Search terms and quote matching both start from `normalizeForMatch`.
+ * `fetch_page`'s `find` is stricter (it ignores only case and whitespace), so
+ * any run of whole words it locates is a quote the scorer accepts.
  */
 
 /**
@@ -26,6 +27,48 @@ export function normalizeForMatch(text: string): string {
 /** Number of words in a normalized string. */
 export function wordCount(normalized: string): number {
   return normalized === '' ? 0 : normalized.split(' ').length;
+}
+
+/** Words of a normalized text in `[start, end)`, a word cut by either end counting as one. */
+export function wordsBetween(normalized: string, start: number, end: number): number {
+  return end <= start ? 0 : wordCount(normalized.slice(start, end).trim());
+}
+
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
+/**
+ * Where each offset of `text` lands in `normalizeForMatch(text)`: entry `i` is
+ * the length of the normalized text produced by `text.slice(0, i)`.
+ *
+ * It lets the scorer turn "characters 12,000–20,000 were displayed" into the
+ * coordinates quotes are located in. The map is built a code point at a time,
+ * which matches normalizing the whole text except where NFKC composes across
+ * code points (a combining accent after its letter); for such a text there is
+ * no exact map and the result is `undefined`.
+ */
+export function normalizedOffsets(text: string): Int32Array | undefined {
+  const offsets = new Int32Array(text.length + 1);
+  let out = '';
+  let gap = false;
+  for (let i = 0; i < text.length; ) {
+    const codePoint = text.codePointAt(i) as number;
+    const width = codePoint > 0xffff ? 2 : 1;
+    offsets[i] = out.length;
+    if (width === 2) offsets[i + 1] = out.length;
+    const character = String.fromCodePoint(codePoint);
+    for (const folded of (codePoint < 0x80 ? character : character.normalize('NFKC')).toLowerCase()) {
+      if (!WORD_CHARACTER.test(folded)) {
+        gap = true;
+        continue;
+      }
+      if (gap && out.length > 0) out += ' ';
+      gap = false;
+      out += folded;
+    }
+    i += width;
+  }
+  offsets[text.length] = out.length;
+  return out === normalizeForMatch(text) ? offsets : undefined;
 }
 
 const STOP_WORDS = new Set([
@@ -59,10 +102,15 @@ function stem(term: string): string {
   return term;
 }
 
-/** A located quote, in the coordinates of the normalized document. */
+/** A stretch of text: of the normalized document, unless a comment says otherwise. */
 export interface TextRange {
   start: number;
   end: number;
+}
+
+/** One occurrence of a quote: its whole extent, and each elided piece on its own. */
+export interface QuoteMatch extends TextRange {
+  segments: TextRange[];
 }
 
 /**
@@ -84,15 +132,17 @@ const MAX_ELISION_GAP = 1_000;
 
 /**
  * Every place `quote` occurs in `normalizedDocument`, matching whole words
- * only — `cache` does not match inside `cacheable`.
+ * only — `cache` does not match inside `cacheable`. Elided pieces are matched
+ * greedily: each at its first occurrence after the piece before it.
  */
-export function locateQuote(normalizedDocument: string, quote: string): TextRange[] {
+export function locateQuote(normalizedDocument: string, quote: string): QuoteMatch[] {
   const segments = quoteSegments(quote);
   const [first, ...rest] = segments;
   if (first === undefined) return [];
 
-  const found: TextRange[] = [];
+  const found: QuoteMatch[] = [];
   for (const start of wordOccurrences(normalizedDocument, first)) {
+    const pieces: TextRange[] = [{ start, end: start + first.length }];
     let end = start + first.length;
     let complete = true;
     for (const segment of rest) {
@@ -101,9 +151,10 @@ export function locateQuote(normalizedDocument: string, quote: string): TextRang
         complete = false;
         break;
       }
+      pieces.push({ start: next.value, end: next.value + segment.length });
       end = next.value + segment.length;
     }
-    if (complete) found.push({ start, end });
+    if (complete) found.push({ start, end, segments: pieces });
   }
   return found;
 }

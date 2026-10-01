@@ -1,6 +1,7 @@
 import type { ToolCall } from '@arena/core';
 import { corpusUrlKey, type CorpusDocument, type TaskCorpus } from './corpus';
-import { quoteSegments, wordCount, type TextRange } from './text';
+import { quoteSegments, wordCount, wordsBetween, type QuoteMatch, type TextRange } from './text';
+import { displayedPassages } from './webTools';
 
 /**
  * The deterministic half of research scoring: which pages the agent opened,
@@ -12,11 +13,19 @@ import { quoteSegments, wordCount, type TextRange } from './text';
  */
 
 /**
- * Shortest quote that counts. "308 Permanent Redirect" occurs in a dozen
- * places, including tables of contents; a quote has to be long enough to show
- * the sentence was read.
+ * Shortest quote that counts, in consecutive words. "308 Permanent Redirect"
+ * occurs in a dozen places, including tables of contents; a quote has to be
+ * long enough to show the sentence was read. Consecutive, because elision may
+ * shorten a quote but must not assemble one: "SHALL … not … be … truncated"
+ * is six words of the page and no sentence of it.
  */
 export const MIN_QUOTE_WORDS = 6;
+/**
+ * Words of a quote that may lie outside every passage the run was shown:
+ * enough to finish a sentence that a window or a `find` context cut off, too
+ * few to quote a passage recalled from memory (see `checkQuote`).
+ */
+export const MAX_UNDISPLAYED_WORDS = 5;
 /** Evidence entries beyond this are ignored, which bounds the judge prompt. */
 export const MAX_EVIDENCE_ENTRIES = 40;
 
@@ -172,8 +181,30 @@ export function parseEvidence(answer: string): ParsedEvidence {
 }
 
 // ---------------------------------------------------------------------------
-// what was opened
+// what was opened, and what was read
 // ---------------------------------------------------------------------------
+
+/** What a run saw of its web, as the scorer reconstructs it from the tool journal. */
+export interface Reading {
+  /** Documents opened by a successful `fetch_page`, by id. */
+  opened: Map<string, CorpusDocument>;
+  /** Per document id, the passages any tool displayed, in normalized coordinates. */
+  displayed: Map<string, TextRange[]>;
+}
+
+/** The reading a journal records: what was opened, and what was displayed. */
+export function readingOf(journal: readonly ToolCall[], corpus: TaskCorpus): Reading {
+  const displayed = new Map<string, TextRange[]>();
+  for (const [id, ranges] of displayedPassages(journal, corpus)) {
+    const document = corpus.corpus.document(id);
+    if (!document) continue;
+    displayed.set(
+      id,
+      ranges.map((range) => ({ start: corpus.toNormalized(document, range.start), end: corpus.toNormalized(document, range.end) })),
+    );
+  }
+  return { opened: openedDocuments(journal, corpus), displayed };
+}
 
 /**
  * Documents the agent actually opened: successful `fetch_page` calls only.
@@ -200,40 +231,82 @@ export function openedDocuments(
 // quotes
 // ---------------------------------------------------------------------------
 
-export type QuoteFailure = 'not-in-corpus' | 'not-opened' | 'too-short' | 'not-in-page';
+export type QuoteFailure = 'not-in-corpus' | 'not-opened' | 'too-short' | 'not-in-page' | 'not-displayed';
 
 export type QuoteCheck =
-  | { ok: true; document: CorpusDocument; ranges: TextRange[] }
+  | {
+      ok: true;
+      document: CorpusDocument;
+      /** The quote's occurrences in the page that the run was shown. */
+      ranges: QuoteMatch[];
+    }
   | { ok: false; reason: QuoteFailure; document?: CorpusDocument };
 
 export const QUOTE_FAILURE_TEXT: Record<QuoteFailure, string> = {
   'not-in-corpus': 'the URL is not a page that exists',
   'not-opened': 'the page was never opened',
-  'too-short': `the quote is shorter than ${MIN_QUOTE_WORDS} words`,
+  'too-short': `the quote has fewer than ${MIN_QUOTE_WORDS} consecutive words`,
   'not-in-page': 'the quote does not occur in the page',
+  'not-displayed': 'no tool ever showed the run this passage',
 };
 
 /**
- * Whether `quote` is genuinely from the page at `url`: the page exists, the
- * agent opened it, and the quote occurs in it word for word (case,
- * punctuation and whitespace aside).
+ * Whether `quote` is genuinely from the page at `url`, as read in this run:
+ * the page exists, the agent opened it, the quote occurs in it word for word
+ * (case, punctuation and whitespace aside), and a tool displayed that
+ * passage during the run.
+ *
+ * The last condition is what makes a verified quote evidence of research.
+ * Models know RFCs and NIST guidance nearly by heart, so "the page contains
+ * this sentence" is satisfied by a run that opens a page's first window and
+ * then quotes its section 15 from memory. A quote counts only where the run
+ * was shown the passage, allowing `MAX_UNDISPLAYED_WORDS` words beyond the
+ * edge of what it was shown.
  */
-export function checkQuote(
-  corpus: TaskCorpus,
-  opened: ReadonlyMap<string, CorpusDocument>,
-  quote: string,
-  url: string,
-): QuoteCheck {
+export function checkQuote(corpus: TaskCorpus, reading: Reading, quote: string, url: string): QuoteCheck {
   const document = corpus.resolve(url);
   if (!document) return { ok: false, reason: 'not-in-corpus' };
-  if (!opened.has(document.id)) return { ok: false, reason: 'not-opened', document };
+  if (!reading.opened.has(document.id)) return { ok: false, reason: 'not-opened', document };
 
-  const words = quoteSegments(quote).reduce((total, segment) => total + wordCount(segment), 0);
-  if (words < MIN_QUOTE_WORDS) return { ok: false, reason: 'too-short', document };
+  const longest = Math.max(0, ...quoteSegments(quote).map(wordCount));
+  if (longest < MIN_QUOTE_WORDS) return { ok: false, reason: 'too-short', document };
 
-  const ranges = corpus.locate(document, quote);
-  if (ranges.length === 0) return { ok: false, reason: 'not-in-page', document };
-  return { ok: true, document, ranges };
+  const matches = corpus.locate(document, quote);
+  if (matches.length === 0) return { ok: false, reason: 'not-in-page', document };
+
+  const normalized = corpus.normalized(document);
+  const displayed = reading.displayed.get(document.id) ?? [];
+  const read = matches.filter((match) => undisplayedWords(normalized, match, displayed) <= MAX_UNDISPLAYED_WORDS);
+  if (read.length === 0) return { ok: false, reason: 'not-displayed', document };
+  return { ok: true, document, ranges: read };
+}
+
+/**
+ * Words of a quote occurrence outside every displayed range. Only the quoted
+ * pieces count: what an ellipsis skipped was never part of the quote.
+ */
+export function undisplayedWords(normalized: string, match: QuoteMatch, displayed: readonly TextRange[]): number {
+  let words = 0;
+  for (const segment of match.segments) {
+    let cursor = segment.start;
+    for (const range of displayed) {
+      if (range.end <= cursor) continue;
+      if (range.start >= segment.end) break;
+      words += wordsBetween(normalized, cursor, range.start);
+      cursor = Math.max(cursor, range.end);
+      if (cursor >= segment.end) break;
+    }
+    words += wordsBetween(normalized, cursor, segment.end);
+  }
+  return words;
+}
+
+/** Words of a quote occurrence inside `span`: how much of the quote comes from there. */
+export function wordsInside(normalized: string, match: QuoteMatch, span: TextRange): number {
+  return match.segments.reduce(
+    (total, segment) => total + wordsBetween(normalized, Math.max(segment.start, span.start), Math.min(segment.end, span.end)),
+    0,
+  );
 }
 
 // ---------------------------------------------------------------------------

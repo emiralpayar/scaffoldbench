@@ -85,7 +85,7 @@ function session(task: Task) {
   const tools = createWebTools({ corpus: researchState(env).corpus });
   return {
     env,
-    fetch: (url: string) => callTool(tools, env.journal, 'fetch_page', { url }),
+    fetch: (url: string, extra: Record<string, unknown> = {}) => callTool(tools, env.journal, 'fetch_page', { url, ...extra }),
     search: (query: string) => callTool(tools, env.journal, 'search', { query }),
     input: (judge: Judge, finalText: string, judgeSamples = 1): ScoreInput => ({
       env,
@@ -198,6 +198,22 @@ describe('defineResearchTask scoring', () => {
     expect(score.breakdown.every((item) => item.earned === UNGROUNDED_CREDIT)).toBe(true);
     expect(score.penalties[0]).toMatchObject({ id: 'citation-integrity', multiplier: 0.5 });
     expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT * 0.5, 6);
+  });
+
+  it('does not let evidence count from a page that was opened but never shown', async () => {
+    // A `find` that matches nothing opens the page and displays none of it.
+    const task = judgedTask();
+    const run = session(task);
+    expect((await run.fetch(SPEC_URL, { find: 'zebra crossing' })).text).toContain('No occurrences');
+    const { judge } = judgeReturning(verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]));
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+
+    expect(score.penalties).toEqual([]);
+    expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+    expect(score.metadata?.evidence).toMatchObject([
+      { verified: false, failure: 'no tool ever showed the run this passage' },
+      { verified: false, failure: 'no tool ever showed the run this passage' },
+    ]);
   });
 
   it('downgrades a verdict whose quote is not actually in the answer', async () => {
@@ -430,6 +446,33 @@ describe('defineBreadthTask', () => {
     expect(score.breakdown[1]?.detail).toContain('outside the part that defines this item');
   });
 
+  it('needs six of the quote\'s own words inside the defining section, not just a toe across the heading', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    // Mostly section 1, running three words into section 2.
+    const straddling = { ...RED, quote: 'Blue widgets are cacheable by default unless a header forbids it. 2. Red Widgets A red widget' };
+    const elided = { ...RED, quote: 'Blue widgets are cacheable by default … A red widget' };
+    for (const red of [straddling, elided]) {
+      const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, red)));
+      expect(score.breakdown[1]?.detail, red.quote).toContain('outside the part that defines this item');
+    }
+  });
+
+  it('also grounds a quote from another place that states the item', async () => {
+    const elsewhere = 'blue widgets are round, red widgets are square, and both are popular';
+    const task = defineBreadthTask({
+      ...BREADTH,
+      items: BREADTH.items.map((item) => (item.key === 'blue' ? { ...item, alsoSource: [{ doc: 'guide', from: elsewhere }] } : item)),
+    });
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    await run.fetch(GUIDE_URL);
+    const answer = breadthAnswer({ ...BLUE, quote: elsewhere, url: GUIDE_URL }, RED);
+    expect((await task.score(run.input(noJudge, answer))).score).toBe(1);
+    const without = await breadthTask.score(run.input(noJudge, answer));
+    expect(without.breakdown[0]?.detail).toContain('quote is from guide, expected spec');
+  });
+
   it('does not ground a quote from a page the run never opened, and penalises the citation', async () => {
     const run = session(breadthTask);
     const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, RED)));
@@ -498,15 +541,35 @@ function shippedSession(task: Task) {
   const env = task.createEnvironment({ cwd: scratch, fixtureMode: 'replay', fixtureDir: FIXTURES_DIR }) as TaskEnvironment;
   const corpus = researchState(env).corpus;
   const tools = createWebTools({ corpus });
+  const urlOf = (id: string): string => {
+    const document = corpus.documents.find((candidate) => candidate.id === id);
+    if (!document) throw new Error(`${id} is not in ${task.id}'s corpus`);
+    return document.url;
+  };
   return {
     env,
     corpus,
+    /** Open a page and nothing more: its first window. */
     fetchDoc: async (id: string) => {
-      const document = corpus.documents.find((candidate) => candidate.id === id);
-      if (!document) throw new Error(`${id} is not in ${task.id}'s corpus`);
-      const reply = await callTool(tools, env.journal, 'fetch_page', { url: document.url });
+      const reply = await callTool(tools, env.journal, 'fetch_page', { url: urlOf(id) });
       expect(reply.isError).toBe(false);
-      return document.url;
+      return urlOf(id);
+    },
+    /**
+     * Read a passage the way an agent does: `find` a few of its words (the
+     * first four that `find` can match: it does not skip an RFC's `|` margin),
+     * then read a window from each place they occur.
+     */
+    readPassage: async (id: string, quote: string) => {
+      const url = urlOf(id);
+      const words = quote.split(/\s+/);
+      for (let first = 0; first + 4 <= words.length; first++) {
+        const found = await callTool(tools, env.journal, 'fetch_page', { url, find: words.slice(first, first + 4).join(' ') });
+        const offsets = [...found.text.matchAll(/^- offset (\d+):/gm)].map((match) => Number(match[1]));
+        for (const offset of offsets) await callTool(tools, env.journal, 'fetch_page', { url, offset: Math.max(0, offset - 300) });
+        if (offsets.length > 0) return url;
+      }
+      throw new Error(`${id}: no four consecutive words of "${quote}" can be found`);
     },
     input: (judge: Judge, finalText: string): ScoreInput => ({
       env,
@@ -548,7 +611,21 @@ describe('researchTasks', () => {
   for (const spec of breadthResearchSpecs) {
     const task = researchTasks.find((candidate) => candidate.id === spec.id)!;
 
-    it(`${spec.id}: the gold key, quoted from opened pages, scores 1`, async () => {
+    it(`${spec.id}: the gold key, quoted from the passages the run read, scores 1`, async () => {
+      const run = shippedSession(task);
+      const answers = [];
+      for (const item of spec.items) {
+        const url = await run.readPassage(item.source.doc, item.goldQuote);
+        answers.push({ [spec.key.name]: item.key, ...item.expected, quote: item.goldQuote, url });
+      }
+      const score = await task.score(run.input(noJudge, answerWithBlock('Answer.', { answers })));
+      expect(score.score).toBe(1);
+    });
+
+    it(`${spec.id}: opening each page but quoting from memory earns no grounding`, async () => {
+      // The page is opened, so no citation is a fabrication, and every quote
+      // is in it word for word; but the run was only shown each page's first
+      // window, and a model can recite a specification it has memorized.
       const run = shippedSession(task);
       const answers = [];
       for (const item of spec.items) {
@@ -556,7 +633,9 @@ describe('researchTasks', () => {
         answers.push({ [spec.key.name]: item.key, ...item.expected, quote: item.goldQuote, url });
       }
       const score = await task.score(run.input(noJudge, answerWithBlock('Answer.', { answers })));
-      expect(score.score).toBe(1);
+      expect(score.penalties).toEqual([]);
+      expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+      expect(score.breakdown[0]?.detail).toContain('no tool ever showed the run this passage');
     });
 
     it(`${spec.id}: a perfect closed-book answer stays low`, async () => {
@@ -581,7 +660,7 @@ describe('researchTasks', () => {
       const support: Record<string, string[]> = {};
       for (const item of spec.rubric) {
         for (const passage of item.support) {
-          evidence.push({ claim: item.claim, quote: passage.quote, url: await run.fetchDoc(passage.doc) });
+          evidence.push({ claim: item.claim, quote: passage.quote, url: await run.readPassage(passage.doc, passage.quote) });
           (support[item.id] ??= []).push(`E${evidence.length}`);
         }
       }

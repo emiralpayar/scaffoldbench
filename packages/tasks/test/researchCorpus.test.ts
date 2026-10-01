@@ -10,14 +10,19 @@ import {
   CORPUS_SOURCES,
   Corpus,
   LICENSES,
+  MIN_QUOTE_WORDS,
   breadthResearchSpecs,
   chunkDocument,
   corpusUrlKey,
   createWebTools,
+  displayedPassages,
   documentFile,
   judgedResearchSpecs,
+  mergeRanges,
+  normalizedOffsets,
   normalizeForMatch,
   sha256,
+  wordsInside,
   type CorpusSelection,
 } from '../src/research/index';
 import { callTool, writeCorpus } from './researchHelpers';
@@ -337,6 +342,102 @@ describe('tool output is quotable', () => {
   });
 });
 
+describe('displayedPassages', () => {
+  const text = [
+    'Section 1. Scope',
+    '',
+    `${'Opening prose that fills the first window of the page. '.repeat(12)}`,
+    '',
+    'Section 2. Hashing',
+    '',
+    `Verifiers SHALL store passwords salted and hashed. ${'More prose about storage follows here. '.repeat(20)}`,
+    '',
+    'Section 3. Index',
+  ].join('\n');
+  const dir = writeCorpus(freshDir(), [
+    { id: 'page', url: 'https://nist.test.org/guidelines.html', title: 'Guidelines', text },
+    { id: 'other', url: 'https://other.test.org/', title: 'Elsewhere', text: 'Hashing is discussed elsewhere too, briefly.' },
+  ]);
+  const view = Corpus.load(path.join(dir, CORPUS_DIRNAME)).forTask({ primary: ['page'], secondary: ['other'] });
+  const pageChars = 400;
+  const tools = createWebTools({ corpus: view, pageChars });
+  const flat = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+  it('replays from the journal exactly the text each call displayed', async () => {
+    const calls: Array<[string, Record<string, unknown>]> = [
+      ['fetch_page', { url: 'https://nist.test.org/guidelines.html' }],
+      ['fetch_page', { url: 'https://nist.test.org/guidelines.html', offset: 750 }],
+      ['fetch_page', { url: 'https://nist.test.org/guidelines.html', find: 'salted and hashed' }],
+      ['search', { query: 'verifiers hashing', limit: 2 }],
+    ];
+    for (const [name, args] of calls) {
+      const journal: ToolCall[] = [];
+      const reply = await callTool(tools, journal, name, args);
+      const displayed = displayedPassages(journal, view, pageChars);
+      expect(displayed.size, name).toBeGreaterThan(0);
+      for (const [id, ranges] of displayed) {
+        const document = view.corpus.document(id);
+        for (const range of ranges) {
+          expect(range.end).toBeGreaterThan(range.start);
+          expect(flat(reply.text)).toContain(flat(document?.text.slice(range.start, range.end) ?? '<missing>'));
+        }
+      }
+    }
+  });
+
+  it('skips failed calls and pages outside the task', () => {
+    const journal: ToolCall[] = [
+      { name: 'fetch_page', args: { url: 'https://nist.test.org/guidelines.html', offset: 99_999 }, tMs: 0, ok: false, result: '' },
+      { name: 'fetch_page', args: { url: 'https://unknown.test.org/' }, tMs: 0, ok: false, result: '' },
+      { name: 'search', args: { query: '' }, tMs: 0, ok: false, result: '' },
+    ];
+    expect(displayedPassages(journal, view, pageChars).size).toBe(0);
+  });
+
+  it('merges what consecutive windows showed into one stretch', async () => {
+    // Read the page the way the footer says: each window continues where the last ended.
+    const journal: ToolCall[] = [];
+    let offset: number | undefined = 0;
+    while (offset !== undefined) {
+      const reply = await callTool(tools, journal, 'fetch_page', { url: 'https://nist.test.org/guidelines.html', offset });
+      const next = /offset=(\d+)/.exec(reply.text)?.[1];
+      offset = next === undefined ? undefined : Number(next);
+    }
+    expect(journal.length).toBeGreaterThan(2);
+    expect(displayedPassages(journal, view, pageChars).get('page')).toEqual([{ start: 0, end: text.length }]);
+  });
+
+  it('mergeRanges joins overlapping and touching ranges only', () => {
+    expect(mergeRanges([{ start: 30, end: 40 }, { start: 0, end: 10 }, { start: 10, end: 20 }, { start: 5, end: 12 }])).toEqual([
+      { start: 0, end: 20 },
+      { start: 30, end: 40 },
+    ]);
+  });
+});
+
+describe('normalized offsets', () => {
+  it('maps every offset to the length of its normalized prefix', () => {
+    const text = '  RFC 9110, §15.4.9: the “308” code — ﬁne (e.g., 600,000)… done.\n\tEnd';
+    const offsets = normalizedOffsets(text);
+    expect(offsets).toBeDefined();
+    for (let i = 0; i <= text.length; i++) {
+      expect(offsets?.[i], `offset ${i}`).toBe(normalizeForMatch(text.slice(0, i)).length);
+    }
+  });
+
+  it('has no exact map where NFKC composes across code points, and then normalizes prefixes', () => {
+    const text = 'Le cafe\u0301 est ouvert, the page says, and stays open late.';
+    expect(normalizedOffsets(text)).toBeUndefined();
+    const dir = writeCorpus(freshDir(), [{ id: 'accent', url: 'https://accent.test.org/', text }]);
+    const view = Corpus.load(path.join(dir, CORPUS_DIRNAME)).forTask({ primary: ['accent'] });
+    const document = view.documents[0];
+    if (!document) throw new Error('fixture missing');
+    for (const offset of [0, 3, 8, 9, 20, text.length]) {
+      expect(view.toNormalized(document, offset)).toBe(normalizeForMatch(text.slice(0, offset)).length);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // the shipped corpus
 // ---------------------------------------------------------------------------
@@ -370,6 +471,11 @@ describe('shipped corpus integrity', () => {
       expect(document.text, document.id).not.toMatch(/^%PDF|\u0000/);
       expect(document.text, document.id).not.toMatch(/Skip to main content|Stay organized with collections|Was this page helpful/);
     }
+  });
+
+  it('has an exact normalized-offset map for every document', () => {
+    // The scorer's fast path; a document without one is still scored exactly, but slowly.
+    for (const document of corpus.documents) expect(normalizedOffsets(document.text), document.id).toBeDefined();
   });
 
   it('gives every document a distinct address', () => {
@@ -427,18 +533,33 @@ describe('shipped corpus sufficiency', () => {
     it(`${spec.id}: every gold quote sits inside the section its key points at`, () => {
       const view = corpus.forTask(spec.corpus);
       for (const item of spec.items) {
-        expect(view.roleOf(item.source.doc), item.key).toBe('primary');
+        for (const source of [item.source, ...(item.alsoSource ?? [])]) {
+          expect(view.roleOf(source.doc), item.key).toBe('primary');
+          const document = corpus.document(source.doc);
+          if (!document) throw new Error(`${source.doc} missing`);
+          const spans = view.spans(document, source.from, source.to);
+          expect(spans.length, `${item.key}: span found for ${source.from}`).toBeGreaterThan(0);
+          for (const span of spans) {
+            expect(span.end - span.start, item.key).toBeGreaterThan(40);
+            expect(span.end - span.start, item.key).toBeLessThan(20_000);
+          }
+        }
         const document = corpus.document(item.source.doc);
         if (!document) throw new Error(`${item.source.doc} missing`);
         const spans = view.spans(document, item.source.from, item.source.to);
-        expect(spans.length, `${item.key}: span found`).toBeGreaterThan(0);
-        for (const span of spans) {
-          expect(span.end - span.start, item.key).toBeGreaterThan(40);
-          expect(span.end - span.start, item.key).toBeLessThan(20_000);
-        }
-        const ranges = view.locate(document, item.goldQuote);
-        const inside = ranges.some((range) => spans.some((span) => range.start < span.end && range.end > span.start));
+        const normalized = view.normalized(document);
+        const inside = view
+          .locate(document, item.goldQuote)
+          .some((match) => spans.some((span) => wordsInside(normalized, match, span) >= MIN_QUOTE_WORDS));
         expect(inside, `${item.key}: ${item.goldQuote}`).toBe(true);
+      }
+    });
+
+    it(`${spec.id}: every section answer names the heading its quote must come from`, () => {
+      for (const item of spec.items) {
+        const section = item.expected.section;
+        if (typeof section !== 'string') continue;
+        expect(normalizeForMatch(item.source.from).startsWith(`${normalizeForMatch(section)} `), item.key).toBe(true);
       }
     });
   }
@@ -449,6 +570,18 @@ describe('shipped corpus sufficiency', () => {
       expect(rfc9110).toContain(normalizeForMatch(String(item.source.from)));
       const cacheable = rfc9110.includes(normalizeForMatch(`A ${item.key} response is heuristically cacheable`));
       expect(cacheable, item.key).toBe(item.expected.heuristicallyCacheable);
+    }
+
+    // Every sentence a NIST rule may be quoted from uses the gold keyword
+    // (and not its negation) and states the gold number.
+    for (const item of breadthResearchSpecs[2]?.items ?? []) {
+      const keyword = normalizeForMatch(String(item.expected.keyword));
+      for (const source of [item.source, ...(item.alsoSource ?? [])]) {
+        const sentence = ` ${normalizeForMatch(source.from)} `;
+        expect(sentence, item.key).toContain(` ${keyword} `);
+        if (!keyword.endsWith(' not')) expect(sentence, item.key).not.toContain(` ${keyword} not `);
+        if (item.expected.value !== null) expect(sentence, item.key).toContain(` ${String(item.expected.value)} `);
+      }
     }
   });
 

@@ -213,18 +213,25 @@ export const headerFieldsSpec: BreadthTaskSpec = {
 
 const NIST_REV4 = 'nist-sp800-63b-4';
 
+/**
+ * One rule of SP 800-63B-4: the sentence that states it is both the place a
+ * quote must come from and the gold quote. `alsoStated` lists other sentences
+ * of revision 4 that state the same rule with the same keyword.
+ */
 function nistRule(
   key: string,
   prompt: string,
   keyword: string,
   value: number | null,
   sentence: string,
+  alsoStated: string[] = [],
 ): BreadthItem {
   return {
     key,
     prompt,
     expected: { keyword, value },
     source: { doc: NIST_REV4, from: sentence },
+    ...(alsoStated.length > 0 ? { alsoSource: alsoStated.map((from) => ({ doc: NIST_REV4, from })) } : {}),
     goldQuote: sentence,
   };
 }
@@ -265,7 +272,9 @@ export const nistPasswordRulesSpec: BreadthTaskSpec = {
     nistRule('maximum-length', 'the maximum password length verifiers permit (characters)', 'SHOULD', 64,
       'Verifiers and CSPs SHOULD permit a maximum password length of at least 64 characters.'),
     nistRule('composition-rules', 'imposing composition rules, such as requiring a mix of character types', 'SHALL NOT', null,
-      'Verifiers and CSPs SHALL NOT impose other composition rules (e.g., requiring mixtures of different character types) for passwords.'),
+      'Verifiers and CSPs SHALL NOT impose other composition rules (e.g., requiring mixtures of different character types) for passwords.',
+      // Section 3.1.1.1 states the same rule from the CSP's side.
+      ['Other composition requirements for passwords SHALL NOT be imposed.']),
     nistRule('periodic-change', 'requiring subscribers to change their passwords periodically', 'SHALL NOT', null,
       'Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically.'),
     nistRule('password-hints', 'letting subscribers store a password hint that unauthenticated claimants can see', 'SHALL NOT', null,

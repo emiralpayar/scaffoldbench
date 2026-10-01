@@ -30,8 +30,12 @@ listed aliases (other renderings of the same RFC, the address an MDN page moved 
 a 404. There is no closest-match substitution. Long documents are read a window at a time with
 `offset`, or by jumping to a phrase with `find`.
 
-The scorer reads the same files. A quote counts as evidence only if it occurs word for word in the page
-it cites, and that page was opened by a successful `fetch_page` during the run (see
+The scorer reads the same files. A quote counts as evidence only if it has at least six consecutive
+words (an ellipsis may shorten a quote, not assemble one), occurs word for word in the page it cites,
+that page was opened by a successful `fetch_page` during the run, and one of the run's tool
+calls displayed that passage: a window it read, a `find` context or a search snippet, with at most five
+words running past the edge of what was shown. A sentence recalled from memory does not count, even from
+a page the run opened. The scorer replays the tool journal against the corpus to know what was shown (see
 `packages/tasks/src/research/citations.ts`).
 
 ## Integrity

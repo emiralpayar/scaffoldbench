@@ -6,14 +6,18 @@ import type { ToolCall } from '@arena/core';
 import {
   CORPUS_DIRNAME,
   Corpus,
+  DEFAULT_PAGE_CHARS,
   MAX_EVIDENCE_ENTRIES,
+  MAX_UNDISPLAYED_WORDS,
   auditCitations,
   checkQuote,
   citedUrls,
   openedDocuments,
+  pageWindow,
   parseEvidence,
   parseJsonBlock,
   readAnswerBlock,
+  readingOf,
   trimUrl,
 } from '../src/research/index';
 import { answerWithBlock, writeCorpus } from './researchHelpers';
@@ -34,6 +38,15 @@ const SPEC_TEXT = [
   '   systems.',
 ].join('\n');
 
+/**
+ * A page several windows long, one paragraph with no line breaks, whose one
+ * notable sentence sits near the end.
+ */
+const LONG_URL = 'https://docs.test.org/long-page';
+const FILLER = 'Plain filler text about nothing in particular, repeated so the page is long. ';
+const LATE_SENTENCE = 'Verifiers SHALL NOT truncate a password before comparing it with the stored hash.';
+const LONG_TEXT = `${FILLER.repeat(200)}${LATE_SENTENCE} ${FILLER.repeat(5)}`.trim();
+
 writeCorpus(scratch, [
   {
     id: 'spec',
@@ -42,11 +55,15 @@ writeCorpus(scratch, [
     text: SPEC_TEXT,
   },
   { id: 'guide', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301', text: 'A guide page about 301 redirects and nothing else of note here.' },
+  { id: 'long', url: LONG_URL, text: LONG_TEXT },
 ]);
-const corpus = Corpus.load(path.join(scratch, CORPUS_DIRNAME)).forTask({ primary: ['spec'], secondary: ['guide'] });
+const corpus = Corpus.load(path.join(scratch, CORPUS_DIRNAME)).forTask({
+  primary: ['spec'],
+  secondary: ['guide', 'long'],
+});
 
-function fetched(url: string, ok = true): ToolCall {
-  return { name: 'fetch_page', args: { url }, tMs: 0, ok, result: '' };
+function fetched(url: string, ok = true, extra: Record<string, unknown> = {}): ToolCall {
+  return { name: 'fetch_page', args: { url, ...extra }, tMs: 0, ok, result: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -211,34 +228,83 @@ describe('openedDocuments', () => {
 });
 
 describe('checkQuote', () => {
-  const opened = openedDocuments([fetched('https://www.rfc-editor.org/rfc/rfc9110.html')], corpus);
+  const reading = readingOf([fetched('https://www.rfc-editor.org/rfc/rfc9110.html')], corpus);
   const url = 'https://www.rfc-editor.org/rfc/rfc9110.txt';
 
   it('verifies a quote across RFC line breaks, sidebars and re-typed punctuation', () => {
-    const check = checkQuote(corpus, opened, '“For historical reasons, a user agent MAY change the request method from POST to GET”', url);
+    const check = checkQuote(corpus, reading, '“For historical reasons, a user agent MAY change the request method from POST to GET”', url);
     expect(check.ok).toBe(true);
-    expect(checkQuote(corpus, opened, 'HTTP is a stateless application-level protocol for distributed, collaborative, hypertext information systems', url).ok).toBe(true);
+    expect(checkQuote(corpus, reading, 'HTTP is a stateless application-level protocol for distributed, collaborative, hypertext information systems', url).ok).toBe(true);
   });
 
   it('accepts elisions when every piece matches in order', () => {
-    expect(checkQuote(corpus, opened, 'a user agent MAY change the request method … the 308 (Permanent Redirect) status code can be used instead', url).ok).toBe(true);
-    expect(checkQuote(corpus, opened, 'the 308 (Permanent Redirect) status code can be used instead ... a user agent MAY change the request method', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
+    expect(checkQuote(corpus, reading, 'a user agent MAY change the request method … the 308 (Permanent Redirect) status code can be used instead', url).ok).toBe(true);
+    expect(checkQuote(corpus, reading, 'the 308 (Permanent Redirect) status code can be used instead ... a user agent MAY change the request method', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
+  });
+
+  it('refuses a quote assembled from fragments, however many words they add up to', () => {
+    // Every piece is in the page, in order, but the "quote" is no sentence of it.
+    expect(checkQuote(corpus, reading, 'user agent … MAY change … request method … POST to … GET for', url)).toMatchObject({
+      ok: false,
+      reason: 'too-short',
+    });
   });
 
   it('matches whole words only', () => {
-    expect(checkQuote(corpus, opened, 'a user agent MAY change the request meth', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
+    expect(checkQuote(corpus, reading, 'a user agent MAY change the request meth', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
   });
 
   it('names why a quote does not count', () => {
-    expect(checkQuote(corpus, opened, 'MAY change the request method', url)).toMatchObject({ ok: false, reason: 'too-short' });
-    expect(checkQuote(corpus, opened, 'a user agent MAY change the request method to PUT', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
+    expect(checkQuote(corpus, reading, 'MAY change the request method', url)).toMatchObject({ ok: false, reason: 'too-short' });
+    expect(checkQuote(corpus, reading, 'a user agent MAY change the request method to PUT', url)).toMatchObject({ ok: false, reason: 'not-in-page' });
     expect(
-      checkQuote(corpus, opened, 'A guide page about 301 redirects and nothing else', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301'),
+      checkQuote(corpus, reading, 'A guide page about 301 redirects and nothing else', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301'),
     ).toMatchObject({ ok: false, reason: 'not-opened' });
-    expect(checkQuote(corpus, opened, 'a user agent MAY change the request method', 'https://made-up.org/rfc9110')).toMatchObject({
+    expect(checkQuote(corpus, reading, 'a user agent MAY change the request method', 'https://made-up.org/rfc9110')).toMatchObject({
       ok: false,
       reason: 'not-in-corpus',
     });
+  });
+});
+
+describe('checkQuote on a long page', () => {
+  const late = LONG_TEXT.indexOf(LATE_SENTENCE);
+
+  it('does not count a passage of an opened page that no tool displayed', () => {
+    // Opening the page shows its first window; the sentence is far beyond it.
+    expect(late).toBeGreaterThan(DEFAULT_PAGE_CHARS * 1.5);
+    const reading = readingOf([fetched(LONG_URL)], corpus);
+    expect(checkQuote(corpus, reading, LATE_SENTENCE, LONG_URL)).toMatchObject({ ok: false, reason: 'not-displayed' });
+  });
+
+  it('counts it once a window, a find context or a search snippet showed it', () => {
+    const shownBy: ToolCall[][] = [
+      [fetched(LONG_URL, true, { offset: late - 100 })],
+      [fetched(LONG_URL, true, { find: 'SHALL NOT truncate' })],
+      [fetched(LONG_URL), { name: 'search', args: { query: 'verifiers truncate password hash' }, tMs: 0, ok: true, result: '' }],
+    ];
+    for (const journal of shownBy) {
+      expect(checkQuote(corpus, readingOf(journal, corpus), LATE_SENTENCE, LONG_URL).ok, JSON.stringify(journal[0]?.args)).toBe(true);
+    }
+  });
+
+  it('ignores what failed calls would have shown', () => {
+    const reading = readingOf([fetched(LONG_URL), fetched(LONG_URL, false, { offset: late - 100 })], corpus);
+    expect(checkQuote(corpus, reading, LATE_SENTENCE, LONG_URL)).toMatchObject({ ok: false, reason: 'not-displayed' });
+  });
+
+  it('lets a quote finish a sentence a few words past the edge of what was shown', () => {
+    // A window that stops just before "with the stored hash.": the agent saw
+    // the sentence and finished it.
+    const cut = late + LATE_SENTENCE.indexOf('with the stored hash');
+    expect(pageWindow(LONG_TEXT, cut - DEFAULT_PAGE_CHARS, DEFAULT_PAGE_CHARS).end).toBe(cut);
+    const reading = readingOf([fetched(LONG_URL, true, { offset: cut - DEFAULT_PAGE_CHARS })], corpus);
+    expect(LATE_SENTENCE.slice(cut - late).split(' ').length).toBeLessThanOrEqual(MAX_UNDISPLAYED_WORDS);
+    expect(checkQuote(corpus, reading, LATE_SENTENCE, LONG_URL).ok).toBe(true);
+
+    // Twice as far past the edge is a passage the run never read.
+    const longer = `${LATE_SENTENCE} ${FILLER.repeat(2)}`.trim();
+    expect(checkQuote(corpus, reading, longer, LONG_URL)).toMatchObject({ ok: false, reason: 'not-displayed' });
   });
 });
 
