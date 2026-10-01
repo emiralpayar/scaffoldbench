@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { ARCHITECTURES } from '../lib/architectures';
+import { DARK } from '../lib/palette';
 import { contrast, deltaE } from './color';
 
 const css = readFileSync(
@@ -39,6 +40,12 @@ describe('colour tokens', () => {
   it('declares the dark theme identically for the toggle and for the OS preference', () => {
     expect(Object.keys(dark).length).toBeGreaterThan(20);
     expect(darkByOs).toEqual(dark);
+  });
+
+  it('keeps the literal palette used by the social card equal to the dark tokens', () => {
+    for (const [name, value] of Object.entries(DARK)) {
+      expect(dark[name], name).toBe(value);
+    }
   });
 
   it('declares every token in both themes', () => {

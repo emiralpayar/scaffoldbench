@@ -2,13 +2,22 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import { SiteFooter, SiteHeader } from '../components/SiteChrome';
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, TAGLINE } from '../lib/site';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, TAGLINE, absoluteUrl, withBasePath } from '../lib/site';
 import { THEME_BOOTSTRAP } from '../lib/theme';
 import { mono, sans, serif } from './fonts';
 import './globals.css';
 
+const card = {
+  url: absoluteUrl('/og.png'),
+  width: 1200,
+  height: 630,
+  alt: `${SITE_NAME}: ${TAGLINE}`,
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL(`${SITE_URL}/`),
+  // The origin only: Next adds the base path to file-convention URLs itself,
+  // so a base path here would appear twice. Absolute URLs below carry it.
+  metadataBase: new URL(new URL(SITE_URL).origin),
   title: {
     default: `${SITE_NAME} — ${TAGLINE}`,
     template: `%s · ${SITE_NAME}`,
@@ -20,13 +29,21 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: `${SITE_NAME} — ${TAGLINE}`,
     description: SITE_DESCRIPTION,
-    url: './',
+    url: absoluteUrl('/'),
     locale: 'en_US',
+    images: [card],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${SITE_NAME} — ${TAGLINE}`,
     description: SITE_DESCRIPTION,
+    images: [card],
+  },
+  // Declaring any icon in config replaces the file-convention links, so the
+  // SVG favicon (app/icon.svg) is listed here too.
+  icons: {
+    icon: [{ url: withBasePath('/icon.svg'), type: 'image/svg+xml' }],
+    apple: [{ url: withBasePath('/apple-touch-icon.png'), sizes: '180x180', type: 'image/png' }],
   },
 };
 

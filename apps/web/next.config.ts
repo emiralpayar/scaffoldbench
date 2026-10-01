@@ -2,6 +2,8 @@ import path from 'node:path';
 
 import type { NextConfig } from 'next';
 
+import { BASE_PATH } from './lib/site';
+
 const repoRoot = path.join(process.cwd(), '..', '..');
 
 /**
@@ -18,12 +20,10 @@ const repoRoot = path.join(process.cwd(), '..', '..');
  */
 const live = process.env.NEXT_PUBLIC_ARENA_LIVE === '1';
 
-const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-const basePath = rawBasePath === '/' ? '' : rawBasePath.replace(/\/+$/, '');
-
 const nextConfig: NextConfig = {
   ...(live ? {} : { output: 'export' as const }),
-  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
+  /** Normalised once, in `lib/site.ts`, so pages and config cannot disagree. */
+  ...(BASE_PATH ? { basePath: BASE_PATH, assetPrefix: BASE_PATH } : {}),
   /** `/results/` → `results/index.html`, which every static host resolves. */
   trailingSlash: true,
   images: { unoptimized: true },
