@@ -1,7 +1,7 @@
 import type { Task, TaskCategory } from '@arena/core';
 
 import { researchTasks } from './research';
-import { airlineTasks } from './worlds/airline';
+import { airlineExpertTasks, airlineTasks } from './worlds/airline';
 import { ecommerceTasks } from './worlds/ecommerce';
 import { supportTasks } from './worlds/support';
 
@@ -14,6 +14,7 @@ import { supportTasks } from './worlds/support';
  */
 export const ALL_TASKS: Task[] = [
   ...airlineTasks,
+  ...airlineExpertTasks,
   ...ecommerceTasks,
   ...supportTasks,
   ...researchTasks,
