@@ -27,16 +27,19 @@ import {
 } from './common';
 
 /**
- * airline-waiver-desk: five voluntary change requests, settled under dated
+ * airline-waiver-desk: eight voluntary change requests, settled under dated
  * bulletins that exist only in the bulletin tool.
  *
  * The handbook says bulletins override it within their dates and scope, and
- * nothing more. What each bulletin says is only available by reading it:
- * a weather waiver for Chicago with a ticketing cutoff, a travel window and a
- * basic-economy carve-out; an expired hurricane waiver for Boston that one
- * customer still cites; and a standing bulletin that raises the basic economy
- * change fee above what the fare-rules tool still prints. Customers name
- * waivers that do not cover them, and one who is covered names none.
+ * nothing more. What each bulletin says is only available by reading it: a
+ * Chicago weather waiver with a ticketing cutoff, a travel window and a
+ * basic-economy carve-out, and an amendment that widens the window for top
+ * tiers; an expired Boston waiver one customer still cites; a standing
+ * bulletin that raises the basic economy change fee above what the fare-rules
+ * tool prints; and a same-day change policy that competes with the waiver.
+ * When two bulletins cover a change the customer gets the cheaper outcome.
+ * Customers name waivers that do not cover them, and some who are covered
+ * name none. One request changes only the second leg of a connection.
  */
 
 const TODAY = '2026-07-28';
@@ -53,8 +56,14 @@ const CHICAGO_WAIVER = {
   airport: 'ORD',
 } as const;
 
+/** PB-2026-14A: widens the Chicago travel window for gold and platinum members. */
+const CHICAGO_AMENDMENT = { travelTo: '2026-08-05', tiers: ['gold', 'platinum'] } as const;
+
 /** PB-2026-16: the basic economy change fee, superseding the fare-rules table. */
 const BASIC_CHANGE_FEE = { id: 'PB-2026-16', effectiveFrom: '2026-07-01', cents: 15_000 } as const;
+
+/** PB-2026-12: a flat fee for moving to another flight the same day, no fare difference. */
+const SAME_DAY = { effectiveFrom: '2026-07-01', cents: 7500, exemptTiers: ['gold', 'platinum'] } as const;
 
 const BULLETINS: Bulletin[] = [
   {
@@ -83,6 +92,36 @@ const BULLETINS: Bulletin[] = [
     ].join('\n'),
   },
   {
+    id: 'PB-2026-12',
+    title: 'Same-day flight changes',
+    publishedOn: '2026-06-24',
+    effectiveFrom: SAME_DAY.effectiveFrom,
+    effectiveTo: null,
+    body: [
+      `A move to another flight on the same route and the same date as the flight being replaced costs a flat ${SAME_DAY.cents} cents, charged as the change fee, and no fare difference is charged either way.`,
+      'Gold and platinum members pay no same-day fee. Applies to any cabin, including basic economy, and to any single segment of a connecting trip.',
+    ].join('\n'),
+  },
+  {
+    id: 'PB-2026-14A',
+    title: 'Amendment to PB-2026-14 (Chicago weather waiver)',
+    publishedOn: '2026-07-27',
+    effectiveFrom: '2026-07-27',
+    effectiveTo: '2026-08-31',
+    body: [
+      `For passengers holding ${CHICAGO_AMENDMENT.tiers.join(' or ')} status, the PB-2026-14 travel window runs from ${CHICAGO_WAIVER.travelFrom} through ${CHICAGO_AMENDMENT.travelTo}.`,
+      'All other terms of PB-2026-14 are unchanged.',
+    ].join('\n'),
+  },
+  {
+    id: 'PB-2026-17',
+    title: 'Overlapping bulletins',
+    publishedOn: '2026-07-01',
+    effectiveFrom: '2026-07-01',
+    effectiveTo: null,
+    body: 'When more than one bulletin in effect covers the same change, apply whichever one costs the customer least. Bulletins are never combined into a single settlement.',
+  },
+  {
     id: 'PB-2026-15',
     title: 'In-cabin pet carrier fee',
     publishedOn: '2026-07-08',
@@ -107,14 +146,19 @@ interface ChangeRequest {
   requestId: string;
   reservationId: string;
   newFlightId: string;
+  /** Which segment moves; the first unless the request says otherwise. */
+  segmentIndex: number;
 }
 
 const REQUESTS: ChangeRequest[] = [
-  { requestId: 'Q-301', reservationId: 'R5201', newFlightId: 'DL542' },
-  { requestId: 'Q-302', reservationId: 'R5202', newFlightId: 'AA664' },
-  { requestId: 'Q-303', reservationId: 'R5203', newFlightId: 'AA664' },
-  { requestId: 'Q-304', reservationId: 'R5204', newFlightId: 'UA90' },
-  { requestId: 'Q-305', reservationId: 'R5205', newFlightId: 'AA216' },
+  { requestId: 'Q-301', reservationId: 'R5201', newFlightId: 'DL542', segmentIndex: 0 },
+  { requestId: 'Q-302', reservationId: 'R5202', newFlightId: 'AA664', segmentIndex: 0 },
+  { requestId: 'Q-303', reservationId: 'R5203', newFlightId: 'AA664', segmentIndex: 0 },
+  { requestId: 'Q-304', reservationId: 'R5204', newFlightId: 'UA90', segmentIndex: 0 },
+  { requestId: 'Q-305', reservationId: 'R5205', newFlightId: 'AA216', segmentIndex: 0 },
+  { requestId: 'Q-307', reservationId: 'R5207', newFlightId: 'AA218', segmentIndex: 0 },
+  { requestId: 'Q-308', reservationId: 'R5208', newFlightId: 'AA662', segmentIndex: 0 },
+  { requestId: 'Q-309', reservationId: 'R5209', newFlightId: 'AA1406', segmentIndex: 1 },
 ];
 
 export function createWaiverWorld(): AirlineOpsWorld {
@@ -150,6 +194,10 @@ export function createWaiverWorld(): AirlineOpsWorld {
       economy: [35_400, 6],
     }),
     flight('AA640', 'SFO-BOS', '2026-08-09', '07:00-15:35', { economy: [30_900, 9] }),
+    flight('AA212', 'SFO-ORD', '2026-08-05', '08:00-14:10', { economy: [32_000, 7] }),
+    flight('AA218', 'SFO-ORD', '2026-08-08', '14:00-20:10', { economy: [38_500, 5] }),
+    flight('AA1402', 'ORD-BOS', '2026-08-03', '15:30-18:55', { economy: [18_000, 4] }),
+    flight('AA1406', 'ORD-BOS', '2026-08-03', '19:55-23:20', { economy: [21_000, 6] }),
   ];
   const byId = (id: string) => flights.find((entry) => entry.id === id) as Flight;
   const pax = [
@@ -159,6 +207,9 @@ export function createWaiverWorld(): AirlineOpsWorld {
     passenger('P-2204', 'Lena Ortiz', 'gold'),
     passenger('P-2205', 'Max Weber', 'none'),
     passenger('P-2206', 'Nadia Kim', 'silver'),
+    passenger('P-2207', 'Oscar Lund', 'platinum'),
+    passenger('P-2208', 'Petra Novak', 'none'),
+    passenger('P-2209', 'Quinn Adler', 'none'),
   ];
   const p = (id: string) => pax.find((entry) => entry.id === id)!;
 
@@ -218,6 +269,39 @@ export function createWaiverWorld(): AirlineOpsWorld {
       status: 'open',
     },
     {
+      id: 'Q-307',
+      receivedAt: '2026-07-27T17:05',
+      passengerId: 'P-2207',
+      reservationId: 'R5207',
+      kind: 'change',
+      subject: 'Chicago trip on the 5th',
+      message:
+        "Please move me from AA212 on 5 August to AA218 on the 8th. I know the 5th isn't one of the storm days, so I'm prepared to pay whatever the difference is. Oscar",
+      status: 'open',
+    },
+    {
+      id: 'Q-308',
+      receivedAt: '2026-07-27T17:40',
+      passengerId: 'P-2208',
+      reservationId: 'R5208',
+      kind: 'change',
+      subject: 'Later flight same day',
+      message:
+        'My meeting in Boston moved to the evening. Can you put me on AA662 instead of AA660, same day (5 August)? Petra',
+      status: 'open',
+    },
+    {
+      id: 'Q-309',
+      receivedAt: '2026-07-27T18:15',
+      passengerId: 'P-2209',
+      reservationId: 'R5209',
+      kind: 'change',
+      subject: 'More time in Chicago',
+      message:
+        'I fly SFO to Chicago to Boston on the 3rd. I need a few more hours in Chicago, so please move only my Chicago to Boston flight to the 19:55 one (AA1406). Keep the first flight as it is. Quinn',
+      status: 'open',
+    },
+    {
       id: 'Q-306',
       receivedAt: '2026-07-27T17:20',
       passengerId: 'P-2206',
@@ -265,6 +349,27 @@ export function createWaiverWorld(): AirlineOpsWorld {
           paidCents: 30_900,
           bookedOn: '2026-05-11',
         }),
+        reservation('R5207', p('P-2207'), [byId('AA212')], {
+          cabin: 'economy',
+          paidCents: 32_000,
+          bookedOn: '2026-06-28',
+        }),
+        reservation('R5208', p('P-2208'), [byId('AA660')], {
+          cabin: 'economy',
+          paidCents: 31_900,
+          bookedOn: '2026-06-12',
+        }),
+        {
+          ...reservation('R5209', p('P-2209'), [byId('UA88'), byId('AA1402')], {
+            cabin: 'economy',
+            paidCents: 45_000,
+            bookedOn: '2026-07-01',
+          }),
+          segments: [
+            { flightId: 'UA88', origin: 'SFO', destination: 'ORD', date: '2026-08-03', fareCents: 27_000 },
+            { flightId: 'AA1402', origin: 'ORD', destination: 'BOS', date: '2026-08-03', fareCents: 18_000 },
+          ],
+        },
       ],
       ledger: [],
     }),
@@ -277,51 +382,72 @@ export function createWaiverWorld(): AirlineOpsWorld {
 // Oracle
 // ---------------------------------------------------------------------------
 
-type Waiver = 'full' | 'change-fee-only' | 'none';
-
-/** What PB-2026-14 grants a move, read literally from its text. */
-function chicagoWaiver(world: AirlineOpsWorld, booking: Reservation, target: Flight): Waiver {
-  const original = booking.segments[0];
-  if (!original) return 'none';
-  const inForce =
-    world.today >= CHICAGO_WAIVER.effectiveFrom && world.today <= CHICAGO_WAIVER.effectiveTo;
-  const touchesOrd =
-    original.origin === CHICAGO_WAIVER.airport || original.destination === CHICAGO_WAIVER.airport;
-  const covered =
-    inForce &&
-    touchesOrd &&
-    booking.bookedOn <= CHICAGO_WAIVER.ticketedBy &&
-    original.date >= CHICAGO_WAIVER.travelFrom &&
-    original.date <= CHICAGO_WAIVER.travelTo &&
-    target.origin === original.origin &&
-    target.destination === original.destination &&
-    target.date <= CHICAGO_WAIVER.moveBy;
-  if (!covered) return 'none';
-  return booking.cabin === 'basic_economy' ? 'change-fee-only' : 'full';
-}
-
 export interface ExpectedFees {
   change_fee: number;
   fare_difference: number;
 }
 
-/** The fees a request owes, from the seed: base fare rules, then bulletins in force. */
+const total = (fees: ExpectedFees) => fees.change_fee + fees.fare_difference;
+const inForce = (today: string, from: string, to: string | null) =>
+  today >= from && (to === null || today <= to);
+
+/**
+ * The fees a request owes, from the seed: the fare rules (with the bulletin
+ * that supersedes the basic economy fee), then every bulletin that covers the
+ * move, and the cheapest of those outcomes, never a blend of them.
+ */
 export function expectedFees(seed: AirlineOpsWorld, request: ChangeRequest): ExpectedFees {
   const booking = reservationOrThrow(seed, request.reservationId);
+  const segment = booking.segments[request.segmentIndex];
   const target = findFlight(seed, request.newFlightId);
+  if (!segment || !target) throw new Error(`request ${request.requestId} does not resolve in the seed`);
   const tier = findPassenger(seed, booking.passengerId)?.tier ?? 'none';
-  if (!target) throw new Error(`no flight ${request.newFlightId} in the seed`);
-  const waiver = chicagoWaiver(seed, booking, target);
+  const sameRoute = target.origin === segment.origin && target.destination === segment.destination;
 
+  const segmentFare = segment.fareCents ?? booking.paidCents;
+  const newFare = findCabin(target, booking.cabin)?.fareCents ?? Number.NaN;
+  const difference = Math.max(0, newFare - segmentFare);
   const baseChangeFee =
     booking.cabin === 'basic_economy' && seed.today >= BASIC_CHANGE_FEE.effectiveFrom
       ? BASIC_CHANGE_FEE.cents
       : CHANGE_FEE_BY_CABIN[booking.cabin];
-  const changeFee = waiver !== 'none' || CHANGE_FEE_EXEMPT_TIERS.includes(tier) ? 0 : baseChangeFee;
+  const outcomes: ExpectedFees[] = [
+    {
+      change_fee: CHANGE_FEE_EXEMPT_TIERS.includes(tier) ? 0 : baseChangeFee,
+      fare_difference: difference,
+    },
+  ];
 
-  const newFare = findCabin(target, booking.cabin)?.fareCents ?? Number.NaN;
-  const difference = Math.max(0, newFare - booking.paidCents);
-  return { change_fee: changeFee, fare_difference: waiver === 'full' ? 0 : difference };
+  // PB-2026-14, as amended by PB-2026-14A.
+  const travelTo = (CHICAGO_AMENDMENT.tiers as readonly string[]).includes(tier)
+    ? CHICAGO_AMENDMENT.travelTo
+    : CHICAGO_WAIVER.travelTo;
+  const touchesOrd =
+    segment.origin === CHICAGO_WAIVER.airport || segment.destination === CHICAGO_WAIVER.airport;
+  if (
+    inForce(seed.today, CHICAGO_WAIVER.effectiveFrom, CHICAGO_WAIVER.effectiveTo) &&
+    touchesOrd &&
+    sameRoute &&
+    booking.bookedOn <= CHICAGO_WAIVER.ticketedBy &&
+    segment.date >= CHICAGO_WAIVER.travelFrom &&
+    segment.date <= travelTo &&
+    target.date <= CHICAGO_WAIVER.moveBy
+  ) {
+    outcomes.push({
+      change_fee: 0,
+      fare_difference: booking.cabin === 'basic_economy' ? difference : 0,
+    });
+  }
+
+  // PB-2026-12, same-day changes.
+  if (inForce(seed.today, SAME_DAY.effectiveFrom, null) && sameRoute && target.date === segment.date) {
+    outcomes.push({
+      change_fee: (SAME_DAY.exemptTiers as readonly string[]).includes(tier) ? 0 : SAME_DAY.cents,
+      fare_difference: 0,
+    });
+  }
+
+  return outcomes.sort((a, b) => total(a) - total(b))[0]!;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,21 +456,28 @@ export function expectedFees(seed: AirlineOpsWorld, request: ChangeRequest): Exp
 
 const RESERVATIONS = REQUESTS.map((request) => request.reservationId);
 
+/** Flight ids the reservation should hold once the request is done. */
+function expectedSegments(request: ChangeRequest): string[] {
+  const original = reservationOrThrow(createWaiverWorld(), request.reservationId);
+  return original.segments.map((segment, index) =>
+    index === request.segmentIndex ? request.newFlightId : segment.flightId,
+  );
+}
+
 function perRequest(request: ChangeRequest): AssertionSpec<AirlineOpsWorld>[] {
   const { requestId, reservationId, newFlightId } = request;
+  const moved = (world: AirlineOpsWorld) =>
+    reservationOrThrow(world, reservationId).segments.map((segment) => segment.flightId).join() ===
+    expectedSegments(request).join();
   return [
     {
       id: `moved:${reservationId}`,
-      label: `${reservationId} moved to ${newFlightId} in the same cabin`,
+      label: `${reservationId}: ${newFlightId} replaces the requested segment, the rest unchanged, same cabin`,
       weight: 1,
       check: (world) => {
         const booking = reservationOrThrow(world, reservationId);
         const original = reservationOrThrow(createWaiverWorld(), reservationId);
-        return (
-          booking.status === 'confirmed' &&
-          booking.segments[0]?.flightId === newFlightId &&
-          booking.cabin === original.cabin
-        );
+        return booking.status === 'confirmed' && moved(world) && booking.cabin === original.cabin;
       },
     },
     {
@@ -353,9 +486,7 @@ function perRequest(request: ChangeRequest): AssertionSpec<AirlineOpsWorld>[] {
       weight: 2,
       check: (world) => {
         // Settling a change that never happened earns nothing, even when nothing was owed.
-        if (reservationOrThrow(world, reservationId).segments[0]?.flightId !== newFlightId) {
-          return false;
-        }
+        if (!moved(world)) return false;
         const seed = createWaiverWorld();
         const expected = expectedFees(seed, request);
         const added = addedEntries(seed, world, reservationId);
@@ -396,13 +527,13 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
   id: 'airline-waiver-desk',
   title: 'Settle change requests under dated bulletins',
   tags: ['airline', 'bulletins', 'policy-override', 'rules-via-tools', 'batch'],
-  maxTurns: 70,
+  maxTurns: 100,
   prompt: [
     'The service queue has open flight-change requests from yesterday.',
     'Work all of them: make each change the customer asked for and settle it correctly.',
   ].join(' '),
   hypothesis:
-    "plan-execute-verify > single > plan-execute. Every settlement turns on a dated bulletin reachable only through tools, and customers cite waivers that do not cover them. A state-grounded verifier that re-reads the bulletins against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The five requests are independent, so orchestrator-workers should match single on score at lower latency.",
+    "plan-execute-verify > single > plan-execute. Every settlement turns on dated bulletins reachable only through tools, two of which can cover the same move, and customers cite waivers that do not cover them. A state-grounded verifier that re-reads the bulletins against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The eight requests are independent, so orchestrator-workers should match single on score at lower latency.",
   traps: [
     {
       id: 'covered-but-silent',
@@ -437,6 +568,29 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
       id: 'ticketing-cutoff',
       description: 'Applies the waiver to a booking ticketed after its cutoff.',
       caughtBy: ['settled:R5205'],
+    },
+    {
+      id: 'missed-amendment',
+      description:
+        'Reads the weather waiver but not its amendment, and charges a platinum member travelling on the 5th.',
+      caughtBy: ['settled:R5207'],
+    },
+    {
+      id: 'same-day-flat-fee',
+      description:
+        'Charges a change fee and a fare difference for a same-day move that the same-day bulletin settles with one flat fee.',
+      caughtBy: ['settled:R5208'],
+    },
+    {
+      id: 'cheapest-bulletin',
+      description:
+        'Applies the same-day bulletin to a move the weather waiver covers for free, instead of the cheaper of the two.',
+      caughtBy: ['settled:R5209'],
+    },
+    {
+      id: 'wrong-segment',
+      description: 'Changes the first leg of the connecting trip instead of the leg the customer asked to move.',
+      caughtBy: ['moved:R5209'],
     },
     {
       id: 'scope-creep',

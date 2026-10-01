@@ -77,7 +77,11 @@ export function describeReservation(world: AirlineWorld, reservation: Reservatio
       const departure = flight
         ? ` dep ${flight.departureTime}${flight.arrivalTime ? ` arr ${flight.arrivalTime}` : ''}`
         : '';
-      return `    [${index}] ${segment.flightId} ${segment.origin}->${segment.destination} ${segment.date}${departure} flight_status=${status}`;
+      const extras = [
+        segment.status === 'flown' ? ' FLOWN' : '',
+        segment.fareCents !== undefined ? ` segment_fare_cents=${segment.fareCents}` : '',
+      ].join('');
+      return `    [${index}] ${segment.flightId} ${segment.origin}->${segment.destination} ${segment.date}${departure} flight_status=${status}${extras}`;
     })
     .join('\n');
 
@@ -91,9 +95,16 @@ export function describeReservation(world: AirlineWorld, reservation: Reservatio
     `  trip_insurance_purchased: ${reservation.insurancePurchased ? 'yes' : 'no'}`,
     `  checked_bags: ${reservation.checkedBags}`,
     `  booked_on: ${reservation.bookedOn}`,
+    ...(reservation.groupId ? [`  travelling_with: group ${reservation.groupId} (${groupMembers(world, reservation).join(', ')})`] : []),
     '  segments:',
     segments,
   ].join('\n');
+}
+
+function groupMembers(world: AirlineWorld, reservation: Reservation): string[] {
+  return world.reservations
+    .filter((other) => other.groupId === reservation.groupId)
+    .map((other) => other.id);
 }
 
 export function describeLedgerEntry(entry: LedgerEntry): string {
@@ -102,6 +113,7 @@ export function describeLedgerEntry(entry: LedgerEntry): string {
     entry.postedOn ?? '',
     `${entry.kind}/${entry.category}`,
     `${entry.amountCents} cents`,
+    entry.bags ? `bags_added=${entry.bags.added} bags_after=${entry.bags.total}` : '',
     entry.method ? `method=${entry.method}` : '',
     entry.refundOf ? `refund_of=${entry.refundOf}` : '',
     entry.auditOutcome ? `audit=${entry.auditOutcome}` : '',
@@ -266,6 +278,8 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
           '  fare_difference: when the new flight costs more in the same cabin than the fare',
           '    originally paid, the difference is collected in full as a fare_difference fee.',
           '    No tier is exempt from a fare difference. A lower new fare is not refunded.',
+          '    When one segment of a multi-segment trip changes, compare against that',
+          "    segment's own fare (segment_fare_cents on the reservation).",
           '  cabin_changes: the cabin on a reservation may only change if the customer asked for it.',
           refundable
             ? '  refundable: yes, to the original payment method, less the cancellation service fee.'
@@ -303,6 +317,10 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
           '  5. A cancelled reservation must be closed out, either with issue_refund',
           '     (original_payment or travel_credit) or with record_non_refundable.',
           '  6. Anything already returned on the reservation counts toward what it is owed.',
+          '  7. Once part of a trip has been flown, only the unflown segments are refundable,',
+          '     at their segment fares.',
+          '  8. A customer may choose travel credit instead of money back on any refundable',
+          '     booking. Travel credit chosen this way carries no service fee.',
         ].join('\n');
       },
     },
@@ -389,6 +407,9 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         const index = segmentIndex ?? 0;
         const segment = reservation.segments[index];
         if (!segment) return error(`reservation ${reservationId} has no segment at index ${index}`);
+        if (segment.status === 'flown') {
+          return error(`segment ${index} of ${reservationId} has already been flown`);
+        }
 
         const target = findFlight(world, newFlightId);
         if (!target) return error(`no flight with id ${newFlightId}`);
@@ -440,6 +461,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         }
 
         for (const segment of reservation.segments) {
+          if (segment.status === 'flown') continue;
           const flight = findFlight(world, segment.flightId);
           const cabin = flight ? findCabin(flight, reservation.cabin) : undefined;
           if (cabin) cabin.seatsLeft += 1;

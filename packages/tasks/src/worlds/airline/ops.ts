@@ -83,6 +83,17 @@ export interface ServiceRequest {
   resolution?: string;
 }
 
+/**
+ * A request that lands in the queue while the agent is working: once
+ * `afterResolved` requests have been resolved, it appears as open. The queue
+ * of a real desk does not stand still, and an agent that lists it once and
+ * never looks again leaves the newcomer unworked.
+ */
+export interface ScheduledArrival {
+  afterResolved: number;
+  request: ServiceRequest;
+}
+
 export interface AirlineOpsWorld extends AirlineWorld {
   vouchers: Voucher[];
   notifications: PassengerNotification[];
@@ -90,6 +101,7 @@ export interface AirlineOpsWorld extends AirlineWorld {
   paymentInstruments: PaymentInstrument[];
   tierHistory: TierChange[];
   requests: ServiceRequest[];
+  arrivals: ScheduledArrival[];
 }
 
 /** An ops world with nothing in any of the ops collections, for seeds to fill in. */
@@ -102,6 +114,7 @@ export function emptyOps(base: AirlineWorld): AirlineOpsWorld {
     paymentInstruments: [],
     tierHistory: [],
     requests: [],
+    arrivals: [],
   };
 }
 
@@ -256,6 +269,23 @@ export function createAirlineOpsTools(world: AirlineOpsWorld): JournaledToolSpec
       },
     },
     {
+      name: 'get_reservation_history',
+      description: 'Read the dated history of changes made to a reservation after it was booked.',
+      readOnly: true,
+      schema: { reservationId: z.string() },
+      handler: ({ reservationId }: { reservationId: string }) => {
+        const reservation = findReservation(world, reservationId);
+        if (!reservation) return error(`no reservation with id ${reservationId}`);
+        const history = reservation.history ?? [];
+        return [
+          `History for ${reservation.id} (booked ${reservation.bookedOn})`,
+          ...(history.length === 0
+            ? ['  no changes since booking']
+            : history.map((change) => `  ${change.date}: ${change.field} ${change.from} -> ${change.to}`)),
+        ].join('\n');
+      },
+    },
+    {
       name: 'list_requests',
       description: 'List customer requests in the service queue, optionally by status.',
       readOnly: true,
@@ -396,6 +426,7 @@ export function createAirlineOpsTools(world: AirlineOpsWorld): JournaledToolSpec
         if (request.status === 'resolved') return error(`request ${requestId} is already resolved`);
         request.status = 'resolved';
         request.resolution = resolution.trim();
+        deliverArrivals(world);
         return `Request ${requestId} resolved.`;
       },
     },
@@ -453,6 +484,15 @@ export function createAirlineOpsTools(world: AirlineOpsWorld): JournaledToolSpec
       },
     },
   ];
+}
+
+/** Move scheduled requests whose moment has come into the open queue. Says nothing about it. */
+function deliverArrivals(world: AirlineOpsWorld): void {
+  const resolved = world.requests.filter((request) => request.status === 'resolved').length;
+  const due = world.arrivals.filter((arrival) => arrival.afterResolved <= resolved);
+  if (due.length === 0) return;
+  world.arrivals = world.arrivals.filter((arrival) => !due.includes(arrival));
+  world.requests.push(...due.map((arrival) => arrival.request));
 }
 
 /** Total refunded against one fee entry. */

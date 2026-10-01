@@ -52,6 +52,18 @@ export interface Segment {
   origin: string;
   destination: string;
   date: string;
+  /** `flown` once the passenger has travelled on it. Absent means not yet flown. */
+  status?: 'flown';
+  /** This segment's share of the fare, when the ticket prices segments separately. */
+  fareCents?: number;
+}
+
+/** One dated change to a reservation, as the booking history records it. */
+export interface ReservationChange {
+  date: string;
+  field: 'cabin';
+  from: string;
+  to: string;
 }
 
 export interface Passenger {
@@ -76,6 +88,10 @@ export interface Reservation {
   bookedOn: string;
   /** Card or account the fare was paid with, when the world models payments. */
   paymentInstrumentId?: string;
+  /** Reservations booked to travel together share a group id. */
+  groupId?: string;
+  /** Dated changes, oldest first, when the world models history. */
+  history?: ReservationChange[];
 }
 
 export interface LedgerEntry {
@@ -93,6 +109,8 @@ export interface LedgerEntry {
   refundOf?: string;
   /** Set by an audit: what the auditor concluded about this entry. */
   auditOutcome?: AuditOutcome;
+  /** For a baggage fee: bags added by this charge, and the total on the reservation after it. */
+  bags?: { added: number; total: number };
 }
 
 export type AuditOutcome = 'correct' | 'overcharged' | 'undercharged';
@@ -263,7 +281,20 @@ export function cancellationAmountCents(world: AirlineWorld, reservation: Reserv
   const fee = bookedWithinFreeWindow(world, reservation)
     ? 0
     : cancellationServiceFeeCents(tierOf(world, reservation));
-  return Math.max(0, reservation.paidCents - fee - returnedCents(world, reservation.id));
+  return Math.max(0, refundableFareCents(reservation) - fee - returnedCents(world, reservation.id));
+}
+
+/**
+ * The part of the fare a cancellation can return: all of it, or once part of
+ * the trip has been flown, only the unflown segments at their segment fares.
+ */
+export function refundableFareCents(reservation: Reservation): number {
+  if (!reservation.segments.some((segment) => segment.status === 'flown')) {
+    return reservation.paidCents;
+  }
+  return reservation.segments
+    .filter((segment) => segment.status !== 'flown')
+    .reduce((total, segment) => total + (segment.fareCents ?? 0), 0);
 }
 
 export function appendLedger(world: AirlineWorld, entry: Omit<LedgerEntry, 'id'>): LedgerEntry {

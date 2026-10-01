@@ -71,10 +71,12 @@ const BULLETINS = [
 const IRREGULAR_OPERATIONS = [
   'Irregular operations (flights cancelled by the airline)',
   '- Passengers on a flight the airline cancelled are re-protected free of charge: no change fee and no fare difference, whatever the fare rules say about voluntary changes.',
-  '- Re-protect each passenger in the cabin they paid for. Never move anyone to a lower cabin; a higher cabin is not offered on re-protection.',
-  `- A connection is valid only when the onward flight departs at least ${MIN_CONNECTION_MINUTES} minutes after the previous flight arrives. When a new first leg breaks a connection, rebook the onward leg too.`,
-  '- When there are not enough seats for everyone, work through the passengers in priority order: frequent-flyer tier (platinum, gold, silver, none), then earliest booking date. Each passenger takes the available itinerary that reaches their final destination soonest.',
-  `- Compensation depends on how much later than originally scheduled the passenger reaches their final destination: under 3 hours, none; from 3 hours up to but not including 6 hours, a ${COMPENSATION_SHORT_CENTS}-cent compensation voucher; 6 hours or more, a ${COMPENSATION_LONG_CENTS}-cent compensation voucher. A passenger whose new itinerary leaves on a later date than the original also receives one hotel voucher of ${HOTEL_VOUCHER_CENTS} cents.`,
+  '- When there are not enough seats for everyone, work through the passengers in priority order: frequent-flyer tier (platinum, gold, silver, none), then earliest booking date. Each takes the available itinerary that reaches their final destination soonest.',
+  '- Re-protect each passenger in the cabin they paid for, never lower. The one exception runs upwards: a gold or platinum passenger travelling alone on a single flight, whose own cabin is full on a flight that would get them to their destination sooner than any itinerary still open in their own cabin, is seated one cabin higher on that flight. Nobody else is moved up a cabin, and nobody is moved up more than one.',
+  '- Reservations booked to travel together are re-protected together, on the same flights and in their own cabin, at the priority of their highest-priority member. They are never split and never upgraded.',
+  `- A connection is valid only when the onward flight departs at least ${MIN_CONNECTION_MINUTES} minutes after the previous flight arrives; an onward flight the next morning is a valid connection. When a new first leg breaks a connection, rebook the onward leg too.`,
+  `- Compensation depends on how much later than originally scheduled the passenger reaches their final destination: under 3 hours, none; from 3 hours up to but not including 6 hours, a ${COMPENSATION_SHORT_CENTS}-cent compensation voucher; 6 hours or more, a ${COMPENSATION_LONG_CENTS}-cent compensation voucher. A compensation voucher never exceeds the fare paid for the reservation.`,
+  `- A passenger who reaches their final destination on a later date than originally scheduled also receives one hotel voucher of ${HOTEL_VOUCHER_CENTS} cents.`,
   '- Tell each re-protected passenger their new itinerary once, after it is booked.',
 ].join('\n');
 

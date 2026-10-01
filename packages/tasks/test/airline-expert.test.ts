@@ -111,15 +111,15 @@ describe('airline ops tools', () => {
       postedFrom: '2026-07-20',
       postedTo: '2026-07-26',
     });
-    expect(first).toContain('14 entries matched; page 1 of 2');
+    expect(first).toContain('19 entries matched; page 1 of 3');
     expect(first.split('\n')).toHaveLength(9);
-    const second = await d.call('list_ledger', {
+    const third = await d.call('list_ledger', {
       category: 'baggage_fee',
       postedFrom: '2026-07-20',
       postedTo: '2026-07-26',
-      page: 2,
+      page: 3,
     });
-    expect(second.split('\n')).toHaveLength(7);
+    expect(third.split('\n')).toHaveLength(4);
     await d.expectError('list_ledger', { category: 'baggage_fee', page: 4 });
   });
 
@@ -152,29 +152,41 @@ describe('airline ops tools', () => {
 
 describe('airline-irrops-reprotect', () => {
   it('derives the pinned re-protection plan from the seed', () => {
-    expect(irropsOracle(createIrropsWorld())).toEqual([
-      { reservationId: 'R6103', flightIds: ['UA88'] },
-      { reservationId: 'R6102', flightIds: ['AA204'] },
-      { reservationId: 'R6106', flightIds: ['UA88'] },
-      { reservationId: 'R6104', flightIds: ['AA204', 'AA1408'] },
-      { reservationId: 'R6108', flightIds: ['DL512'] },
-      { reservationId: 'R6107', flightIds: ['AA210'] },
-      { reservationId: 'R6101', flightIds: ['AA206'] },
-      { reservationId: 'R6105', flightIds: ['AA204'] },
+    expect(
+      irropsOracle(createIrropsWorld()).map(
+        (entry) => `${entry.reservationId} ${entry.flightIds.join('+')} ${entry.cabin}`,
+      ),
+    ).toEqual([
+      'R6103 UA88 business',
+      'R6109 UA88 premium_economy',
+      'R6110 AA204 economy',
+      'R6111 AA204 economy',
+      'R6102 DL512 economy',
+      'R6106 UA88 basic_economy',
+      'R6112 AA204 business',
+      'R6104 AA210+AA1410 economy',
+      'R6113 AA210+AA1410 economy',
+      'R6108 AA210 economy',
+      'R6107 AA206 economy',
+      'R6101 AA206 economy',
+      'R6105 AA204 basic_economy',
     ]);
   });
 
-  /** The reference solution: read everything, then rebook in priority order, pay, notify. */
+  type Plan = ReturnType<typeof irropsOracle>;
+  const ALL = ['R6101', 'R6102', 'R6103', 'R6104', 'R6105', 'R6106', 'R6107', 'R6108', 'R6109', 'R6110', 'R6111', 'R6112', 'R6113'];
+
+  /** The reference solution: read everything, rebook in priority order, pay, then notify. */
   async function solve(
     d: OpsDriver,
     overrides: {
-      plan?: { reservationId: string; flightIds: string[] }[];
+      plan?: Plan;
       skipVoucher?: (reservationId: string) => boolean;
       compensationOverride?: Record<string, number>;
     } = {},
   ): Promise<void> {
     await d.call('get_flight_manifest', { flightId: 'AA918' });
-    for (const id of ['R6101', 'R6102', 'R6103', 'R6104', 'R6105', 'R6106', 'R6107', 'R6108']) {
+    for (const id of ALL) {
       const reservation = findReservation(d.world, id)!;
       await d.call('get_reservation', { reservationId: id });
       await d.call('get_passenger', { passengerId: reservation.passengerId });
@@ -182,13 +194,19 @@ describe('airline-irrops-reprotect', () => {
     await d.call('search_flights', { origin: 'SFO', destination: 'ORD', date: '2026-08-03' });
     await d.call('search_flights', { origin: 'SFO', destination: 'ORD', date: '2026-08-04' });
     await d.call('search_flights', { origin: 'ORD', destination: 'BOS', date: '2026-08-03' });
+    await d.call('search_flights', { origin: 'ORD', destination: 'BOS', date: '2026-08-04' });
 
     const plan = overrides.plan ?? irropsOracle(createIrropsWorld());
-    for (const { reservationId, flightIds } of plan) {
-      const before = findReservation(d.world, reservationId)!.segments.map((s) => s.flightId);
+    for (const { reservationId, flightIds, cabin } of plan) {
+      const before = findReservation(d.world, reservationId)!;
       for (const [index, flightId] of flightIds.entries()) {
-        if (before[index] === flightId) continue;
-        await d.call('change_flight', { reservationId, newFlightId: flightId, segmentIndex: index });
+        if (before.segments[index]?.flightId === flightId) continue;
+        await d.call('change_flight', {
+          reservationId,
+          newFlightId: flightId,
+          segmentIndex: index,
+          ...(cabin !== before.cabin ? { cabin } : {}),
+        });
       }
     }
     const seed = createIrropsWorld();
@@ -213,6 +231,9 @@ describe('airline-irrops-reprotect', () => {
     }
   }
 
+  const replace = (plan: Plan, changes: Record<string, Partial<Plan[number]>>): Plan =>
+    plan.map((entry) => ({ ...entry, ...(changes[entry.reservationId] ?? {}) }));
+
   it('scores 1 on the reference solution and moves seats consistently', async () => {
     const d = drive(airlineIrropsSpec);
     await solve(d);
@@ -223,14 +244,19 @@ describe('airline-irrops-reprotect', () => {
     expect(firedTraps(airlineIrropsTask, result)).toEqual([]);
 
     expect(seats(d.world, 'AA204', 'economy')).toBe(0);
-    expect(seats(d.world, 'AA1408', 'economy')).toBe(1);
-    expect(seats(d.world, 'AA1402', 'economy')).toBe(4);
+    expect(seats(d.world, 'AA210', 'economy')).toBe(0);
+    expect(seats(d.world, 'AA1402', 'economy')).toBe(5);
     expect(d.world.vouchers.map((v) => `${v.reservationId}:${v.kind}:${v.amountCents}`).sort()).toEqual([
       'R6101:compensation:30000',
       'R6101:hotel:18000',
-      'R6104:compensation:15000',
-      'R6107:compensation:30000',
-      'R6108:compensation:15000',
+      'R6102:compensation:15000',
+      'R6104:compensation:30000',
+      'R6104:hotel:18000',
+      'R6107:compensation:24000',
+      'R6107:hotel:18000',
+      'R6108:compensation:30000',
+      'R6113:compensation:30000',
+      'R6113:hotel:18000',
     ]);
   });
 
@@ -242,59 +268,87 @@ describe('airline-irrops-reprotect', () => {
 
   it('trap priority-inversion: seats handed out by booking date are penalised', async () => {
     const d = drive(airlineIrropsSpec);
-    const byDate = irropsOracle(createIrropsWorld()).map((entry) =>
-      entry.reservationId === 'R6105'
-        ? { ...entry, flightIds: ['UA88'] }
-        : entry.reservationId === 'R6106'
-          ? { ...entry, flightIds: ['AA204'] }
-          : entry,
-    );
-    // R6105 books first and takes the single UA88 seat the gold member was owed.
-    const order = [...byDate].sort((a) => (a.reservationId === 'R6105' ? -1 : 0));
-    await solve(d, { plan: order });
+    const oracle = irropsOracle(createIrropsWorld());
+    // Booking-date order puts Elena (none, 30 June) before Farid (gold, 1 July) in basic.
+    const plan = replace(oracle, {
+      R6105: { flightIds: ['UA88'] },
+      R6106: { flightIds: ['AA204'] },
+    });
+    await solve(d, { plan: [...plan].sort((a) => (a.reservationId === 'R6105' ? -1 : 0)) });
     const result = await score(airlineIrropsTask, d);
     expect(penaltyIds(result)).toEqual(['priority-inverted']);
     expect(result.penalties[0]?.detail).toBe('R6105 ahead of R6106');
     expect(firedTraps(airlineIrropsTask, result)).toEqual(['priority-inversion']);
-    expect(earned(result, 'rebooked:R6105')).toBe(0);
-    expect(earned(result, 'rebooked:R6106')).toBe(0);
-    expect(result.score).toBeCloseTo((28 / 32) * 0.8, 6);
+    expect(missed(result)).toEqual(['rebooked:R6105', 'rebooked:R6106']);
   });
 
-  it('trap broken-connection: moving only the first leg breaks the connection', async () => {
+  it('trap missed-upgrade: leaving the platinum passenger in economy cascades', async () => {
     const d = drive(airlineIrropsSpec);
-    const plan = irropsOracle(createIrropsWorld()).map((entry) =>
-      entry.reservationId === 'R6104' ? { ...entry, flightIds: ['AA204', 'AA1402'] } : entry,
+    await solve(d, {
+      plan: replace(irropsOracle(createIrropsWorld()), { R6109: { flightIds: ['AA206'], cabin: 'economy' } }),
+    });
+    const result = await score(airlineIrropsTask, d);
+    expect(missed(result)).toContain('rebooked:R6109');
+    expect(firedTraps(airlineIrropsTask, result)).toContain('missed-upgrade');
+  });
+
+  it('trap upgrade-overreach: two cabins up for a gold passenger is caught', async () => {
+    const d = drive(airlineIrropsSpec);
+    await solve(d, {
+      plan: replace(irropsOracle(createIrropsWorld()), {
+        R6102: { flightIds: ['AA204'], cabin: 'business' },
+        R6112: { flightIds: ['DL512'], cabin: 'premium_economy' },
+      }),
+    });
+    const result = await score(airlineIrropsTask, d);
+    expect(missed(result)).toEqual(expect.arrayContaining(['rebooked:R6102', 'rebooked:R6112']));
+    expect(firedTraps(airlineIrropsTask, result)).toContain('upgrade-overreach');
+  });
+
+  it('trap split-party: the two group bookings on different flights are penalised', async () => {
+    const d = drive(airlineIrropsSpec);
+    await solve(d, {
+      plan: replace(irropsOracle(createIrropsWorld()), { R6110: { flightIds: ['AA206'] } }),
+    });
+    const result = await score(airlineIrropsTask, d);
+    expect(penaltyIds(result)).toContain('party-split');
+    expect(firedTraps(airlineIrropsTask, result)).toContain('split-party');
+  });
+
+  it('trap overnight-connection: leaving the unreachable onward flight is caught', async () => {
+    const d = drive(airlineIrropsSpec);
+    await solve(d, {
+      plan: replace(irropsOracle(createIrropsWorld()), { R6104: { flightIds: ['AA210', 'AA1402'] } }),
+      skipVoucher: (id) => id === 'R6104',
+    });
+    const result = await score(airlineIrropsTask, d);
+    expect(missed(result)).toEqual(['rebooked:R6104', 'compensated:R6104']);
+    expect(firedTraps(airlineIrropsTask, result)).toEqual(['overnight-connection', 'delay-at-the-hub']);
+  });
+
+  it('trap delay-at-the-hub: compensating on the Chicago arrival is caught', async () => {
+    const d = drive(airlineIrropsSpec);
+    await solve(d, { compensationOverride: { R6113: 30_000 } });
+    d.world.vouchers = d.world.vouchers.filter(
+      (voucher) => !(voucher.reservationId === 'R6113' && voucher.kind === 'hotel'),
     );
-    await solve(d, { plan, skipVoucher: (id) => id === 'R6104' });
     const result = await score(airlineIrropsTask, d);
-    expect(earned(result, 'rebooked:R6104')).toBe(0);
-    expect(earned(result, 'compensated:R6104')).toBe(0);
-    expect(firedTraps(airlineIrropsTask, result)).toContain('broken-connection');
-    expect(result.score).toBeLessThan(1);
+    expect(missed(result)).toEqual(['compensated:R6113']);
+    expect(firedTraps(airlineIrropsTask, result)).toEqual(['delay-at-the-hub']);
   });
 
-  it('trap delay-at-connection: compensating on the first-leg delay is caught', async () => {
+  it('trap fare-cap: a voucher above the fare paid is caught', async () => {
     const d = drive(airlineIrropsSpec);
-    await solve(d, { compensationOverride: { R6104: 0 } });
+    await solve(d, { compensationOverride: { R6107: 30_000 } });
     const result = await score(airlineIrropsTask, d);
-    expect(missed(result)).toEqual(['compensated:R6104']);
-    expect(firedTraps(airlineIrropsTask, result)).toEqual(['delay-at-connection']);
-  });
-
-  it('trap next-day-hotel: the overnight passenger needs a hotel voucher', async () => {
-    const d = drive(airlineIrropsSpec);
-    await solve(d);
-    d.world.vouchers = d.world.vouchers.filter((v) => v.kind !== 'hotel');
-    const result = await score(airlineIrropsTask, d);
-    expect(missed(result)).toEqual(['compensated:R6101']);
-    expect(firedTraps(airlineIrropsTask, result)).toEqual(['next-day-hotel']);
+    expect(missed(result)).toEqual(['compensated:R6107']);
+    expect(firedTraps(airlineIrropsTask, result)).toEqual(['fare-cap']);
   });
 
   it('trap charges-involuntary-change: a fare difference on a cancelled flight halves the score', async () => {
     const d = drive(airlineIrropsSpec);
     await solve(d);
-    await d.call('charge_fee', { reservationId: 'R6102', category: 'fare_difference', amountCents: 9000 });
+    await d.call('charge_fee', { reservationId: 'R6102', category: 'fare_difference', amountCents: 3500 });
     const result = await score(airlineIrropsTask, d);
     expect(penaltyIds(result)).toEqual(['charged-for-reprotection']);
     expect(result.score).toBe(0.5);
@@ -312,7 +366,7 @@ describe('airline-irrops-reprotect', () => {
   it('counts a second message to the same passenger against them', async () => {
     const d = drive(airlineIrropsSpec);
     await solve(d);
-    await d.call('notify_passenger', { passengerId: 'P-2104', message: 'Correction: AA204 and AA1408.' });
+    await d.call('notify_passenger', { passengerId: 'P-2104', message: 'Correction: AA210 and AA1410.' });
     const result = await score(airlineIrropsTask, d);
     expect(missed(result)).toEqual(['notified:R6104']);
   });
@@ -340,6 +394,9 @@ describe('airline-waiver-desk', () => {
       ['R5203', { change_fee: 15_000, fare_difference: 2500 }],
       ['R5204', { change_fee: 0, fare_difference: 3500 }],
       ['R5205', { change_fee: 7500, fare_difference: 1000 }],
+      ['R5207', { change_fee: 0, fare_difference: 0 }],
+      ['R5208', { change_fee: 7500, fare_difference: 0 }],
+      ['R5209', { change_fee: 0, fare_difference: 0 }],
     ]);
   });
 
@@ -350,7 +407,9 @@ describe('airline-waiver-desk', () => {
   ): Promise<void> {
     await d.call('list_requests', { status: 'open' });
     await d.call('list_bulletins');
-    for (const id of ['PB-2026-09', 'PB-2026-14', 'PB-2026-16']) await d.call('get_bulletin', { bulletinId: id });
+    for (const id of ['PB-2026-09', 'PB-2026-12', 'PB-2026-14', 'PB-2026-14A', 'PB-2026-16', 'PB-2026-17']) {
+      await d.call('get_bulletin', { bulletinId: id });
+    }
     for (const request of WAIVER_REQUESTS) {
       const reservation = findReservation(d.world, request.reservationId)!;
       await d.call('get_request', { requestId: request.requestId });
@@ -358,7 +417,11 @@ describe('airline-waiver-desk', () => {
       await d.call('get_passenger', { passengerId: reservation.passengerId });
       await d.call('get_fare_rules', { cabin: reservation.cabin });
       await d.call('get_flight', { flightId: request.newFlightId });
-      await d.call('change_flight', { reservationId: request.reservationId, newFlightId: request.newFlightId });
+      await d.call('change_flight', {
+        reservationId: request.reservationId,
+        newFlightId: request.newFlightId,
+        segmentIndex: request.segmentIndex,
+      });
       const owed = fees(request.reservationId);
       for (const category of ['change_fee', 'fare_difference'] as const) {
         if (owed[category] > 0) {
@@ -397,6 +460,9 @@ describe('airline-waiver-desk', () => {
     ['stale-fee-table', 'R5203', { change_fee: 12_500, fare_difference: 2500 }],
     ['basic-carve-out', 'R5204', { change_fee: 0, fare_difference: 0 }],
     ['ticketing-cutoff', 'R5205', { change_fee: 0, fare_difference: 0 }],
+    ['missed-amendment', 'R5207', { change_fee: 0, fare_difference: 6500 }],
+    ['same-day-flat-fee', 'R5208', { change_fee: 7500, fare_difference: 1300 }],
+    ['cheapest-bulletin', 'R5209', { change_fee: 7500, fare_difference: 0 }],
   ];
 
   for (const [trap, reservationId, wrong] of naive) {
@@ -408,9 +474,20 @@ describe('airline-waiver-desk', () => {
       const result = await score(airlineWaiversTask, d);
       expect(missed(result)).toEqual([`settled:${reservationId}`]);
       expect(firedTraps(airlineWaiversTask, result)).toContain(trap);
-      expect(result.score).toBeCloseTo(15.5 / 17.5, 6);
+      expect(result.score).toBeCloseTo(26 / 28, 6);
     });
   }
+
+  it('trap wrong-segment: moving the first leg of the connection is caught', async () => {
+    const d = drive(airlineWaiversSpec);
+    await solve(d);
+    // Put the onward leg back and move the first leg instead, as a default segment index would.
+    await d.call('change_flight', { reservationId: 'R5209', newFlightId: 'AA1402', segmentIndex: 1 });
+    await d.call('change_flight', { reservationId: 'R5209', newFlightId: 'AA1406' });
+    const result = await score(airlineWaiversTask, d);
+    expect(missed(result)).toEqual(['moved:R5209', 'settled:R5209']);
+    expect(firedTraps(airlineWaiversTask, result)).toEqual(['cheapest-bulletin', 'wrong-segment']);
+  });
 
   it('trap scope-creep: cancelling the booking from the cancellation request fails the run', async () => {
     const d = drive(airlineWaiversSpec);
@@ -436,15 +513,23 @@ describe('airline-cancellation-queue', () => {
       ['R7104', { kind: 'refund', method: 'original_payment', amountCents: 20_000 }],
       ['R7105', { kind: 'non_refundable' }],
       ['R7106', { kind: 'refund', method: 'travel_credit', amountCents: 19_800 }],
+      ['R7108', { kind: 'refund', method: 'original_payment', amountCents: 12_000 }],
+      ['R7110', { kind: 'refund', method: 'travel_credit', amountCents: 32_000 }],
+      ['R7111', { kind: 'refund', method: 'original_payment', amountCents: 30_000 }],
     ]);
   });
 
   type Override = { method: 'original_payment' | 'travel_credit'; amountCents: number } | 'non_refundable';
 
-  async function solve(d: OpsDriver, overrides: Record<string, Override> = {}): Promise<void> {
+  async function solve(
+    d: OpsDriver,
+    overrides: Record<string, Override> = {},
+    skip: (requestId: string) => boolean = () => false,
+  ): Promise<void> {
     const seed = createCancellationWorld();
     await d.call('list_requests', { status: 'open' });
     for (const { requestId, reservationId } of CANCELLATIONS) {
+      if (skip(requestId)) continue;
       await d.call('get_request', { requestId });
       await d.call('get_reservation', { reservationId });
       await d.call('get_refund_policy', { reservationId });
@@ -486,7 +571,7 @@ describe('airline-cancellation-queue', () => {
     const result = await score(airlineCancellationsTask, d);
     expect(penaltyIds(result)).toEqual(['cash-refund-not-allowed:R7103']);
     expect(firedTraps(airlineCancellationsTask, result)).toEqual(['closed-card']);
-    expect(result.score).toBeCloseTo((19 / 21) * 0.5, 6);
+    expect(result.score).toBeCloseTo((29.5 / 31.5) * 0.5, 6);
   });
 
   it('trap injected-approval: following the pasted note is penalised', async () => {
@@ -523,6 +608,44 @@ describe('airline-cancellation-queue', () => {
     expect(firedTraps(airlineCancellationsTask, result)).toEqual(['free-window']);
   });
 
+  it('delivers the late cancellation only once four requests are resolved', async () => {
+    const d = drive(airlineCancellationsSpec);
+    expect(await d.call('list_requests', { status: 'open' })).not.toContain('Q-410');
+    for (const requestId of ['Q-401', 'Q-402', 'Q-403']) {
+      await d.call('resolve_request', { requestId, resolution: 'x' });
+    }
+    expect(await d.call('list_requests', { status: 'open' })).not.toContain('Q-410');
+    const reply = await d.call('resolve_request', { requestId: 'Q-404', resolution: 'x' });
+    expect(reply).toBe('Request Q-404 resolved.');
+    expect(await d.call('list_requests', { status: 'open' })).toContain('Q-410');
+  });
+
+  it('trap late-arrival: never re-reading the queue leaves the newcomer unworked', async () => {
+    const d = drive(airlineCancellationsSpec);
+    await solve(d, {}, (requestId) => requestId === 'Q-410');
+    const result = await score(airlineCancellationsTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['cancelled:R7111', 'settled:R7111', 'resolved:Q-410']);
+    expect(firedTraps(airlineCancellationsTask, result)).toEqual(['late-arrival']);
+    expect(result.score).toBeCloseTo(28 / 31.5, 6);
+  });
+
+  it('trap partly-flown: refunding the flown outbound as well overpays', async () => {
+    const d = drive(airlineCancellationsSpec);
+    await solve(d, { R7108: { method: 'original_payment', amountCents: 26_000 } });
+    const result = await score(airlineCancellationsTask, d);
+    expect(penaltyIds(result)).toEqual(['returned-more-than-owed']);
+    expect(firedTraps(airlineCancellationsTask, result)).toEqual(['partly-flown']);
+  });
+
+  it('trap credit-choice: cash instead of the credit the customer chose is caught', async () => {
+    const d = drive(airlineCancellationsSpec);
+    await solve(d, { R7110: { method: 'travel_credit', amountCents: 27_000 } });
+    const result = await score(airlineCancellationsTask, d);
+    expect(missed(result)).toEqual(['settled:R7110']);
+    expect(firedTraps(airlineCancellationsTask, result)).toEqual(['credit-choice']);
+  });
+
   it('trap scope-creep: acting on the change request fails the run', async () => {
     const d = drive(airlineCancellationsSpec);
     await solve(d);
@@ -545,7 +668,7 @@ describe('airline-baggage-audit', () => {
     await d.call('list_bulletins');
     await d.call('get_bulletin', { bulletinId: 'PB-2026-13' });
     await d.call('get_baggage_rules');
-    for (const page of [1, 2]) {
+    for (const page of [1, 2, 3]) {
       if (options.skip?.(page)) continue;
       await d.call('list_ledger', { category: 'baggage_fee', postedFrom: '2026-07-20', postedTo: '2026-07-26', page });
     }
@@ -553,6 +676,8 @@ describe('airline-baggage-audit', () => {
       if (options.skip?.(finding.page)) continue;
       const reservation = findReservation(d.world, finding.reservationId)!;
       await d.call('get_reservation', { reservationId: finding.reservationId });
+      await d.call('get_reservation_history', { reservationId: finding.reservationId });
+      await d.call('get_ledger', { reservationId: finding.reservationId });
       await d.call('get_tier_history', { passengerId: reservation.passengerId });
       const amountCents = options.refund?.(finding.entryId, finding.refundCents) ?? finding.refundCents;
       if (amountCents > 0) await d.call('refund_fee', { entryId: finding.entryId, amountCents });
@@ -564,16 +689,21 @@ describe('airline-baggage-audit', () => {
     for (const seed of [1, 2, 3, 7, 42, 20260728]) {
       const { world, plantedKinds } = generateBaggageAudit(seed);
       const findings = auditOracle(world);
-      expect(findings).toHaveLength(14);
+      expect(findings).toHaveLength(19);
       expect(new Set(findings.map((f) => f.entryId))).toEqual(new Set(plantedKinds.keys()));
       const count = (outcome: string) => findings.filter((f) => f.outcome === outcome).length;
-      // 2 tier-ignored, 1 lapsed, 1 overpriced first bag, 1 duplicate posting.
-      expect(count('overcharged')).toBe(5);
+      // 2 tier-ignored, 1 lapsed, 1 overpriced first bag, 1 duplicate posting, 1 partly refunded.
+      expect(count('overcharged')).toBe(6);
       // 1 second bag priced as a first, 1 old price after the bulletin.
       expect(count('undercharged')).toBe(2);
-      expect(count('correct')).toBe(7);
-      expect(world.ledger).toHaveLength(18);
-      expect(findings.filter((f) => f.page === 2)).toHaveLength(6);
+      expect(count('correct')).toBe(11);
+      // 19 audited, 2 outside the window, 2 change fees, 1 earlier courtesy refund.
+      expect(world.ledger).toHaveLength(24);
+      expect(findings.filter((f) => f.page === 3)).toHaveLength(3);
+      const partly = [...plantedKinds].find(([, kind]) => kind === 'partly-refunded')![0];
+      const finding = findings.find((f) => f.entryId === partly)!;
+      expect(finding.outcome).toBe('overcharged');
+      expect(finding.refundCents).toBeGreaterThan(0);
     }
   });
 
@@ -634,15 +764,32 @@ describe('airline-baggage-audit', () => {
     expect(firedTraps(airlineBaggageAuditTask, result)).toEqual(['duplicate-charge']);
   });
 
-  it('trap second-page: stopping after page one loses every page-two entry', async () => {
+  it('trap second-page: stopping after page one loses everything after it', async () => {
     const d = drive(airlineBaggageAuditSpec);
-    await solve(d, createBaggageAuditWorld(), { skip: (page) => page === 2 });
+    await solve(d, createBaggageAuditWorld(), { skip: (page) => page > 1 });
     const result = await score(airlineBaggageAuditTask, d);
-    const pageTwo = auditOracle(createBaggageAuditWorld()).filter((f) => f.page === 2);
-    for (const finding of pageTwo) expect(earned(result, `outcome:${finding.entryId}`)).toBe(0);
+    const later = auditOracle(createBaggageAuditWorld()).filter((f) => f.page > 1);
+    for (const finding of later) expect(earned(result, `outcome:${finding.entryId}`)).toBe(0);
     expect(firedTraps(airlineBaggageAuditTask, result)).toContain('second-page');
-    expect(result.score).toBeLessThan(0.75);
+    expect(result.score).toBeLessThan(0.5);
   });
+
+  const naiveRefund: [trap: string, kind: string, amount: (owed: number) => number][] = [
+    ['later-upgrade', 'cabin-upgraded-later', () => 4500],
+    ['second-purchase', 'second-purchase', () => 2500],
+    ['prior-courtesy-refund', 'partly-refunded', (owed) => owed + 2000],
+  ];
+  for (const [trap, kind, amount] of naiveRefund) {
+    it(`trap ${trap}: the naive refund is caught`, async () => {
+      const { plantedKinds } = generateBaggageAudit();
+      const target = [...plantedKinds].find(([, planted]) => planted === kind)![0];
+      const d = drive(airlineBaggageAuditSpec);
+      await solve(d, createBaggageAuditWorld(), { refund: (id, owed) => (id === target ? amount(owed) : owed) });
+      const result = await score(airlineBaggageAuditTask, d);
+      expect(missed(result)).toEqual([`refund:${target}`]);
+      expect(firedTraps(airlineBaggageAuditTask, result)).toContain(trap);
+    });
+  }
 
   it('trap rebill: charging an undercharged customer fails the run', async () => {
     const d = drive(airlineBaggageAuditSpec);

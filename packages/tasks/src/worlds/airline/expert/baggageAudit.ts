@@ -24,11 +24,14 @@ import { AIRLINE_EXPERT_BASE, OPS_DIFF, flight, passenger, reservation } from '.
 /**
  * airline-baggage-audit: audit a week of baggage fees, generated from a seed.
  *
- * Fourteen charges over two pages of ledger, each an independent check:
- * re-derive the allowance from the cabin and the tier the passenger held on
- * the day of the charge (not today's tier), price the chargeable bags at the
- * fees in force that day (a bulletin raised the first-bag price mid-week),
- * then refund exactly the overcharge, or nothing, and record the outcome.
+ * Nineteen charges over three pages of ledger, each an independent check:
+ * re-derive the allowance from the cabin the booking had and the tier the
+ * passenger held on the day of the charge (not today's), price the bags that
+ * charge added at the fees in force that day (a bulletin raised the first-bag
+ * price mid-week, and a bag's price depends on how many chargeable bags were
+ * already on the booking), tell a second purchase from a duplicate posting,
+ * net off anything a colleague already refunded, then refund exactly what is
+ * left of the overcharge, or nothing, and record the outcome.
  *
  * The world is generated from a seed so the same audit can be re-instantiated
  * with different passengers, dates and amounts while every expectation is
@@ -43,17 +46,41 @@ const TODAY = '2026-07-28';
 const PRICE_CHANGE_ON = '2026-07-23';
 const NEW_FIRST_BAG_CENTS = 5000;
 export const DEFAULT_AUDIT_SEED = 20260728;
+const PAGE_SIZE = 8;
 
 /** First-bag price on a date, per the base fee table and bulletin PB-2026-13. */
 export function firstBagCentsOn(date: string): number {
   return date >= PRICE_CHANGE_ON ? NEW_FIRST_BAG_CENTS : FIRST_CHARGEABLE_BAG_CENTS;
 }
 
-/** The correct fee for `bags` on a reservation, under the rules in force on `date`. */
-export function baggageFeeOn(date: string, cabin: CabinClass, tier: Tier, bags: number): number {
-  const chargeable = Math.max(0, bags - freeCheckedBags(cabin, tier));
-  if (chargeable === 0) return 0;
-  return firstBagCentsOn(date) + (chargeable - 1) * ADDITIONAL_CHARGEABLE_BAG_CENTS;
+/**
+ * The correct fee for a charge that took a booking from `total - added` to
+ * `total` bags, under the rules in force on `date`: each newly chargeable bag
+ * is priced by its position among the chargeable bags on the booking.
+ */
+export function chargeFeeOn(
+  date: string,
+  cabin: CabinClass,
+  tier: Tier,
+  bags: { added: number; total: number },
+): number {
+  const allowance = freeCheckedBags(cabin, tier);
+  const before = Math.max(0, bags.total - bags.added - allowance);
+  const after = Math.max(0, bags.total - allowance);
+  let fee = 0;
+  for (let position = before + 1; position <= after; position++) {
+    fee += position === 1 ? firstBagCentsOn(date) : ADDITIONAL_CHARGEABLE_BAG_CENTS;
+  }
+  return fee;
+}
+
+/** The cabin a booking had on a date, undoing any later recorded change. */
+export function cabinOn(booking: Reservation, date: string): CabinClass {
+  let cabin = booking.cabin;
+  for (const change of [...(booking.history ?? [])].reverse()) {
+    if (change.field === 'cabin' && change.date > date) cabin = change.from as CabinClass;
+  }
+  return cabin;
 }
 
 /**
@@ -66,10 +93,13 @@ type CaseKind =
   | 'tier-rose-later'
   | 'tier-ignored'
   | 'tier-lapsed-later'
+  | 'cabin-upgraded-later'
   | 'first-bag-overpriced'
   | 'duplicate'
   | 'second-bag-underpriced'
-  | 'old-price-after-change';
+  | 'old-price-after-change'
+  | 'second-purchase'
+  | 'partly-refunded';
 
 const CASE_MIX: CaseKind[] = [
   'correct',
@@ -81,20 +111,26 @@ const CASE_MIX: CaseKind[] = [
   'tier-ignored',
   'tier-ignored',
   'tier-lapsed-later',
+  'cabin-upgraded-later',
+  'cabin-upgraded-later',
   'first-bag-overpriced',
   'duplicate',
   'second-bag-underpriced',
   'old-price-after-change',
+  'second-purchase',
+  'partly-refunded',
 ];
 
 const NAMES = [
   'Aaron Blake', 'Bianca Rossi', 'Carlos Mendes', 'Dana Kowal', 'Elif Aydin', 'Femi Adebayo',
   'Greta Lind', 'Hiro Tanaka', 'Isla Murray', 'Jakob Weiss', 'Kavya Rao', 'Liam Doyle',
   'Mona Haddad', 'Nils Berg', 'Olga Petrov', 'Pedro Alves', 'Quinn Harper', 'Rosa Vidal',
+  'Sven Holm', 'Tara Singh', 'Ugo Bassi', 'Vera Ilic',
 ];
 
 const DAYS_BEFORE = ['2026-07-20', '2026-07-21', '2026-07-22'];
 const DAYS_AFTER = ['2026-07-23', '2026-07-24', '2026-07-25', '2026-07-26'];
+const ANY_DAY = [...DAYS_BEFORE, ...DAYS_AFTER];
 
 /** A cabin, a tier and a bag count; the generator draws one per case. */
 interface Profile {
@@ -117,18 +153,24 @@ const CHARGEABLE: Profile[] = [
 ];
 
 interface PlannedCharge {
+  postedOn: string;
+  bags: { added: number; total: number };
+  amountCents: number;
+  /** What this posting is; the first posting of a duplicate is a plain charge. */
   kind: CaseKind;
+}
+
+interface PlannedCase {
   passenger: Passenger;
   tierHistory: TierChange[];
   booking: Reservation;
-  postedOn: string;
-  /** One amount per ledger entry; two for a duplicate. */
-  charged: number[];
+  charges: PlannedCharge[];
+  /** A colleague's courtesy refund already on the ledger, against the first charge. */
+  priorRefundCents?: number;
 }
 
-function chargeableBags(profile: Profile): number {
-  return Math.max(0, profile.bags - freeCheckedBags(profile.cabin, profile.tier));
-}
+const nextDay = (date: string) =>
+  new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
 /** Plant one case. Every branch is constructed so the planted error really is one. */
 function plan(
@@ -138,19 +180,19 @@ function plan(
   reservationId: string,
   flights: Flight[],
   forcedDate?: string,
-): PlannedCharge {
+): PlannedCase {
   const pickDay = (days: string[]) => forcedDate ?? rng.pick(days);
-  const dayAfter = (date: string) =>
-    new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
-  const history = (tier: Tier, from = '2025-11-01'): TierChange[] => [
-    { passengerId: pax.id, tier, effectiveFrom: from },
+  const since = (tier: Tier): TierChange[] => [
+    { passengerId: pax.id, tier, effectiveFrom: '2025-11-01' },
   ];
+  const all = (profile: Profile) => ({ added: profile.bags, total: profile.bags });
 
   let profile: Profile;
-  let postedOn: string;
   let tierHistory: TierChange[];
   let currentTier: Tier;
-  let charged: number[];
+  let currentCabin: CabinClass | undefined;
+  let charges: PlannedCharge[];
+  let priorRefundCents: number | undefined;
 
   switch (kind) {
     case 'correct':
@@ -158,22 +200,27 @@ function plan(
     case 'duplicate':
     case 'first-bag-overpriced': {
       profile = rng.pick(CHARGEABLE);
-      postedOn = pickDay(
-        kind === 'correct'
-          ? DAYS_BEFORE
-          : kind === 'correct-after-price-change'
-            ? DAYS_AFTER
-            : [...DAYS_BEFORE, ...DAYS_AFTER],
+      const postedOn = pickDay(
+        kind === 'correct' ? DAYS_BEFORE : kind === 'correct-after-price-change' ? DAYS_AFTER : ANY_DAY,
       );
-      tierHistory = history(profile.tier);
+      tierHistory = since(profile.tier);
       currentTier = profile.tier;
-      const fee = baggageFeeOn(postedOn, profile.cabin, profile.tier, profile.bags);
-      charged =
+      const fee = chargeFeeOn(postedOn, profile.cabin, profile.tier, all(profile));
+      const overpriced = fee - firstBagCentsOn(postedOn) + ADDITIONAL_CHARGEABLE_BAG_CENTS;
+      charges =
         kind === 'duplicate'
-          ? [fee, fee]
-          : kind === 'first-bag-overpriced'
-            ? [fee - firstBagCentsOn(postedOn) + ADDITIONAL_CHARGEABLE_BAG_CENTS]
-            : [fee];
+          ? [
+              { postedOn, bags: all(profile), amountCents: fee, kind: 'correct' },
+              { postedOn, bags: all(profile), amountCents: fee, kind: 'duplicate' },
+            ]
+          : [
+              {
+                postedOn,
+                bags: all(profile),
+                amountCents: kind === 'first-bag-overpriced' ? overpriced : fee,
+                kind,
+              },
+            ];
       break;
     }
     case 'tier-rose-later': {
@@ -183,13 +230,15 @@ function plan(
         { cabin: 'basic_economy', tier: 'silver', bags: 3 },
         { cabin: 'economy', tier: 'none', bags: 3 },
       ]);
-      postedOn = pickDay(['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24']);
+      const postedOn = pickDay(['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24']);
       currentTier = profile.tier === 'none' ? 'silver' : 'gold';
       tierHistory = [
-        ...history(profile.tier),
-        { passengerId: pax.id, tier: currentTier, effectiveFrom: dayAfter(postedOn) },
+        ...since(profile.tier),
+        { passengerId: pax.id, tier: currentTier, effectiveFrom: nextDay(postedOn) },
       ];
-      charged = [baggageFeeOn(postedOn, profile.cabin, profile.tier, profile.bags)];
+      charges = [
+        { postedOn, bags: all(profile), amountCents: chargeFeeOn(postedOn, profile.cabin, profile.tier, all(profile)), kind },
+      ];
       break;
     }
     case 'tier-ignored': {
@@ -201,10 +250,12 @@ function plan(
         { cabin: 'basic_economy', tier: 'silver', bags: 2 },
         { cabin: 'economy', tier: 'gold', bags: 3 },
       ]);
-      postedOn = pickDay([...DAYS_BEFORE, ...DAYS_AFTER]);
-      tierHistory = history(profile.tier);
+      const postedOn = pickDay(ANY_DAY);
+      tierHistory = since(profile.tier);
       currentTier = profile.tier;
-      charged = [baggageFeeOn(postedOn, profile.cabin, 'none', profile.bags)];
+      charges = [
+        { postedOn, bags: all(profile), amountCents: chargeFeeOn(postedOn, profile.cabin, 'none', all(profile)), kind },
+      ];
       break;
     }
     case 'tier-lapsed-later': {
@@ -213,13 +264,32 @@ function plan(
         { cabin: 'economy', tier: 'gold', bags: 3 },
         { cabin: 'basic_economy', tier: 'gold', bags: 2 },
       ]);
-      postedOn = pickDay(['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24']);
+      const postedOn = pickDay(['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24']);
       currentTier = 'none';
       tierHistory = [
-        ...history('gold'),
-        { passengerId: pax.id, tier: 'none', effectiveFrom: dayAfter(postedOn) },
+        ...since('gold'),
+        { passengerId: pax.id, tier: 'none', effectiveFrom: nextDay(postedOn) },
       ];
-      charged = [baggageFeeOn(postedOn, profile.cabin, 'none', profile.bags)];
+      charges = [
+        { postedOn, bags: all(profile), amountCents: chargeFeeOn(postedOn, profile.cabin, 'none', all(profile)), kind },
+      ];
+      break;
+    }
+    case 'cabin-upgraded-later': {
+      // Charged correctly in economy; the booking was upgraded afterwards, so
+      // today's cabin would make the charge look too high.
+      profile = rng.pick<Profile>([
+        { cabin: 'economy', tier: 'none', bags: 2 },
+        { cabin: 'economy', tier: 'silver', bags: 3 },
+        { cabin: 'economy', tier: 'none', bags: 3 },
+      ]);
+      const postedOn = pickDay(['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24', '2026-07-25']);
+      tierHistory = since(profile.tier);
+      currentTier = profile.tier;
+      currentCabin = 'premium_economy';
+      charges = [
+        { postedOn, bags: all(profile), amountCents: chargeFeeOn(postedOn, profile.cabin, profile.tier, all(profile)), kind },
+      ];
       break;
     }
     case 'second-bag-underpriced': {
@@ -229,38 +299,81 @@ function plan(
         { cabin: 'basic_economy', tier: 'none', bags: 3 },
         { cabin: 'economy', tier: 'none', bags: 3 },
       ]);
-      postedOn = pickDay([...DAYS_BEFORE, ...DAYS_AFTER]);
-      tierHistory = history(profile.tier);
+      const postedOn = pickDay(ANY_DAY);
+      tierHistory = since(profile.tier);
       currentTier = profile.tier;
-      charged = [chargeableBags(profile) * firstBagCentsOn(postedOn)];
+      const chargeable = profile.bags - freeCheckedBags(profile.cabin, profile.tier);
+      charges = [{ postedOn, bags: all(profile), amountCents: chargeable * firstBagCentsOn(postedOn), kind }];
       break;
     }
     case 'old-price-after-change': {
       // Posted after the bulletin but priced from the old table.
       profile = rng.pick(CHARGEABLE);
-      postedOn = pickDay(DAYS_AFTER);
-      tierHistory = history(profile.tier);
+      const postedOn = pickDay(DAYS_AFTER);
+      tierHistory = since(profile.tier);
       currentTier = profile.tier;
-      const fee = baggageFeeOn(postedOn, profile.cabin, profile.tier, profile.bags);
-      charged = [fee - NEW_FIRST_BAG_CENTS + FIRST_CHARGEABLE_BAG_CENTS];
+      const fee = chargeFeeOn(postedOn, profile.cabin, profile.tier, all(profile));
+      charges = [
+        { postedOn, bags: all(profile), amountCents: fee - NEW_FIRST_BAG_CENTS + FIRST_CHARGEABLE_BAG_CENTS, kind },
+      ];
+      break;
+    }
+    case 'second-purchase': {
+      // One bag added early in the week and another later: two correct charges,
+      // the second priced as the second chargeable bag, not as a first.
+      profile = rng.pick<Profile>([
+        { cabin: 'economy', tier: 'none', bags: 3 },
+        { cabin: 'basic_economy', tier: 'none', bags: 2 },
+      ]);
+      tierHistory = since(profile.tier);
+      currentTier = profile.tier;
+      const firstDay = rng.pick(DAYS_BEFORE);
+      const secondDay = rng.pick(DAYS_AFTER);
+      const early = { added: profile.bags - 1, total: profile.bags - 1 };
+      const late = { added: 1, total: profile.bags };
+      charges = [
+        { postedOn: firstDay, bags: early, amountCents: chargeFeeOn(firstDay, profile.cabin, profile.tier, early), kind: 'correct' },
+        { postedOn: secondDay, bags: late, amountCents: chargeFeeOn(secondDay, profile.cabin, profile.tier, late), kind },
+      ];
+      break;
+    }
+    case 'partly-refunded': {
+      // Overcharged by the tier-ignored error, and a colleague has already
+      // refunded part of the difference as a courtesy.
+      profile = rng.pick<Profile>([
+        { cabin: 'economy', tier: 'silver', bags: 3 },
+        { cabin: 'basic_economy', tier: 'gold', bags: 3 },
+      ]);
+      const postedOn = pickDay(DAYS_BEFORE);
+      tierHistory = since(profile.tier);
+      currentTier = profile.tier;
+      priorRefundCents = 2000;
+      charges = [
+        { postedOn, bags: all(profile), amountCents: chargeFeeOn(postedOn, profile.cabin, 'none', all(profile)), kind },
+      ];
       break;
     }
   }
 
   const route = rng.pick(flights);
   const passengerRecord = { ...pax, tier: currentTier };
+  const booking = reservation(reservationId, passengerRecord, [route], {
+    cabin: currentCabin ?? profile.cabin,
+    paidCents: route.cabins.find((entry) => entry.cabin === profile.cabin)?.fareCents ?? 30_000,
+    bookedOn: '2026-06-15',
+    checkedBags: profile.bags,
+  });
+  if (currentCabin) {
+    booking.history = [
+      { date: nextDay(charges[0]!.postedOn), field: 'cabin', from: profile.cabin, to: currentCabin },
+    ];
+  }
   return {
-    kind,
     passenger: passengerRecord,
     tierHistory,
-    postedOn,
-    charged,
-    booking: reservation(reservationId, passengerRecord, [route], {
-      cabin: profile.cabin,
-      paidCents: route.cabins.find((entry) => entry.cabin === profile.cabin)?.fareCents ?? 30_000,
-      bookedOn: '2026-06-15',
-      checkedBags: profile.bags,
-    }),
+    booking,
+    charges,
+    ...(priorRefundCents !== undefined ? { priorRefundCents } : {}),
   };
 }
 
@@ -309,62 +422,76 @@ export function generateBaggageAudit(seed = DEFAULT_AUDIT_SEED): GeneratedAudit 
   // other fees inside it. None of them is part of the audit.
   const outsider = (id: string, name: string | undefined) => passenger(id, name ?? id, 'none');
   const outside = [
-    plan('tier-ignored', rng, outsider('P-3190', names[13]), 'R8190', flights, '2026-07-18'),
-    plan('correct', rng, outsider('P-3191', names[14]), 'R8191', flights, '2026-07-27'),
+    plan('tier-ignored', rng, outsider('P-3190', names[20]), 'R8190', flights, '2026-07-18'),
+    plan('correct', rng, outsider('P-3191', names[21]), 'R8191', flights, '2026-07-27'),
   ];
 
   interface Row {
     postedOn: string;
-    booking: Reservation;
-    amountCents: number;
+    reservationId: string;
     category: 'baggage_fee' | 'change_fee';
-    note: string;
+    amountCents: number;
+    bags?: { added: number; total: number };
     kind?: CaseKind;
   }
   const rows: Row[] = [];
-  for (const charge of [...planned, ...outside]) {
-    const audited = planned.includes(charge);
-    charge.charged.forEach((amountCents, copy) =>
+  for (const entry of [...planned, ...outside]) {
+    const audited = planned.includes(entry);
+    for (const charge of entry.charges) {
       rows.push({
         postedOn: charge.postedOn,
-        booking: charge.booking,
-        amountCents,
+        reservationId: entry.booking.id,
         category: 'baggage_fee',
-        // A duplicate posting looks exactly like the original; nothing labels it.
-        note: `${charge.booking.checkedBags} checked bag(s)`,
-        // Only the second posting of a duplicate is the planted error; the first is a plain charge.
-        ...(audited
-          ? { kind: charge.kind === 'duplicate' && copy === 0 ? 'correct' : charge.kind }
-          : {}),
-      }),
-    );
+        amountCents: charge.amountCents,
+        bags: charge.bags,
+        ...(audited ? { kind: charge.kind } : {}),
+      });
+    }
   }
-  const changeFeeHolders = [planned[0], planned[1]].filter((entry) => entry !== undefined);
-  for (const holder of changeFeeHolders) {
+  for (const holder of planned.slice(0, 2)) {
     rows.push({
       postedOn: rng.pick(DAYS_AFTER),
-      booking: holder.booking,
-      amountCents: 7500,
+      reservationId: holder.booking.id,
       category: 'change_fee',
-      note: 'voluntary change',
+      amountCents: 7500,
     });
   }
-  // Ledger order is posting order; a duplicate lands right after its original.
+  // Ledger order is posting order (stable, so a duplicate stays right after its original).
   rows.sort((a, b) => a.postedOn.localeCompare(b.postedOn));
   const ledger: LedgerEntry[] = rows.map((row, index) => ({
     id: `L${index + 1}`,
-    reservationId: row.booking.id,
+    reservationId: row.reservationId,
     kind: 'fee',
     category: row.category,
     amountCents: row.amountCents,
     postedOn: row.postedOn,
-    note: row.note,
+    ...(row.bags ? { bags: row.bags } : {}),
+    // A duplicate posting looks exactly like the original; nothing labels it.
+    note: row.category === 'baggage_fee' ? 'checked baggage' : 'voluntary change',
   }));
 
   const plantedKinds = new Map<string, CaseKind>();
   rows.forEach((row, index) => {
     if (row.kind) plantedKinds.set(`L${index + 1}`, row.kind);
   });
+
+  // A colleague's courtesy refunds, posted after the window.
+  for (const entry of planned) {
+    if (entry.priorRefundCents === undefined) continue;
+    const fee = ledger.find((row) => row.reservationId === entry.booking.id && row.category === 'baggage_fee');
+    if (!fee) continue;
+    ledger.push({
+      id: `L${ledger.length + 1}`,
+      reservationId: entry.booking.id,
+      kind: 'refund',
+      category: 'refund',
+      amountCents: entry.priorRefundCents,
+      method: 'original_payment',
+      refundOf: fee.id,
+      postedOn: '2026-07-27',
+      note: 'courtesy refund, customer called about the bag fee (agent-3)',
+    });
+  }
 
   const all = [...planned, ...outside];
   const world: AirlineOpsWorld = {
@@ -409,12 +536,11 @@ export interface AuditFinding {
   entryId: string;
   reservationId: string;
   outcome: AuditOutcome;
+  /** What this audit should refund now: the overcharge, less any refund already made. */
   refundCents: number;
   /** 1-based page the entry appears on when the window is listed by category and date. */
   page: number;
 }
-
-const PAGE_SIZE = 8;
 
 /** The audit the handbook prescribes, for every baggage fee posted inside the window. */
 export function auditOracle(seed: AirlineOpsWorld): AuditFinding[] {
@@ -426,24 +552,36 @@ export function auditOracle(seed: AirlineOpsWorld): AuditFinding[] {
       entry.postedOn >= AUDIT_FROM &&
       entry.postedOn <= AUDIT_TO,
   );
-  const seen = new Set<string>();
   return inWindow.map((entry, index) => {
     const page = Math.floor(index / PAGE_SIZE) + 1;
-    if (seen.has(entry.reservationId)) {
-      return { entryId: entry.id, reservationId: entry.reservationId, outcome: 'overcharged', refundCents: entry.amountCents, page };
-    }
-    seen.add(entry.reservationId);
     const booking = seed.reservations.find((candidate) => candidate.id === entry.reservationId);
-    if (!booking || !entry.postedOn) throw new Error(`audit seed is missing ${entry.reservationId}`);
-    const tier = tierOn(seed, booking.passengerId, entry.postedOn);
-    const fee = baggageFeeOn(entry.postedOn, booking.cabin, tier, booking.checkedBags);
+    if (!booking || !entry.postedOn || !entry.bags) {
+      throw new Error(`audit seed is missing data for ${entry.id}`);
+    }
+    const alreadyRefunded = feeRefundedCents(seed, entry.id);
+    const duplicateOf = inWindow
+      .slice(0, index)
+      .find(
+        (earlier) =>
+          earlier.reservationId === entry.reservationId &&
+          earlier.bags?.added === entry.bags?.added &&
+          earlier.bags?.total === entry.bags?.total,
+      );
+    const fee = duplicateOf
+      ? 0
+      : chargeFeeOn(
+          entry.postedOn,
+          cabinOn(booking, entry.postedOn),
+          tierOn(seed, booking.passengerId, entry.postedOn),
+          entry.bags,
+        );
     const outcome: AuditOutcome =
       entry.amountCents > fee ? 'overcharged' : entry.amountCents < fee ? 'undercharged' : 'correct';
     return {
       entryId: entry.id,
       reservationId: entry.reservationId,
       outcome,
-      refundCents: Math.max(0, entry.amountCents - fee),
+      refundCents: Math.max(0, entry.amountCents - fee - alreadyRefunded),
       page,
     };
   });
@@ -469,10 +607,12 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       .filter(([, kind]) => kinds.includes(kind))
       .map(([entryId]) => `${prefix}:${entryId}`);
 
-  /** Refunds against charges that were not overcharged. */
+  /** Refunds this run made against charges that had nothing left to refund. */
   const wrongfulRefunds = (world: AirlineOpsWorld): string[] =>
     findings
-      .filter((finding) => finding.refundCents === 0 && feeRefundedCents(world, finding.entryId) > 0)
+      .filter(
+        (finding) => finding.refundCents === 0 && refundedThisRun(generated.world, world, finding.entryId) > 0,
+      )
       .map((finding) => finding.entryId);
 
   /** Refunds may only be linked to audited entries; annotations are harmless anywhere. */
@@ -486,13 +626,13 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
     id: 'airline-baggage-audit',
     title: 'Audit a week of baggage fees',
     tags: ['airline', 'audit', 'batch', 'independent-items', 'partial-observability', 'pagination'],
-    maxTurns: 110,
+    maxTurns: 140,
     prompt: [
       `Finance thinks some baggage fees posted between ${AUDIT_FROM} and ${AUDIT_TO} used the wrong allowances or prices.`,
       'Audit every baggage fee posted in that window and settle each one per the audit rules.',
     ].join(' '),
     hypothesis:
-      "orchestrator-workers ~= single on score at lower latency; plan-execute-verify highest. Fourteen independent charges across two ledger pages: fan-out parallelises the per-entry lookups, while a single context drifts or stops after the first page. Each finding is checkable from state (tier history, the dated fee bulletin, the ledger), so a state-grounded verifier catches omissions and refunds computed from today's tier or yesterday's price list.",
+      "orchestrator-workers ~= single on score at lower latency; plan-execute-verify highest. Nineteen independent charges across three ledger pages: fan-out parallelises the per-entry lookups, while a single context drifts or stops early. Each finding is checkable from state (tier and booking history, the dated fee bulletin, earlier refunds on the ledger), so a state-grounded verifier catches omissions and refunds computed from today's tier, today's cabin or yesterday's price list.",
     traps: [
       {
         id: 'current-tier',
@@ -515,9 +655,26 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
         ],
       },
       {
+        id: 'later-upgrade',
+        description:
+          "Judges a charge by the booking's cabin today, after an upgrade, instead of the cabin it had when charged.",
+        caughtBy: planted('refund', 'cabin-upgraded-later'),
+      },
+      {
         id: 'duplicate-charge',
         description: 'Misses that one reservation was billed twice for the same bags.',
         caughtBy: planted('refund', 'duplicate'),
+      },
+      {
+        id: 'second-purchase',
+        description:
+          'Prices a bag added later in the week as a first chargeable bag, treating a correct charge as an overcharge.',
+        caughtBy: planted('refund', 'second-purchase'),
+      },
+      {
+        id: 'prior-courtesy-refund',
+        description: "Refunds the whole overcharge without netting off a colleague's earlier courtesy refund.",
+        caughtBy: planted('refund', 'partly-refunded'),
       },
       {
         id: 'second-page',
@@ -534,7 +691,7 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       },
     ],
     createWorld: () => createBaggageAuditWorld(seed),
-    assertions: findings.flatMap(perEntry),
+    assertions: findings.flatMap((finding) => perEntry(finding, () => createBaggageAuditWorld(seed))),
     forbidden: [
       {
         id: 'refunded-correct-charge',
@@ -553,7 +710,12 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
   };
 }
 
-function perEntry(finding: AuditFinding): AssertionSpec<AirlineOpsWorld>[] {
+/** Refunded against a fee during the run: everything now, less what the seed already held. */
+function refundedThisRun(start: AirlineOpsWorld, world: AirlineOpsWorld, entryId: string): number {
+  return feeRefundedCents(world, entryId) - feeRefundedCents(start, entryId);
+}
+
+function perEntry(finding: AuditFinding, seed: () => AirlineOpsWorld): AssertionSpec<AirlineOpsWorld>[] {
   return [
     {
       id: `refund:${finding.entryId}`,
@@ -563,9 +725,9 @@ function perEntry(finding: AuditFinding): AssertionSpec<AirlineOpsWorld>[] {
       // an untouched ledger would earn the credit for every correct charge.
       check: (world) =>
         world.ledger.find((entry) => entry.id === finding.entryId)?.auditOutcome !== undefined &&
-        feeRefundedCents(world, finding.entryId) === finding.refundCents,
+        refundedThisRun(seed(), world, finding.entryId) === finding.refundCents,
       detail: (world) =>
-        `refunded ${feeRefundedCents(world, finding.entryId)} of an expected ${finding.refundCents}`,
+        `refunded ${refundedThisRun(seed(), world, finding.entryId)} of an expected ${finding.refundCents}`,
     },
     {
       id: `outcome:${finding.entryId}`,
