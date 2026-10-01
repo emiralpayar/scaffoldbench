@@ -412,6 +412,8 @@ ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.
 | … plain percentile | 0.95 | 0.928 |
 | … BCa | 0.95 | 0.893 |
 | 95% interval, 20 tasks: expanded percentile | 0.95 | 0.944 |
+| 95% interval, exponential (skewed) task effects, 9 tasks × 3 | 0.95 | 0.896 |
+| … 70 tasks × 3 | 0.95 | 0.944 |
 | 95% interval, 9 tasks × 2, task means far apart: task bootstrap | 0.95 | 0.950 |
 | … the legacy bootstrap over runs | 0.95 | 0.801 |
 | `better`/`worse` when there is no effect, 20 tasks × 3 | ≤ 0.05 | 0.048 |
@@ -520,10 +522,12 @@ for the site and CLI. They are descriptive:
 - **Repeats are paired by index.** Within a task, repeat r of one arm is paired with repeat r of
   the other. That only decides which cells count as complete; the task-level difference is the
   same either way when every cell is present.
-- **Small-sample bootstrap.** The expanded percentile interval reaches its nominal coverage for the
-  scenarios above, but no bootstrap is exact at 5–10 tasks. Marginal cost intervals can undercover
-  when per-task costs are heavily skewed. Paired cost contrasts use log ratios, which are much
-  closer to symmetric.
+- **Small-sample bootstrap.** The expanded percentile interval is close to nominal for the
+  symmetric scenarios above, but no bootstrap is exact at 5–10 tasks, and skew costs coverage.
+  With exponentially distributed task effects (a few tasks where a scaffold costs far more), the
+  95% interval covered 90% of the time at 9 tasks and 94% at 70. Paired cost contrasts use log
+  ratios, which are usually much closer to symmetric than the costs themselves; marginal cost
+  intervals have no such help.
 - **Equivalence on few, lumpy differences.** The sign-flip halves of the TOST assume symmetric
   differences. The informative-task rule and the binary floor cover the failure modes the
   simulations found, and the measured rates are in the table. They are guards, not a proof for

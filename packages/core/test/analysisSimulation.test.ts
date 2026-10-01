@@ -180,6 +180,30 @@ describe('interval coverage', () => {
     expect(report('coverage, 20 tasks, expanded percentile', covered / trials)).toBeGreaterThan(0.91);
   });
 
+  it('undercovers a little when task effects are strongly skewed', () => {
+    // Paired log cost ratios whose task effects are exponential (skewness 2):
+    // a few tasks where the scaffold costs far more. No bootstrap is exact
+    // here; this pins how far short the interval falls, for the limitations.
+    const rng = makeRng(250);
+    const normal = gaussian(rng);
+    const trials = trialsOr(300);
+    for (const tasks of [9, 70]) {
+      let covered = 0;
+      for (let s = 0; s < trials; s++) {
+        const truth = 0.2;
+        const diffs = Array.from({ length: tasks }, () => {
+          const effect = truth - 0.2 - 0.2 * Math.log(1 - rng());
+          let d = 0;
+          for (let r = 0; r < 3; r++) d += effect + 0.05 * normal();
+          return d / 3;
+        });
+        const ci = expandedPercentileInterval(bootstrapMeans(diffs, ITERATIONS, s + 1), tasks, 0.95)!;
+        if (ci.low <= truth && truth <= ci.high) covered += 1;
+      }
+      expect(report(`coverage, skewed (exponential) task effects, ${tasks} tasks x 3`, covered / trials)).toBeGreaterThan(0.85);
+    }
+  });
+
   it('accounts for clustering: iid intervals over runs undercover when tasks differ', () => {
     // 9 tasks x 2 repeats, task means spread far more than repeats do (ICC ~ 0.9).
     const rng = makeRng(303);
