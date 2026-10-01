@@ -182,7 +182,8 @@ export function paretoFrontier<T>(
 // Implemented here rather than pulled from a package: the site and the CLI
 // both import @arena/core, and a few special functions are not worth a
 // dependency. Accuracy is ~1e-14 relative in the range the analysis uses,
-// which the tests pin against published values.
+// which the tests pin against published values; only the normal quantile
+// beyond about 37.5 standard deviations falls back to ~1e-9.
 // ---------------------------------------------------------------------------
 
 const EPS = 1e-15;
