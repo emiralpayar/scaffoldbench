@@ -696,6 +696,8 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
         ...OPEN_RMAS.map((id) => within('returns', id)),
         ...RMA_CUSTOMERS.map((id) => within('customers', id)),
         addedTo('refunds', (entry) => RMA_ORDERS.includes(String(entry.orderId))),
+        // Telling a customer about their own return is part of the job.
+        addedTo('notices', (entry) => RMA_ORDERS.includes(String(entry.orderId))),
         addedTo('investigations', (entry) => OPEN_RMAS.includes(String(entry.rmaId))),
         addedTo('inventoryMovements'),
         // The late parcel's receipt moves from the schedule into the receipts.

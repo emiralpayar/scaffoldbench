@@ -539,6 +539,12 @@ export const airlineCancellationsSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
         seatCounts,
         // The late request leaves the schedule and joins the queue.
         within('arrivals'),
+        // Telling a customer about their own cancellation is part of the job.
+        addedTo('notifications', (entry) =>
+          RESERVATIONS.some(
+            (id) => reservationOrThrow(createCancellationWorld(), id).passengerId === entry.passengerId,
+          ),
+        ),
       ),
       label: 'Changed a booking or request outside the cancellations',
     }),

@@ -61,9 +61,11 @@ export interface Segment {
 /** One dated change to a reservation, as the booking history records it. */
 export interface ReservationChange {
   date: string;
-  field: 'cabin';
+  field: 'cabin' | 'flight';
   from: string;
   to: string;
+  /** Why the change was made, as the agent who made it recorded it. */
+  note?: string;
 }
 
 export interface Passenger {

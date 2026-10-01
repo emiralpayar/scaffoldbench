@@ -27,8 +27,9 @@ import {
 } from './common';
 
 /**
- * airline-waiver-desk: eight voluntary change requests, settled under dated
- * bulletins that exist only in the bulletin tool.
+ * airline-waiver-desk: ten voluntary change requests, one of them arriving
+ * mid-run, settled under dated bulletins that exist only in the bulletin
+ * tool.
  *
  * The handbook says bulletins override it within their dates and scope, and
  * nothing more. What each bulletin says is only available by reading it: a
@@ -39,7 +40,9 @@ import {
  * tool prints; and a same-day change policy that competes with the waiver.
  * When two bulletins cover a change the customer gets the cheaper outcome.
  * Customers name waivers that do not cover them, and some who are covered
- * name none. One request changes only the second leg of a connection.
+ * name none. One request changes only the second leg of a connection, and one
+ * booking has already had the single move the waiver allows, which only its
+ * history shows.
  */
 
 const TODAY = '2026-07-28';
@@ -159,7 +162,13 @@ const REQUESTS: ChangeRequest[] = [
   { requestId: 'Q-307', reservationId: 'R5207', newFlightId: 'AA218', segmentIndex: 0 },
   { requestId: 'Q-308', reservationId: 'R5208', newFlightId: 'AA662', segmentIndex: 0 },
   { requestId: 'Q-309', reservationId: 'R5209', newFlightId: 'AA1406', segmentIndex: 1 },
+  { requestId: 'Q-310', reservationId: 'R5210', newFlightId: 'AA216', segmentIndex: 0 },
+  // Arrives in the queue once four requests have been resolved.
+  { requestId: 'Q-311', reservationId: 'R5211', newFlightId: 'AA216', segmentIndex: 0 },
 ];
+
+/** Resolving this many requests brings the late change request into the queue. */
+const LATE_ARRIVAL_AFTER = 4;
 
 export function createWaiverWorld(): AirlineOpsWorld {
   const flights: Flight[] = [
@@ -210,6 +219,8 @@ export function createWaiverWorld(): AirlineOpsWorld {
     passenger('P-2207', 'Oscar Lund', 'platinum'),
     passenger('P-2208', 'Petra Novak', 'none'),
     passenger('P-2209', 'Quinn Adler', 'none'),
+    passenger('P-2210', 'Ravi Shah', 'none'),
+    passenger('P-2211', 'Sara Holt', 'none'),
   ];
   const p = (id: string) => pax.find((entry) => entry.id === id)!;
 
@@ -302,6 +313,17 @@ export function createWaiverWorld(): AirlineOpsWorld {
       status: 'open',
     },
     {
+      id: 'Q-310',
+      receivedAt: '2026-07-27T18:40',
+      passengerId: 'P-2210',
+      reservationId: 'R5210',
+      kind: 'change',
+      subject: 'Chicago waiver - new date',
+      message:
+        'Please move me from AA210 on 3 August to AA216 on the 8th, under the Chicago weather waiver. Ravi',
+      status: 'open',
+    },
+    {
       id: 'Q-306',
       receivedAt: '2026-07-27T17:20',
       passengerId: 'P-2206',
@@ -370,12 +392,56 @@ export function createWaiverWorld(): AirlineOpsWorld {
             { flightId: 'AA1402', origin: 'ORD', destination: 'BOS', date: '2026-08-03', fareCents: 18_000 },
           ],
         },
+        {
+          ...reservation('R5210', p('P-2210'), [byId('AA210')], {
+            cabin: 'economy',
+            paidCents: 31_000,
+            bookedOn: '2026-07-12',
+          }),
+          // A colleague already used this booking's one waiver move.
+          history: [
+            {
+              date: '2026-07-26',
+              field: 'flight',
+              from: 'AA214',
+              to: 'AA210',
+              note: `moved free of charge under ${CHICAGO_WAIVER.id}`,
+            },
+          ],
+        },
+        reservation('R5211', p('P-2211'), [byId('AA214')], {
+          cabin: 'economy',
+          paidCents: 33_000,
+          bookedOn: '2026-07-15',
+        }),
       ],
       ledger: [],
     }),
     bulletins: structuredClone(BULLETINS),
     requests,
+    arrivals: [
+      {
+        afterResolved: LATE_ARRIVAL_AFTER,
+        request: {
+          id: 'Q-311',
+          receivedAt: '2026-07-28T08:55',
+          passengerId: 'P-2211',
+          reservationId: 'R5211',
+          kind: 'change',
+          subject: 'Chicago flight on the 4th',
+          message: 'Hello, please move me from AA214 on 4 August to AA216 on the 8th. Thank you, Sara',
+          status: 'open',
+        },
+      },
+    ],
   };
+}
+
+/** True when the booking has already had its one move under the Chicago waiver. */
+function usedChicagoWaiver(booking: Reservation): boolean {
+  return (booking.history ?? []).some(
+    (change) => change.field === 'flight' && (change.note ?? '').includes(CHICAGO_WAIVER.id),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +497,8 @@ export function expectedFees(seed: AirlineOpsWorld, request: ChangeRequest): Exp
     booking.bookedOn <= CHICAGO_WAIVER.ticketedBy &&
     segment.date >= CHICAGO_WAIVER.travelFrom &&
     segment.date <= travelTo &&
-    target.date <= CHICAGO_WAIVER.moveBy
+    target.date <= CHICAGO_WAIVER.moveBy &&
+    !usedChicagoWaiver(booking)
   ) {
     outcomes.push({
       change_fee: 0,
@@ -455,6 +522,7 @@ export function expectedFees(seed: AirlineOpsWorld, request: ChangeRequest): Exp
 // ---------------------------------------------------------------------------
 
 const RESERVATIONS = REQUESTS.map((request) => request.reservationId);
+const REQUESTERS = RESERVATIONS.map((id) => reservationOrThrow(createWaiverWorld(), id).passengerId);
 
 /** Flight ids the reservation should hold once the request is done. */
 function expectedSegments(request: ChangeRequest): string[] {
@@ -527,13 +595,13 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
   id: 'airline-waiver-desk',
   title: 'Settle change requests under dated bulletins',
   tags: ['airline', 'bulletins', 'policy-override', 'rules-via-tools', 'batch'],
-  maxTurns: 100,
+  maxTurns: 120,
   prompt: [
     'The service queue has open flight-change requests from yesterday.',
     'Work all of them: make each change the customer asked for and settle it correctly.',
   ].join(' '),
   hypothesis:
-    "plan-execute-verify > single > plan-execute. Every settlement turns on dated bulletins reachable only through tools, two of which can cover the same move, and customers cite waivers that do not cover them. A state-grounded verifier that re-reads the bulletins against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The eight requests are independent, so orchestrator-workers should match single on score at lower latency.",
+    "plan-execute-verify > single > plan-execute. Every settlement turns on dated bulletins reachable only through tools, two of which can cover the same move, and customers cite waivers that do not cover them; one booking has already used its single waiver move, which only its history shows. A state-grounded verifier that re-reads the bulletins and the booking against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The requests are independent, so orchestrator-workers should match single on score at lower latency, and one arrives mid-run, which only an agent that re-reads the queue will see.",
   traps: [
     {
       id: 'covered-but-silent',
@@ -593,6 +661,17 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
       caughtBy: ['moved:R5209'],
     },
     {
+      id: 'waiver-used-once',
+      description:
+        "Waives the fees for a booking that already had its one move under the Chicago waiver, which only the reservation's history shows.",
+      caughtBy: ['settled:R5210'],
+    },
+    {
+      id: 'late-request',
+      description: 'Lists the queue once and never sees the change request that arrives mid-run.',
+      caughtBy: ['resolved:Q-311', 'moved:R5211'],
+    },
+    {
       id: 'scope-creep',
       description: 'Also works the cancellation request, which is not a change request.',
       caughtBy: ['out-of-scope-change'],
@@ -609,6 +688,10 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
         ...REQUESTS.map((request) => within('requests', request.requestId)),
         addedTo('ledger', (entry) => RESERVATIONS.includes(String(entry.reservationId))),
         seatCounts,
+        // The late request leaves the schedule and joins the queue.
+        within('arrivals'),
+        // Telling a requester about their own change is part of the job.
+        addedTo('notifications', (entry) => REQUESTERS.includes(String(entry.passengerId))),
       ),
       label: 'Changed a booking or request outside the change requests',
     }),

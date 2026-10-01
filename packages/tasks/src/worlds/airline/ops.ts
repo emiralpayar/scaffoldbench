@@ -281,7 +281,10 @@ export function createAirlineOpsTools(world: AirlineOpsWorld): JournaledToolSpec
           `History for ${reservation.id} (booked ${reservation.bookedOn})`,
           ...(history.length === 0
             ? ['  no changes since booking']
-            : history.map((change) => `  ${change.date}: ${change.field} ${change.from} -> ${change.to}`)),
+            : history.map(
+                (change) =>
+                  `  ${change.date}: ${change.field} ${change.from} -> ${change.to}${change.note ? ` (${change.note})` : ''}`,
+              )),
         ].join('\n');
       },
     },
