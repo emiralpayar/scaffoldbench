@@ -17,7 +17,16 @@ const M = { top: 46, right: 14, bottom: 46, left: 50 };
  * one wholly above it means the structure bought real score, at the cost the
  * x axis states. One panel per model on shared axes.
  */
-export function PayoffSmallMultiples({ data, method }: { data: PayoffData; method: string }) {
+export function PayoffSmallMultiples({
+  data,
+  method,
+  single = false,
+}: {
+  data: PayoffData;
+  method: string;
+  /** One model's panel on its own, at full width rather than in a grid. */
+  single?: boolean;
+}) {
   if (data.panels.length === 0) return null;
   const domains = payoffDomains(data);
   const x: [number, number] = [domains.x[0] / 1.18, domains.x[1] * 1.18];
@@ -39,7 +48,7 @@ export function PayoffSmallMultiples({ data, method }: { data: PayoffData; metho
         ))}
       </div>
 
-      <div className="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-3">
+      <div className={single ? 'grid' : 'grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-3'}>
         {data.panels.map((panel) => (
           <PayoffPanelChart
             key={panel.model}

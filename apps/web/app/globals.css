@@ -465,7 +465,13 @@ body {
     top: 0.75rem;
   }
 
+  /*
+   * Positioned, so absolutely positioned descendants (screen-reader text in a
+   * table cell, chart marks) are clipped with the rest of the content instead
+   * of escaping to the page and widening it on a phone.
+   */
   .scroll-x {
+    position: relative;
     overflow-x: auto;
     overscroll-behavior-x: contain;
   }

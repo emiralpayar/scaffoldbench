@@ -10,8 +10,9 @@
  * together — so the site can be built against real shapes. When core exports
  * it, this file should become a thin adapter from its output to `SiteAnalysis`,
  * and `method` should be taken from core's documentation of what it did.
- * What this version does not do yet, and says so in `method`: adjust the
- * verdicts for multiple comparisons.
+ * Each family of verdicts is adjusted for multiplicity with Bonferroni,
+ * which is more conservative than the Holm step-down core specifies: a
+ * verdict this version draws, core's would draw too.
  *
  * Pure: no filesystem, safe anywhere.
  */
@@ -50,7 +51,10 @@ export interface BaselineContrast {
   /** Matched (task, repeat) pairs the contrast is computed over. */
   pairs: number;
   tasks: number;
-  /** Mean paired score difference, architecture minus baseline. */
+  /**
+   * Mean paired score difference, architecture minus baseline. The interval
+   * is widened for the number of comparisons with the baseline on the model.
+   */
   scoreDelta: Estimate;
   /** Architecture mean cost divided by the baseline's, over the same pairs. */
   costRatio: Estimate;
@@ -190,17 +194,23 @@ export function analyzeForSite(
     );
 
     const baseline = scoped.filter((record) => record.strategyId === baselineId);
-    const contrasts = strategies
+    const candidates = strategies
       .filter((strategyId) => strategyId !== baselineId)
-      .map((strategyId) => {
-        const paired = pairRuns(
+      .map((strategyId) => ({
+        strategyId,
+        paired: pairRuns(
           scoped.filter((record) => record.strategyId === strategyId),
           baseline,
-        );
-        if (paired.pairs === 0) return null;
+        ),
+      }))
+      .filter(({ paired }) => paired.pairs > 0);
+    // One family: every comparison with the control on this model.
+    const familyConfidence = adjusted(confidence, candidates.length);
+    const contrasts = candidates
+      .map(({ strategyId, paired }) => {
         const stats = pairedStatistics(paired, {
-          iterations,
-          confidence,
+          iterations: drawsFor(iterations, familyConfidence),
+          confidence: familyConfidence,
           seedKey: `${model}/${strategyId}-vs-${baselineId}`,
         });
         return {
@@ -236,7 +246,7 @@ export function analyzeForSite(
     };
   });
 
-  const scale: ScaleContrast[] = [];
+  const scaleCandidates: { strategyId: string; model: string; nextModel: string; paired: PairedRuns }[] = [];
   for (let i = 0; i + 1 < models.length; i++) {
     const model = models[i] as string;
     const nextModel = models[i + 1] as string;
@@ -252,24 +262,28 @@ export function analyzeForSite(
         rankable.filter((record) => record.model === model && record.strategyId === strategyId),
         nextBaseline,
       );
-      if (paired.pairs === 0) continue;
-      const stats = pairedStatistics(paired, {
-        iterations,
-        confidence,
-        seedKey: `${model}/${strategyId}-vs-${nextModel}/${baselineId}`,
-      });
-      scale.push({
-        strategyId,
-        model,
-        nextModel,
-        pairs: paired.pairs,
-        tasks: paired.tasks.length,
-        scoreDelta: stats.scoreDelta,
-        costRatio: stats.costRatio,
-        verdict: verdictFor(stats.scoreDelta, margin),
-      });
+      if (paired.pairs > 0) scaleCandidates.push({ strategyId, model, nextModel, paired });
     }
   }
+  // One family: every scaffold-or-scale contrast in the run set.
+  const scaleConfidence = adjusted(confidence, scaleCandidates.length);
+  const scale: ScaleContrast[] = scaleCandidates.map(({ strategyId, model, nextModel, paired }) => {
+    const stats = pairedStatistics(paired, {
+      iterations: drawsFor(iterations, scaleConfidence),
+      confidence: scaleConfidence,
+      seedKey: `${model}/${strategyId}-vs-${nextModel}/${baselineId}`,
+    });
+    return {
+      strategyId,
+      model,
+      nextModel,
+      pairs: paired.pairs,
+      tasks: paired.tasks.length,
+      scoreDelta: stats.scoreDelta,
+      costRatio: stats.costRatio,
+      verdict: verdictFor(stats.scoreDelta, margin),
+    };
+  });
 
   const pct = Math.round(confidence * 100);
   return {
@@ -277,12 +291,12 @@ export function analyzeForSite(
     confidence,
     margin,
     method:
-      `${pct}% percentile intervals from a ${iterations.toLocaleString('en-US')}-draw bootstrap that resamples tasks, ` +
-      `keeping each task's repeats together. Differences are paired by task and repeat; ` +
-      `"equivalent" means the whole interval sits within ±${margin.toFixed(2)}. ` +
-      'Verdicts against single are not adjusted for multiple comparisons; ranks are, because an ' +
-      'architecture ranks below another only when their paired interval, widened for the number of ' +
-      'pairs (Bonferroni), excludes zero.',
+      `Each architecture's own numbers carry ${pct}% percentile intervals from a bootstrap of at least ` +
+      `${iterations.toLocaleString('en-US')} draws that resamples tasks, keeping each task's repeats together. ` +
+      'Differences are paired by task and repeat, and each family of verdicts is adjusted for the comparisons ' +
+      'it makes at once (Bonferroni): the comparisons with single on a model, the pairs behind its ranks, and ' +
+      `the scaffold-or-scale contrasts each keep a ${100 - pct}% chance of any false call, so their intervals ` +
+      `are wider than ${pct}%. "Equivalent" means the whole interval sits within ±${margin.toFixed(2)}.`,
     models: perModel,
     scale,
     health: summarizeHealth(records),
@@ -310,13 +324,29 @@ export function verdictFor(delta: Estimate, margin: number): PairedVerdict {
 // Pairs and ranks
 // ---------------------------------------------------------------------------
 
+/**
+ * The confidence each of `m` intervals needs for the whole family to hold
+ * at `confidence` (Bonferroni).
+ */
+export function adjusted(confidence: number, m: number): number {
+  return 1 - (1 - confidence) / Math.max(1, m);
+}
+
+/**
+ * Enough draws that a widened interval's tails rest on at least 20 draws
+ * each, rather than on two or three.
+ */
+function drawsFor(iterations: number, confidence: number): number {
+  return Math.max(iterations, Math.ceil(20 / ((1 - confidence) / 2)));
+}
+
 function comparePairs(
   records: readonly RunRecord[],
   strategies: readonly string[],
   config: BootstrapConfig,
 ): PairContrast[] {
   const pairs = (strategies.length * (strategies.length - 1)) / 2;
-  const pairConfidence = 1 - (1 - config.confidence) / Math.max(1, pairs);
+  const pairConfidence = adjusted(config.confidence, pairs);
   const out: PairContrast[] = [];
   for (let i = 0; i < strategies.length; i++) {
     for (let j = i + 1; j < strategies.length; j++) {
@@ -329,7 +359,7 @@ function comparePairs(
       if (paired.pairs === 0) continue;
       const deltas = paired.tasks.map((task) => mean(task.score.map(([x, y]) => x - y)));
       const scoreDelta = clusterMean(deltas, {
-        iterations: config.iterations,
+        iterations: drawsFor(config.iterations, pairConfidence),
         confidence: pairConfidence,
         seedKey: `${config.seedKey}/${a}-vs-${b}/rank`,
       });

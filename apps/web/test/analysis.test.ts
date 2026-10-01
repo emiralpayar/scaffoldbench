@@ -180,7 +180,7 @@ describe('analyzeForSite', () => {
 
   it('describes its own method, including what it does not adjust for', () => {
     expect(analyzeForSite([]).method).toMatch(/resamples tasks/);
-    expect(analyzeForSite([]).method).toMatch(/not adjusted for multiple comparisons; ranks are/);
+    expect(analyzeForSite([]).method).toMatch(/adjusted for the comparisons it makes at once \(Bonferroni\)/);
   });
 });
 
