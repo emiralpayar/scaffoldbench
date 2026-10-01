@@ -8,7 +8,7 @@ import {
   compareArchitectures,
 } from '../lib/architectures';
 import { formatDelta, formatMultiple, joinList } from '../lib/format';
-import { GLYPHS } from '../lib/glyphs';
+import { GLYPHS, glyphFor } from '../lib/glyphs';
 import { MODELS, compareModels, modelShortName } from '../lib/models';
 import { isRankable, normalizeRecord, runSetModels } from '../lib/records';
 import { run } from './fixtures';
@@ -18,6 +18,7 @@ describe('architectures', () => {
     expect(canonicalArchitectureId('debate-select')).toBe('propose-select');
     expect(architectureName('debate-select')).toBe('Propose-select');
     expect(normalizeRecord(run({ strategyId: 'debate-select' })).strategyId).toBe('propose-select');
+    expect(glyphFor('debate-select')).toBe(GLYPHS['propose-select']);
   });
 
   it('keeps the recorded run id when it renames the architecture', () => {

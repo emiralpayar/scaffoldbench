@@ -7,6 +7,7 @@
  * diagrams of Act 1, where individual nodes are marked dead by id.
  */
 
+import { canonicalArchitectureId } from './architectures';
 import type { ArchitectureId } from './architectures';
 
 export const GLYPH_WIDTH = 40;
@@ -121,5 +122,5 @@ export const GLYPHS: Record<ArchitectureId, GlyphGeometry> = {
 };
 
 export function glyphFor(strategyId: string): GlyphGeometry | undefined {
-  return (GLYPHS as Record<string, GlyphGeometry | undefined>)[strategyId];
+  return (GLYPHS as Record<string, GlyphGeometry | undefined>)[canonicalArchitectureId(strategyId)];
 }
