@@ -19,6 +19,7 @@ import type {
   RunSetManifest as CoreRunSetManifest,
   StrategyInfo,
   TaskInfo as CoreTaskInfo,
+  TraceEvent as CoreTraceEvent,
 } from '@arena/core';
 
 import { canonicalArchitectureId } from './architectures';
@@ -36,6 +37,15 @@ export interface IntegrityCheck {
 export interface Integrity {
   ok: boolean;
   checks: IntegrityCheck[];
+}
+
+/**
+ * A trace event as the v1 runner writes it. `callId` ties an event to the
+ * model call that wrote it, which is what separates concurrent calls; traces
+ * from before it existed are read by phase instead (`lib/timeline.ts`).
+ */
+export interface TraceEvent extends CoreTraceEvent {
+  callId?: string;
 }
 
 export interface PhaseRecord extends CorePhaseRecord {

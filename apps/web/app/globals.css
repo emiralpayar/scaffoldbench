@@ -629,3 +629,121 @@ details > summary::before {
 details[open] > summary::before {
   transform: rotate(90deg);
 }
+
+/* --- agent Markdown (components/Markdown.tsx) ----------------------------- */
+
+/*
+ * An agent's reply is data, so it reads in the UI face at a compact size,
+ * not in the editorial serif: the serif is the site speaking, sans is the
+ * model speaking.
+ */
+.md {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.md > * + * {
+  margin-top: 0.6em;
+}
+
+.md strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.md .md-h {
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.md .md-h1,
+.md .md-h2 {
+  font-size: 1.0625em;
+  margin-top: 1.1em;
+}
+
+.md .md-h3,
+.md .md-h4 {
+  font-size: 1em;
+  margin-top: 0.9em;
+}
+
+.md > .md-h:first-child {
+  margin-top: 0;
+}
+
+.md ul,
+.md ol {
+  padding-left: 1.35em;
+}
+
+.md ul {
+  list-style: disc;
+}
+
+.md ol {
+  list-style: decimal;
+}
+
+.md li + li {
+  margin-top: 0.2em;
+}
+
+.md li::marker {
+  color: var(--muted);
+}
+
+.md li > ul,
+.md li > ol,
+.md li > p {
+  margin-top: 0.25em;
+}
+
+.md blockquote {
+  border-left: 2px solid var(--rule-strong);
+  padding-left: 0.85em;
+  color: var(--ink-2);
+}
+
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.md .md-pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  padding: 0.65em 0.85em;
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.md .md-table table {
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.md .md-table th,
+.md .md-table td {
+  border: 1px solid var(--rule);
+  padding: 0.3em 0.6em;
+  text-align: left;
+  vertical-align: top;
+}
+
+.md .md-table th {
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--sunken);
+}
+
+.md del {
+  color: var(--muted);
+}
