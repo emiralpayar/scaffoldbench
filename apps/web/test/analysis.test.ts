@@ -180,7 +180,7 @@ describe('analyzeForSite', () => {
 
   it('describes its own method, including what it does not adjust for', () => {
     expect(analyzeForSite([]).method).toMatch(/resamples tasks/);
-    expect(analyzeForSite([]).method).toMatch(/not yet adjusted for multiple comparisons/);
+    expect(analyzeForSite([]).method).toMatch(/not adjusted for multiple comparisons; ranks are/);
   });
 });
 
@@ -189,5 +189,51 @@ describe('summarizeHealth', () => {
     const health = summarizeHealth([run({}), run({ integrity: { ok: true, checks: [] } })]);
     expect(health.withoutIntegrity).toBe(1);
     expect(health.rankable).toBe(2);
+  });
+});
+
+describe('ranks', () => {
+  it('shares a rank between architectures the data cannot separate', () => {
+    // plan-execute is clearly above single on every task; gated-execute sits
+    // between them, within noise of both.
+    const records = grid([
+      { strategyId: 'single', cost: 0.1, score: (t, r) => 0.5 + ((t * 7 + r) % 3) * 0.01 },
+      { strategyId: 'plan-execute', cost: 0.2, score: (t, r) => 0.8 + ((t * 5 + r) % 3) * 0.01 },
+      { strategyId: 'gated-execute', cost: 0.2, score: (t, r) => (t % 2 === 0 ? 0.95 : 0.35) + r * 0.001 },
+    ]);
+    const [model] = analyzeForSite(records).models;
+    const rank = (id: string) => model?.ranks.find((entry) => entry.strategyId === id);
+
+    expect(rank('plan-execute')).toMatchObject({ rank: 1, tied: true, above: ['single'], below: [] });
+    expect(rank('gated-execute')).toMatchObject({ rank: 1, tied: true, above: [], below: [] });
+    expect(rank('single')).toMatchObject({ rank: 2, tied: false, below: ['plan-execute'] });
+    // Within a shared rank, the higher mean is listed first.
+    expect(model?.ranks.map((entry) => entry.strategyId)).toEqual(['plan-execute', 'gated-execute', 'single']);
+  });
+
+  it('compares every pair once, on matched tasks and repeats', () => {
+    const records = grid(
+      ['single', 'plan-execute', 'propose-select'].map((strategyId) => ({ strategyId, cost: 0.1, score: () => 1 })),
+    );
+    const [model] = analyzeForSite(records).models;
+    expect(model?.pairwise.map((pair) => `${pair.a}/${pair.b}`)).toEqual([
+      'single/plan-execute',
+      'single/propose-select',
+      'plan-execute/propose-select',
+    ]);
+    expect(model?.pairwise.every((pair) => pair.winner === 'tie' && pair.pairs === 18)).toBe(true);
+    expect(model?.ranks.every((entry) => entry.rank === 1 && entry.tied)).toBe(true);
+  });
+
+  it('counts health per model as well as for the whole set', () => {
+    const records = [
+      ...grid([{ strategyId: 'single', cost: 0.1, score: () => 1 }]),
+      run({ runId: 'lost', model: 'claude-sonnet-5-5', failureMode: 'api_error' }),
+      run({ runId: 'opus', model: 'claude-opus-5-5', integrity: { ok: false, checks: [{ id: 'x', ok: false }] } }),
+    ];
+    const analysis = analyzeForSite(records);
+    const sonnet = analysis.models.find((m) => m.model === 'claude-sonnet-5-5');
+    expect(sonnet?.health).toMatchObject({ total: 19, rankable: 18, apiErrors: 1, integrityFailed: 0 });
+    expect(analysis.health).toMatchObject({ total: 20, apiErrors: 1, integrityFailed: 1 });
   });
 });

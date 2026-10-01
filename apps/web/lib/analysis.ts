@@ -58,13 +58,51 @@ export interface BaselineContrast {
   verdict: PairedVerdict;
 }
 
+/**
+ * Two architectures on the same model, paired by task and repeat. The
+ * interval is widened for the number of pairs compared on the model
+ * (Bonferroni), because the ranking reads all of them at once.
+ */
+export interface PairContrast {
+  a: string;
+  b: string;
+  pairs: number;
+  tasks: number;
+  /** Mean paired score difference, a minus b. */
+  scoreDelta: Estimate;
+  /** Which side scores reliably higher, or `tie` when the interval spans zero. */
+  winner: 'a' | 'b' | 'tie';
+}
+
+/**
+ * A rank that shows ties as ties: one plus the number of architectures that
+ * score reliably above this one. Two architectures share a rank when neither
+ * is reliably above anything the other is not; the leaderboard draws that as
+ * "=1", never as an order the data does not support.
+ */
+export interface RankEntry {
+  strategyId: string;
+  rank: number;
+  /** Another architecture holds the same rank. */
+  tied: boolean;
+  /** Architectures that score reliably above this one. */
+  below: string[];
+  /** Architectures this one scores reliably above. */
+  above: string[];
+}
+
 export interface ModelAnalysis {
   model: string;
   architectures: ArchitectureSummary[];
   /** One per non-baseline architecture that shares tasks with the baseline. */
   contrasts: BaselineContrast[];
+  /** Every pair of architectures that share tasks. */
+  pairwise: PairContrast[];
+  /** In rank order; within a rank, by mean score. */
+  ranks: RankEntry[];
   /** Non-dominated on (mean score, mean cost). Means only; see the intervals. */
   frontier: string[];
+  health: RunSetHealth;
 }
 
 /**
@@ -184,7 +222,18 @@ export function analyzeForSite(
       (a) => a.costUsd.mean,
     ).map((a) => a.strategyId);
 
-    return { model, architectures, contrasts, frontier };
+    const pairwise = comparePairs(scoped, strategies, { iterations, confidence, seedKey: model });
+    const ranks = rankArchitectures(architectures, pairwise);
+
+    return {
+      model,
+      architectures,
+      contrasts,
+      pairwise,
+      ranks,
+      frontier,
+      health: summarizeHealth(records.filter((record) => record.model === model)),
+    };
   });
 
   const scale: ScaleContrast[] = [];
@@ -231,7 +280,9 @@ export function analyzeForSite(
       `${pct}% percentile intervals from a ${iterations.toLocaleString('en-US')}-draw bootstrap that resamples tasks, ` +
       `keeping each task's repeats together. Differences are paired by task and repeat; ` +
       `"equivalent" means the whole interval sits within ±${margin.toFixed(2)}. ` +
-      'Verdicts are not yet adjusted for multiple comparisons.',
+      'Verdicts against single are not adjusted for multiple comparisons; ranks are, because an ' +
+      'architecture ranks below another only when their paired interval, widened for the number of ' +
+      'pairs (Bonferroni), excludes zero.',
     models: perModel,
     scale,
     health: summarizeHealth(records),
@@ -253,6 +304,80 @@ export function verdictFor(delta: Estimate, margin: number): PairedVerdict {
   if (delta.low > 0) return 'better';
   if (delta.high < 0) return 'worse';
   return 'inconclusive';
+}
+
+// ---------------------------------------------------------------------------
+// Pairs and ranks
+// ---------------------------------------------------------------------------
+
+function comparePairs(
+  records: readonly RunRecord[],
+  strategies: readonly string[],
+  config: BootstrapConfig,
+): PairContrast[] {
+  const pairs = (strategies.length * (strategies.length - 1)) / 2;
+  const pairConfidence = 1 - (1 - config.confidence) / Math.max(1, pairs);
+  const out: PairContrast[] = [];
+  for (let i = 0; i < strategies.length; i++) {
+    for (let j = i + 1; j < strategies.length; j++) {
+      const a = strategies[i] as string;
+      const b = strategies[j] as string;
+      const paired = pairRuns(
+        records.filter((record) => record.strategyId === a),
+        records.filter((record) => record.strategyId === b),
+      );
+      if (paired.pairs === 0) continue;
+      const deltas = paired.tasks.map((task) => mean(task.score.map(([x, y]) => x - y)));
+      const scoreDelta = clusterMean(deltas, {
+        iterations: config.iterations,
+        confidence: pairConfidence,
+        seedKey: `${config.seedKey}/${a}-vs-${b}/rank`,
+      });
+      out.push({
+        a,
+        b,
+        pairs: paired.pairs,
+        tasks: paired.tasks.length,
+        scoreDelta,
+        winner: scoreDelta.low > 0 ? 'a' : scoreDelta.high < 0 ? 'b' : 'tie',
+      });
+    }
+  }
+  return out;
+}
+
+/** Rank = 1 + the number of architectures reliably above; ties share a rank. */
+export function rankArchitectures(
+  architectures: readonly Pick<ArchitectureSummary, 'strategyId' | 'score'>[],
+  pairwise: readonly PairContrast[],
+): RankEntry[] {
+  const below = new Map<string, string[]>();
+  const above = new Map<string, string[]>();
+  for (const arch of architectures) {
+    below.set(arch.strategyId, []);
+    above.set(arch.strategyId, []);
+  }
+  for (const pair of pairwise) {
+    if (pair.winner === 'tie') continue;
+    const [high, low] = pair.winner === 'a' ? [pair.a, pair.b] : [pair.b, pair.a];
+    below.get(low)?.push(high);
+    above.get(high)?.push(low);
+  }
+  const entries = architectures.map((arch) => ({
+    strategyId: arch.strategyId,
+    score: arch.score.mean,
+    rank: 1 + (below.get(arch.strategyId)?.length ?? 0),
+  }));
+  entries.sort(
+    (x, y) => x.rank - y.rank || y.score - x.score || compareArchitectures(x.strategyId, y.strategyId),
+  );
+  return entries.map((entry) => ({
+    strategyId: entry.strategyId,
+    rank: entry.rank,
+    tied: entries.some((other) => other !== entry && other.rank === entry.rank),
+    below: below.get(entry.strategyId) ?? [],
+    above: above.get(entry.strategyId) ?? [],
+  }));
 }
 
 // ---------------------------------------------------------------------------

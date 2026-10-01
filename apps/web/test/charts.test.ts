@@ -109,9 +109,14 @@ function model(id: string, verdicts: ('better' | 'worse' | 'equivalent' | 'incon
       latencyRatio: e(2, 1.9, 2.1),
       verdict,
     })),
+    pairwise: [],
+    ranks: [],
     frontier: ['single'],
+    health: EMPTY_HEALTH,
   };
 }
+
+const EMPTY_HEALTH = { total: 0, rankable: 0, integrityFailed: 0, apiErrors: 0, withoutIntegrity: 0, failedChecks: [], byStrategy: [] };
 
 function analysis(models: ModelAnalysis[]): SiteAnalysis {
   return {
@@ -121,7 +126,7 @@ function analysis(models: ModelAnalysis[]): SiteAnalysis {
     method: 'method',
     models,
     scale: [],
-    health: { total: 0, rankable: 0, integrityFailed: 0, apiErrors: 0, withoutIntegrity: 0, failedChecks: [], byStrategy: [] },
+    health: EMPTY_HEALTH,
   };
 }
 
