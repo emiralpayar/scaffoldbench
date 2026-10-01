@@ -29,6 +29,7 @@ import {
   createDebateSelectStrategy,
   createOrchestratorWorkersStrategy,
   createPlanExecuteStrategy,
+  createPlanExecuteVerifyStrategy,
   createSingleStrategy,
 } from '@arena/strategies';
 import {
@@ -427,5 +428,99 @@ describe('single through the real runQuery', () => {
     expect(outcome.finalText).toBe('Refunded O-1.');
     expect(failures(strategy, ctx, outcome)).toEqual([]);
     expect(sessions()[0]?.tools).toEqual(['mcp__shop__get_order', 'mcp__shop__refund']);
+  });
+});
+
+describe('plan-execute-verify through the real runQuery', () => {
+  const PLAN = { steps: ['Read order O-1', 'Refund it'], rationale: 'read before acting' };
+  const APPROVE = { approved: true, issues: [], severity: 'none' };
+  const REJECT = { approved: false, issues: ['O-1 was never refunded'], severity: 'blocking' };
+
+  /** A run whose verifiers answer, in turn, with `verdicts`; `null` answers in prose only. */
+  function script(verdicts: (Record<string, unknown> | null)[]) {
+    let verifier = 0;
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are the planning step')) {
+        yield* answerWith(session, PLAN);
+      } else if (session.prompt.includes('You are the verifier')) {
+        const verdict = verifier < verdicts.length ? verdicts[verifier] : APPROVE;
+        verifier += 1;
+        const read = await session.callTool('mcp__shop__get_order', { id: 'O-1' });
+        yield toolUse('mcp__shop__get_order', { id: 'O-1' });
+        yield toolResult(read);
+        yield* verdict === null ? proseOnly('Looks fine to me, I think.') : answerWith(session, verdict);
+      } else if (session.prompt.includes('<issues_found>')) {
+        yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Refunded O-1 after review.');
+      } else {
+        yield assistant('Checked O-1; nothing to do.');
+        yield success({ text: 'Checked O-1; nothing to do.' });
+      }
+    });
+  }
+
+  it('verifies against state through the schema and approves', async () => {
+    script([APPROVE]);
+    const ctx = makeCtx(makeEnv());
+    const strategy = createPlanExecuteVerifyStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['plan', 'execute', 'verify-1']);
+    const verifier = sessions().find((s) => s.prompt.includes('You are the verifier'));
+    // Read-only tools and the structured-output tool, nothing that mutates.
+    expect(verifier?.tools).toEqual([STRUCTURED_OUTPUT_TOOL, 'mcp__shop__get_order']);
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
+
+  it('sends a rejected execution back for revision, then verifies the revision', async () => {
+    script([REJECT, APPROVE]);
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createPlanExecuteVerifyStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['plan', 'execute', 'verify-1', 'revise-1', 'verify-2']);
+    expect(env.journal.filter((entry) => entry.name === 'refund')).toHaveLength(1);
+    expect(outcome.finalText).toBe('Refunded O-1 after review.');
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+    expect(checkNamed(fidelityOf(strategy, ctx, outcome), 'plan-execute-verify.loop').detail).toBe(
+      '1 revision, each called for by a verdict',
+    );
+  });
+
+  it('recovers a verdict the verifier gave in prose by asking once more', async () => {
+    script([null, REJECT, APPROVE]);
+    const ctx = makeCtx(makeEnv());
+    const strategy = createPlanExecuteVerifyStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual([
+      'plan',
+      'execute',
+      'verify-1',
+      'verify-1-retry',
+      'revise-1',
+      'verify-2',
+    ]);
+    // The miss was recovered, so neither the harness nor the strategy objects.
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
+
+  it('fails integrity, never approving, when no verdict can be read even on the retry', async () => {
+    script([null, null]);
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createPlanExecuteVerifyStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['plan', 'execute', 'verify-1', 'verify-1-retry']);
+    expect(failures(strategy, ctx, outcome).map((check) => check.id)).toEqual([
+      HARNESS_CHECK.structuredOutput,
+      HARNESS_CHECK.notDegraded,
+      'plan-execute-verify.verdicts',
+    ]);
   });
 });

@@ -15,8 +15,10 @@ import type {
 import {
   ACTING_INSTRUCTIONS,
   FINAL_ANSWER_INSTRUCTION,
+  MAX_REVISIONS,
   REASONING_TURNS,
   STRATEGIES,
+  VERIFY_SCHEMA,
   createDebateSelectStrategy,
   createPhaseRunner,
   createOrchestratorWorkersStrategy,
@@ -210,7 +212,7 @@ const genericScript: Script = (spec) => {
       },
     };
   }
-  if (spec.phase === 'verify') {
+  if (spec.phase.startsWith('verify')) {
     return { text: 'looks good', structured: { approved: true, issues: [], severity: 'none' } };
   }
   if (spec.phase === 'select') {
@@ -560,91 +562,153 @@ describe('orchestrator-workers', () => {
 // ---------------------------------------------------------------------------
 
 describe('plan-execute-verify', () => {
+  const BLOCKING = { approved: false, issues: ['refund amount is wrong'], severity: 'blocking' };
+  /** Every verdict is `verdict`; everything else is `genericScript`. */
+  const verdicts =
+    (verdict: unknown): Script =>
+    (spec, index) =>
+      spec.phase.startsWith('verify')
+        ? { text: 'verifier notes', structured: verdict }
+        : spec.phase === 'plan'
+          ? genericScript(spec, index)
+          : { text: `${spec.phase} answer` };
+
   it('stops after the first verify when the work is approved', async () => {
     const fake = createFake(genericScript);
     const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
-    expect(fake.phases()).toEqual(['plan', 'execute', 'verify']);
+    expect(fake.phases()).toEqual(['plan', 'execute', 'verify-1']);
     expect(outcome.finalText).toBe('execute answer');
     expect(outcome.subagentCount).toBe(0);
     expect(outcome.phases).toHaveLength(3);
+    expect(outcome.phases[2]?.meta).toEqual({
+      approved: true,
+      severity: 'none',
+      issues: 0,
+      decision: 'approve',
+      source: 'schema',
+    });
   });
 
-  it('gives the verifier read-only tools and the executor the full toolset', async () => {
+  it('asks the verifier for its verdict through the schema, holding only the read-only tools', async () => {
     const fake = createFake(genericScript);
     const ctx = makeCtx();
     await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(ctx);
 
-    expect(fake.phase('verify').allowedTools).toEqual(ctx.env.readOnlyTools);
+    expect(fake.phase('verify-1').outputSchema).toBe(VERIFY_SCHEMA);
+    expect(fake.phase('verify-1').allowedTools).toEqual(ctx.env.readOnlyTools);
     expect(fake.phase('execute').allowedTools).toBeUndefined();
     expect(fake.phase('plan').allowedTools).toEqual([]);
   });
 
-  it('revises at most twice when the verifier keeps rejecting', async () => {
-    const fake = createFake((spec) => {
-      if (spec.phase === 'plan') return genericScript(spec, 0);
-      if (spec.phase === 'verify') {
-        return {
-          text: 'not yet',
-          structured: { approved: false, issues: ['refund amount is wrong'], severity: 'blocking' },
-        };
-      }
-      return { text: `${spec.phase} answer` };
-    });
+  it('revises a blocking rejection, at most twice, and leaves the last revision final', async () => {
+    const fake = createFake(verdicts(BLOCKING));
     const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
-    expect(fake.phases()).toEqual([
-      'plan',
-      'execute',
-      'verify',
-      'revise-1',
-      'verify',
-      'revise-2',
-      'verify',
-    ]);
+    expect(fake.phases()).toEqual(['plan', 'execute', 'verify-1', 'revise-1', 'verify-2', 'revise-2']);
+    expect(MAX_REVISIONS).toBe(2);
     expect(outcome.phases.map((phase) => phase.phase)).toEqual(fake.phases());
     // The verifier's critique must not become the agent's answer.
     expect(outcome.finalText).toBe('revise-2 answer');
   });
 
-  it('injects the reported issues into the revision prompt', async () => {
-    const fake = createFake((spec) => {
-      if (spec.phase === 'plan') return genericScript(spec, 0);
-      if (spec.phase === 'verify') {
-        return {
-          text: 'not yet',
-          structured: { approved: false, issues: ['refund amount is wrong'], severity: 'blocking' },
-        };
-      }
-      return { text: `${spec.phase} answer` };
-    });
+  it('shows the next verifier the revised answer and the reviser the issues', async () => {
+    const fake = createFake(verdicts(BLOCKING));
     await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     const revise = fake.phase('revise-1');
     expect(revise.prompt).toContain('refund amount is wrong');
     expect(revise.prompt).toContain('execute answer');
     expect(revise.allowedTools).toBeUndefined();
+    expect(fake.phase('verify-2').prompt).toContain('revise-1 answer');
   });
 
-  it('treats an unreadable verdict as approval rather than revising blindly', async () => {
-    const fake = createFake((spec) => {
-      if (spec.phase === 'plan') return genericScript(spec, 0);
-      if (spec.phase === 'verify') return { text: 'I could not decide', structured: undefined };
-      return { text: `${spec.phase} answer` };
-    });
+  it('ends the review on a rejection whose issues are only minor', async () => {
+    const fake = createFake(verdicts({ approved: false, issues: ['the note is terse'], severity: 'minor' }));
+    const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phases()).toEqual(['plan', 'execute', 'verify-1']);
+    expect(outcome.phases[2]?.meta).toMatchObject({ approved: false, decision: 'accept-minor' });
+  });
+
+  it('revises a rejection that names no severity', async () => {
+    const fake = createFake(verdicts({ approved: false, issues: ['wrong order refunded'], severity: 'none' }));
     await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
-    expect(fake.phases()).toEqual(['plan', 'execute', 'verify']);
+    expect(fake.phases()).toContain('revise-1');
+  });
+
+  it('asks again when the verdict cannot be read, and acts on the second answer', async () => {
+    let asked = 0;
+    const fake = createFake((spec, index) => {
+      if (spec.phase.startsWith('verify')) {
+        return asked++ === 0
+          ? { text: 'I checked R-1 and the refund looks wrong', structuredMissing: true }
+          : { text: '', structured: BLOCKING };
+      }
+      return verdicts(BLOCKING)(spec, index);
+    });
+    const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phases().slice(0, 5)).toEqual(['plan', 'execute', 'verify-1', 'verify-1-retry', 'revise-1']);
+    // The retry starts from what the first attempt found.
+    expect(fake.phase('verify-1-retry').prompt).toContain('I checked R-1 and the refund looks wrong');
+    expect(fake.phase('verify-1-retry').outputSchema).toBe(VERIFY_SCHEMA);
+    const [first, retry] = outcome.phases.slice(2, 4);
+    expect(first).toMatchObject({ retriedBy: 'verify-1-retry', meta: { decision: 'unreadable' } });
+    expect(first?.degraded).toBeUndefined();
+    expect(retry?.meta).toMatchObject({ decision: 'revise', source: 'schema' });
+  });
+
+  it('never approves a verdict it cannot read: it ends the review and records why', async () => {
+    const fake = createFake((spec, index) =>
+      spec.phase.startsWith('verify')
+        ? { text: 'I could not decide', structuredMissing: true }
+        : verdicts(BLOCKING)(spec, index),
+    );
+    const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phases()).toEqual(['plan', 'execute', 'verify-1', 'verify-1-retry']);
+    const retry = outcome.phases[3];
+    expect(retry?.meta).toEqual({ decision: 'unreadable' });
+    expect(retry?.degraded).toBe('no verdict could be read, even when asked again; the review ended without one');
+  });
+
+  it('falls back to a verdict in prose only after the schema failed twice, and says so', async () => {
+    const fake = createFake((spec, index) =>
+      spec.phase.startsWith('verify')
+        ? {
+            text: 'Verdict: {"approved": false, "issues": ["wrong amount"], "severity": "blocking"}',
+            structuredMissing: true,
+          }
+        : verdicts(BLOCKING)(spec, index),
+    );
+    const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phases().slice(0, 5)).toEqual(['plan', 'execute', 'verify-1', 'verify-1-retry', 'revise-1']);
+    expect(outcome.phases[3]?.degraded).toMatch(/read from prose/);
+    expect(outcome.phases[3]?.meta).toMatchObject({ decision: 'revise', source: 'prose' });
+  });
+
+  it('does not ask again when the run’s limits cut the verifier short', async () => {
+    const fake = createFake((spec, index) =>
+      spec.phase.startsWith('verify')
+        ? { text: '', structuredMissing: true, aborted: true, subtype: 'aborted' }
+        : verdicts(BLOCKING)(spec, index),
+    );
+    const outcome = await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phases()).toEqual(['plan', 'execute', 'verify-1']);
+    expect(outcome.phases[2]?.degraded).toBeUndefined();
+    expect(outcome.finalText).toBe('execute answer');
   });
 
   it('uses the verifier prose when it rejects without listing issues', async () => {
-    const fake = createFake((spec) => {
-      if (spec.phase === 'plan') return genericScript(spec, 0);
-      if (spec.phase === 'verify') {
-        return { text: 'the order was never read', structured: { approved: false, issues: [], severity: 'blocking' } };
-      }
-      return { text: `${spec.phase} answer` };
-    });
+    const fake = createFake((spec, index) =>
+      spec.phase.startsWith('verify')
+        ? { text: 'the order was never read', structured: { approved: false, issues: [], severity: 'blocking' } }
+        : verdicts(BLOCKING)(spec, index),
+    );
     await createPlanExecuteVerifyStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(fake.phase('revise-1').prompt).toContain('the order was never read');
