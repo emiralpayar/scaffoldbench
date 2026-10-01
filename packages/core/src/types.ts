@@ -36,12 +36,37 @@ export interface ToolCall {
   result: string;
 }
 
+/** Narrows which of a task's MCP tools a `query()` call is shown. */
+export interface McpServerFilter {
+  /**
+   * Fully-qualified tool names (`mcp__<server>__<tool>`, `*` wildcards
+   * allowed) to expose. Omitted means every tool. A server left with no
+   * tools is left out altogether.
+   */
+  only?: readonly string[];
+}
+
 /**
  * Everything a task needs to hand to the agent, plus the mutable state the
  * scorer inspects once the run is over.
  */
 export interface TaskEnvironment {
-  mcpServers: Record<string, McpServerConfig>;
+  /**
+   * Build the task's MCP servers for one `query()` call.
+   *
+   * `runQuery` calls this once per call, so every call gets its own server
+   * instances. An in-process MCP server can be connected to only one session
+   * at a time: when every phase shared one instance, concurrent phases after
+   * the first silently failed to connect and ran with no tools at all. The
+   * handlers of every instance close over the same world and journal, so
+   * state is still shared — concurrent workers acting on one world is the
+   * architecture under test — and only the protocol endpoint is new.
+   *
+   * The filter is what keeps a phase's view honest: a phase is shown only the
+   * tools it may call, so a "tool-less" planner sees none and a read-only
+   * proposer never sees a mutating tool it would be denied.
+   */
+  createMcpServers(filter?: McpServerFilter): Record<string, McpServerConfig>;
   /**
    * Fully-qualified tool names (`mcp__<server>__<tool>`) that the agent is
    * pre-approved to call. Combined with `permissionMode: 'dontAsk'` this is

@@ -108,7 +108,7 @@ const READ_ONLY_TOOLS = ['mcp__shop__get_order'];
 
 function makeEnv(overrides: Partial<TaskEnvironment> = {}): TaskEnvironment {
   return {
-    mcpServers: {},
+    createMcpServers: () => ({}),
     allowedTools: MUTATING_TOOLS,
     readOnlyTools: READ_ONLY_TOOLS,
     state: {},

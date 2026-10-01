@@ -79,7 +79,7 @@ function drive(): Driver {
 
 function scoreInput(driver: Driver): ScoreInput {
   const env: TaskEnvironment = {
-    mcpServers: {},
+    createMcpServers: () => ({}),
     allowedTools: [],
     readOnlyTools: [],
     state: driver.world,

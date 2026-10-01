@@ -123,7 +123,7 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
 
     createEnvironment(options: EnvironmentOptions): TaskEnvironment {
       const journal: ToolCall[] = [];
-      const { server, serverName, allowedTools } = createJournaledToolServer({
+      const { createMcpServers, allowedTools } = createJournaledToolServer({
         name: 'web',
         instructions: SERVER_INSTRUCTIONS,
         journal,
@@ -135,7 +135,7 @@ export function defineResearchTask(spec: ResearchTaskSpec): Task {
       });
 
       return {
-        mcpServers: { [serverName]: server },
+        createMcpServers,
         allowedTools,
         // Research has nothing to mutate, so every tool is safe to hand to a
         // throwaway proposer. Equality here is what tells `debate-select` it can

@@ -119,7 +119,12 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     tools: [...allowedTools],
     allowedTools: [...allowedTools],
     disallowedTools: [...SANDBOX_DENYLIST],
-    mcpServers: { ...ctx.env.mcpServers, ...(spec.mcpServers ?? {}) },
+    // A fresh server instance per call (one instance serves one session at
+    // a time), showing the phase only the task tools it may call.
+    mcpServers: {
+      ...ctx.env.createMcpServers({ only: allowedTools }),
+      ...(spec.mcpServers ?? {}),
+    },
     // Only pre-approved tools may run, and nothing prompts an operator.
     permissionMode: 'dontAsk',
     // Hermetic: never inherit ~/.claude or the repo's own settings, otherwise

@@ -40,7 +40,8 @@ export interface SandboxGuardOptions {
   onDenied?: (toolName: string) => void;
 }
 
-function isAllowed(toolName: string, allowed: readonly string[]): boolean {
+/** True when `toolName` matches an entry of `allowed`, exactly or by a trailing `*` wildcard. */
+export function matchesToolList(toolName: string, allowed: readonly string[]): boolean {
   for (const pattern of allowed) {
     if (pattern === toolName) return true;
     // Support `mcp__server__*` style wildcards used by MCP allowlists.
@@ -68,7 +69,7 @@ export function createSandboxGuard(options: SandboxGuardOptions): HookCallbackMa
           if (input.hook_event_name !== 'PreToolUse') return {};
           const toolName = input.tool_name;
 
-          if (isAllowed(toolName, allowedTools)) return {};
+          if (matchesToolList(toolName, allowedTools)) return {};
 
           onDenied?.(toolName);
           trace.append({

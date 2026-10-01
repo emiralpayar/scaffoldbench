@@ -42,7 +42,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createEnvironment(): TaskEnvironment {
       const world: CounterWorld = { value: 0, policyRead: false };
       return {
-        mcpServers: {},
+        createMcpServers: () => ({}),
         allowedTools: ['mcp__stub__set', 'mcp__stub__read_policy'],
         readOnlyTools: ['mcp__stub__read_policy'],
         state: world,

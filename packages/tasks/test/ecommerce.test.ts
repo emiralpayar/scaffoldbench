@@ -37,7 +37,7 @@ function setup() {
 
 function scoreInput(world: EcommerceWorld, journal: ToolCall[]): ScoreInput {
   const env: TaskEnvironment = {
-    mcpServers: {},
+    createMcpServers: () => ({}),
     allowedTools: [],
     readOnlyTools: [],
     state: world,

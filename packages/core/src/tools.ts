@@ -1,5 +1,6 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
-import type { McpServerConfig, ToolCall } from './types';
+import { matchesToolList } from './guard';
+import type { McpServerConfig, McpServerFilter, ToolCall } from './types';
 import { truncate } from './trace';
 
 /** What a task's tool handler may return. */
@@ -36,7 +37,13 @@ export interface JournaledServerOptions {
 
 export interface JournaledServer {
   serverName: string;
-  server: McpServerConfig;
+  /**
+   * A fresh server instance, keyed by `serverName`, exposing only the tools
+   * the filter permits — or `{}` when it permits none. Every instance shares
+   * the same handlers, world and journal; this is what a task hands to
+   * `TaskEnvironment.createMcpServers`.
+   */
+  createMcpServers(filter?: McpServerFilter): Record<string, McpServerConfig>;
   /** Fully-qualified names to put in `allowedTools`. */
   allowedTools: string[];
   /** Subset of `allowedTools` that cannot mutate world state. */
@@ -60,8 +67,9 @@ export function createJournaledToolServer(options: JournaledServerOptions): Jour
   const startedAt = now();
   const { journal, name: serverName } = options;
 
-  const sdkTools = options.tools.map((spec) =>
-    tool(spec.name, spec.description, spec.schema, async (args: unknown) => {
+  const sdkTools = options.tools.map((spec) => ({
+    qualifiedName: qualifiedToolName(serverName, spec.name),
+    definition: tool(spec.name, spec.description, spec.schema, async (args: unknown) => {
       const argsRecord = (args ?? {}) as Record<string, unknown>;
       let text: string;
       let isError = false;
@@ -92,17 +100,26 @@ export function createJournaledToolServer(options: JournaledServerOptions): Jour
         ...(isError ? { isError: true } : {}),
       };
     }),
-  );
+  }));
 
   return {
     serverName,
-    server: createSdkMcpServer({
-      name: serverName,
-      version: options.version ?? '1.0.0',
-      ...(options.instructions ? { instructions: options.instructions } : {}),
-      tools: sdkTools,
-    }) as McpServerConfig,
-    allowedTools: options.tools.map((spec) => qualifiedToolName(serverName, spec.name)),
+    createMcpServers(filter: McpServerFilter = {}): Record<string, McpServerConfig> {
+      const { only } = filter;
+      const exposed = sdkTools
+        .filter(({ qualifiedName }) => only === undefined || matchesToolList(qualifiedName, only))
+        .map(({ definition }) => definition);
+      if (exposed.length === 0) return {};
+      return {
+        [serverName]: createSdkMcpServer({
+          name: serverName,
+          version: options.version ?? '1.0.0',
+          ...(options.instructions ? { instructions: options.instructions } : {}),
+          tools: exposed,
+        }) as McpServerConfig,
+      };
+    },
+    allowedTools: sdkTools.map(({ qualifiedName }) => qualifiedName),
     readOnlyTools: options.tools
       .filter((spec) => spec.readOnly === true)
       .map((spec) => qualifiedToolName(serverName, spec.name)),

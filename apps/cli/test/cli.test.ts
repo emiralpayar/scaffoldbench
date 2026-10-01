@@ -317,7 +317,7 @@ describe('ALL_TASKS', () => {
       const env = await task.createEnvironment(options);
 
       expect(env.allowedTools.length, task.id).toBeGreaterThan(0);
-      expect(Object.keys(env.mcpServers).length, task.id).toBeGreaterThan(0);
+      expect(Object.keys(env.createMcpServers()).length, task.id).toBeGreaterThan(0);
       for (const tool of env.readOnlyTools) {
         expect(env.allowedTools, task.id).toContain(tool);
       }

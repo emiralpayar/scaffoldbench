@@ -53,7 +53,7 @@ function harness(world = createSupportWorld()): Harness {
 
 function scoreInput(world: SupportWorld, journal: ToolCall[]): ScoreInput {
   return {
-    env: { mcpServers: {}, allowedTools: [], readOnlyTools: [], state: world, journal },
+    env: { createMcpServers: () => ({}), allowedTools: [], readOnlyTools: [], state: world, journal },
     outcome: { finalText: '', subagentCount: 0, phases: [] },
     trace: [],
     deps: {

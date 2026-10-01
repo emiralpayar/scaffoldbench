@@ -41,7 +41,7 @@ describe('createJournaledToolServer', () => {
 
     expect(server.serverName).toBe('shop');
     expect(server.allowedTools).toEqual(['mcp__shop__get_order']);
-    expect(server.server).toBeDefined();
+    expect(Object.keys(server.createMcpServers())).toEqual(['shop']);
   });
 
   it('builds a server for every declared tool', () => {
@@ -55,6 +55,33 @@ describe('createJournaledToolServer', () => {
       ],
     });
     expect(server.allowedTools).toHaveLength(2);
+  });
+
+  it('builds a fresh server instance for every call', () => {
+    const server = createJournaledToolServer({
+      name: 'shop',
+      journal: [],
+      tools: [{ name: 'a', description: 'a', schema: {}, handler: () => 'a' }],
+    });
+    const first = server.createMcpServers().shop as { instance?: unknown };
+    const second = server.createMcpServers().shop as { instance?: unknown };
+
+    // One MCP server instance can serve only one session at a time.
+    expect(first.instance).toBeDefined();
+    expect(first.instance).not.toBe(second.instance);
+  });
+
+  it('leaves out a server when the filter permits none of its tools', () => {
+    const server = createJournaledToolServer({
+      name: 'shop',
+      journal: [],
+      tools: [{ name: 'a', description: 'a', schema: {}, handler: () => 'a' }],
+    });
+
+    expect(server.createMcpServers({ only: [] })).toEqual({});
+    expect(Object.keys(server.createMcpServers({ only: ['mcp__shop__a'] }))).toEqual(['shop']);
+    expect(Object.keys(server.createMcpServers({ only: ['mcp__shop__*'] }))).toEqual(['shop']);
+    expect(server.createMcpServers({ only: ['mcp__other__a'] })).toEqual({});
   });
 });
 

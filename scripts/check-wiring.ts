@@ -23,7 +23,7 @@ const INIT_TIMEOUT_MS = 60_000;
 
 async function main(): Promise<number> {
   const journal: ToolCall[] = [];
-  const { server, serverName, allowedTools, readOnlyTools } = createJournaledToolServer({
+  const { createMcpServers, serverName, allowedTools, readOnlyTools } = createJournaledToolServer({
     name: 'wiringcheck',
     instructions: 'Canary server.',
     journal,
@@ -62,7 +62,7 @@ async function main(): Promise<number> {
         model: 'claude-sonnet-5',
         systemPrompt: 'canary',
         allowedTools,
-        mcpServers: { [serverName]: server },
+        mcpServers: createMcpServers(),
         permissionMode: 'dontAsk',
         settingSources: [],
         persistSession: false,

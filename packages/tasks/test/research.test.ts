@@ -124,7 +124,7 @@ function fetchEvent(url: string, seq = 0): TraceEvent {
 }
 
 function emptyEnv(journal: ToolCall[] = []): TaskEnvironment {
-  return { mcpServers: {}, allowedTools: [], readOnlyTools: [], state: {}, journal };
+  return { createMcpServers: () => ({}), allowedTools: [], readOnlyTools: [], state: {}, journal };
 }
 
 function scoreInput(options: {
@@ -420,7 +420,7 @@ describe('defineResearchTask environment', () => {
 
     expect(env.allowedTools).toEqual(['mcp__web__search', 'mcp__web__fetch_page']);
     expect(env.readOnlyTools).toEqual(env.allowedTools);
-    expect(Object.keys(env.mcpServers)).toEqual(['web']);
+    expect(Object.keys(env.createMcpServers())).toEqual(['web']);
     expect(env.journal).toEqual([]);
   });
 
