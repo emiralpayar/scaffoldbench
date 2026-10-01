@@ -94,9 +94,9 @@ export const statusCodesSpec: BreadthTaskSpec = {
       'The 501 (Not Implemented) status code indicates that the server does not support the functionality required to fulfill the request.'),
   ],
   hypothesis:
-    'Orchestrator-workers should beat single: twelve independent lookups in one 500,000-character ' +
-    'specification, which workers can split while a single agent carries every window it opened in ' +
-    'one context. Grading is exact, so any difference here is not judge noise.',
+    'A tie on score: in a one-run calibration, single scored 1.0 with both Haiku 4.5 and Sonnet 5.5. ' +
+    'Twelve independent lookups are what orchestrator-workers can split, so fan-out should show up as ' +
+    'lower wall-clock time at a higher token cost. Grading is exact, so any score gap is not judge noise.',
   traps: [
     {
       id: 'renamed-reason-phrases',
@@ -185,9 +185,10 @@ export const headerFieldsSpec: BreadthTaskSpec = {
       'The Link header field provides a means for serialising one or more links into HTTP headers.'),
   ],
   hypothesis:
-    'The strongest case for fan-out: ten lookups across four current RFCs. Expect orchestrator-workers ' +
-    'ahead of single on completeness, and a verify phase ahead on the version trap, since three ' +
-    'obsolete RFCs in the corpus define the same fields.',
+    'The strongest case for fan-out, ten lookups across four current RFCs, but expect a tie on score: ' +
+    'in a one-run calibration, single scored 1.0 with both Haiku 4.5 and Sonnet 5.5 once it read the ' +
+    'corpus (closed-book, Haiku named an obsolete RFC for 8 of 10 fields). Fan-out should cut wall-clock ' +
+    'time at a higher token cost.',
   traps: [
     {
       id: 'obsolete-rfc',
@@ -282,8 +283,9 @@ export const nistPasswordRulesSpec: BreadthTaskSpec = {
   ],
   hypothesis:
     'A version trap more than a breadth task: every rule sits in one section of one document, but the ' +
-    'superseded revision 3, also in the corpus, answers four of them differently. Verification should ' +
-    'matter more than decomposition here.',
+    'superseded revision 3, also in the corpus, answers four of them differently. Decomposition has ' +
+    'nothing to split, so expect single to match or beat fan-out on score and cost; in a one-run ' +
+    'calibration it scored 1.0 with both Haiku 4.5 and Sonnet 5.5.',
   traps: [
     {
       id: 'revision-3',

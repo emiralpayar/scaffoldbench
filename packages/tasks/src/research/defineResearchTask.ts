@@ -87,7 +87,12 @@ export function loadTaskCorpus(fixtureDir: string, selection: CorpusSelection): 
   return Corpus.load(path.join(fixtureDir, CORPUS_DIRNAME)).forTask(selection);
 }
 
-/** The web tools over one task's corpus, journaled like every task's tools. */
+/**
+ * The web tools over one task's corpus, journaled like every task's tools.
+ *
+ * `options.fixtureMode` is deliberately ignored: the frozen corpus is the only
+ * web research tasks have, so there is nothing to record and nothing live.
+ */
 export function createResearchEnvironment(
   selection: CorpusSelection,
   options: EnvironmentOptions,
