@@ -1,0 +1,54 @@
+308 Permanent Redirect
+
+The HTTP 308 Permanent Redirect redirection response status code indicates that the requested resource has been permanently moved to the URL given by the Location header.
+
+A browser receiving this status will automatically request the resource at the URL in the Location header, redirecting the user to the new page.
+
+The request method and the body will not be modified by the client in the redirected request. A 301 Moved Permanently requires the request method and the body to remain unchanged when redirection is performed, but this is incorrectly handled by older clients to use the GET method instead.
+
+Note: Some Web applications may use the 308 Permanent Redirect in a non-standard way and for different purposes. For example, Google Drive uses a 308 Resume Incomplete response to indicate to the client when an unfinished upload has stalled. See Perform a resumable download on the Google Drive documentation for more information.
+
+Status
+
+http
+
+308 Permanent Redirect
+
+Examples
+
+308 response to a moved resource
+
+http
+
+GET /featured HTTP/1.1
+Host: www.example.org
+
+http
+
+HTTP/1.1 308 Permanent Redirect
+Location: http://www.example.com/featured
+Content-Length: 0
+
+Specifications
+
+Specification
+
+HTTP Semantics
+# status.308
+
+Browser compatibility
+
+See also
+
+- Redirections in HTTP
+- HTTP response status codes
+- 301 Moved Permanently, the equivalent of this status code that may modify the request method when it is not a GET
+- 302 Found, a temporary redirect
+
+Help improve MDN
+
+Learn how to contribute
+
+This page was last modified on Jan 14, 2026 by MDN contributors.
+
+View this page on GitHub • Report a problem with this content
