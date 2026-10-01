@@ -1,12 +1,14 @@
 import {
   buildScore,
   createJournaledToolServer,
+  type Difficulty,
   type JournaledToolSpec,
   type PenaltyKind,
   type Penalty,
   type ScoreItem,
   type Task,
   type TaskEnvironment,
+  type TaskTrap,
   type ToolCall,
 } from '@arena/core';
 
@@ -35,7 +37,8 @@ export interface ForbiddenSpec<W> {
   /** Score multiplier when violated. Defaults to 0 — a hard fail. */
   multiplier?: number;
   violated(world: W, journal: readonly ToolCall[]): boolean;
-  detail?: string;
+  /** Fixed text, or computed from the run (e.g. naming what was changed out of scope). */
+  detail?: string | ((world: W, journal: readonly ToolCall[]) => string | undefined);
 }
 
 export interface ToolUseTaskSpec<W> {
@@ -46,9 +49,13 @@ export interface ToolUseTaskSpec<W> {
   prompt: string;
   /** Binding domain rules, injected into the system prompt for every strategy. */
   policy?: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: Difficulty;
   tags: string[];
   maxTurns: number;
+  /** Pre-registered prediction of which architecture should win, and why. */
+  hypothesis?: string;
+  /** Documented failure paths; every `caughtBy` id must name an assertion or forbidden rule. */
+  traps?: TaskTrap[];
   /** Fresh world state for each run. Must not share references between calls. */
   createWorld(): W;
   /** Tools the agent may call, closing over the world instance. */
@@ -68,6 +75,7 @@ export interface ToolUseTaskSpec<W> {
  * grading, so these scores are reproducible and not open to argument.
  */
 export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
+  assertTrapsResolve(spec);
   return {
     id: spec.id,
     category: 'tool-use',
@@ -78,6 +86,8 @@ export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
     difficulty: spec.difficulty,
     tags: spec.tags,
     maxTurns: spec.maxTurns,
+    ...(spec.hypothesis ? { hypothesis: spec.hypothesis } : {}),
+    ...(spec.traps ? { traps: spec.traps } : {}),
 
     createEnvironment(): TaskEnvironment {
       const world = spec.createWorld();
@@ -120,12 +130,17 @@ export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
       const penalties: Penalty[] = [];
       for (const rule of spec.forbidden ?? []) {
         if (!safeCheck(() => rule.violated(world, journal))) continue;
+        const ruleDetail = rule.detail;
+        const detail =
+          typeof ruleDetail === 'function'
+            ? safeDetail(() => ruleDetail(world, journal))
+            : ruleDetail;
         penalties.push({
           id: rule.id,
           label: rule.label,
           kind: rule.kind ?? 'policy_violation',
           multiplier: rule.multiplier ?? 0,
-          ...(rule.detail ? { detail: rule.detail } : {}),
+          ...(detail ? { detail } : {}),
         });
       }
 
@@ -140,6 +155,28 @@ export function defineToolUseTask<W>(spec: ToolUseTaskSpec<W>): Task {
       });
     },
   };
+}
+
+/**
+ * A trap that names a scorer item which does not exist would silently never
+ * fire, and the report would show a perfect trap record for every
+ * architecture. Fail at definition time instead.
+ */
+function assertTrapsResolve<W>(spec: ToolUseTaskSpec<W>): void {
+  const known = new Set([
+    ...spec.assertions.map((assertion) => assertion.id),
+    ...(spec.forbidden ?? []).map((rule) => rule.id),
+  ]);
+  for (const trap of spec.traps ?? []) {
+    if (trap.caughtBy.length === 0) {
+      throw new Error(`task ${spec.id}: trap ${trap.id} names no scorer item in caughtBy`);
+    }
+    for (const id of trap.caughtBy) {
+      if (!known.has(id)) {
+        throw new Error(`task ${spec.id}: trap ${trap.id} is caught by unknown scorer item ${id}`);
+      }
+    }
+  }
 }
 
 /**
