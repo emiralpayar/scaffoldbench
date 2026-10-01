@@ -39,6 +39,31 @@ describe(`published run set ${RUN_SET}`, () => {
     expect(analysis.health.integrity.unchecked).toBe(90);
   });
 
+  it('has most of its cost and latency variance between tasks, not between repeats', () => {
+    // One-way ICC(1) by task: (MSB − MSW) / (MSB + (k − 1)·MSW), k repeats per task.
+    const icc = (values: (r: RunRecord) => number, strategyId: string) => {
+      const byTask = new Map<string, number[]>();
+      for (const r of records.filter((x) => x.strategyId === strategyId)) {
+        byTask.set(r.taskId, [...(byTask.get(r.taskId) ?? []), values(r)]);
+      }
+      const groups = [...byTask.values()];
+      const k = groups[0]!.length;
+      const means = groups.map((g) => g.reduce((a, v) => a + v, 0) / k);
+      const grand = means.reduce((a, v) => a + v, 0) / groups.length;
+      const msb = (k * means.reduce((a, v) => a + (v - grand) ** 2, 0)) / (groups.length - 1);
+      const msw =
+        groups.reduce((a, g, i) => a + g.reduce((b, v) => b + (v - means[i]!) ** 2, 0), 0) / (groups.length * (k - 1));
+      return (msb - msw) / (msb + (k - 1) * msw);
+    };
+    const strategies = [...SCAFFOLDS, 'single'];
+    const cost = strategies.map((s) => icc((r) => r.costUsd, s));
+    const latency = strategies.map((s) => icc((r) => r.latencyMs, s));
+    expect(Math.min(...cost)).toBeCloseTo(0.83, 2);
+    expect(Math.max(...cost)).toBeCloseTo(0.97, 2);
+    expect(Math.min(...latency)).toBeCloseTo(0.9, 2);
+    expect(Math.max(...latency)).toBeCloseTo(0.96, 2);
+  });
+
   it('finds every scaffold costlier and slower than single in every paired cell', () => {
     const single = new Map(
       records.filter((r) => r.strategyId === 'single').map((r) => [`${r.taskId}#${r.repeat}`, r]),
