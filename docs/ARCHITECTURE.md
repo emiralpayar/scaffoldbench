@@ -141,23 +141,94 @@ interface Strategy {
 ```
 
 Strategies never import the Agent SDK. They call `runQuery`, taken as an injectable dependency
-(`StrategyDeps`), which is what lets the entire orchestration logic — how many calls, in what
-order, with which tools, what happens when a phase returns nothing — be tested without a network
-or an API key. The 63 strategy tests all run against a fake `runQuery`.
+(`StrategyDeps`), which is what lets the orchestration logic — how many calls, in what order, with
+which tools, what happens when a phase returns nothing — be tested without a network or an API
+key. Two suites do it. `strategies.test.ts` injects a fake `runQuery` and pins the orchestration
+itself, every fallback included. `realSeam.test.ts` drives every architecture through the real
+`runQuery`, sandbox guard and per-call MCP servers against a scripted SDK — the layer a fake
+`runQuery` hides, and where the first published run set broke — and computes the integrity checks
+on what came out: each architecture's ordinary run must pass them all, a degraded run of each must
+fail them, and `gated-execute` must let allowed actions through and keep denied ones out of the
+world.
 
 `createPhaseRunner` ([`helpers.ts`](../packages/strategies/src/helpers.ts)) carries the
-bookkeeping every architecture shares: one `PhaseRecord` per model call, a fallback answer if the
-final phase produces nothing, `runAll` for fan-out (recorded in spec order, never completion
-order, so a parallel phase list is stable), and the `canContinue()` budget check that every
-strategy makes before starting another phase.
+bookkeeping every architecture shares:
 
-Prompt symmetry is enforced by shared helpers rather than by discipline: `taskBlock(ctx)` quotes
-`ctx.task.prompt` verbatim into every phase of every architecture, `REASONING_TURNS = 1` caps
-every tool-less prose phase identically, and every phase that answers through a JSON schema gets
-`SCHEMA_MIN_TURNS = 3` (the structured reply is itself a tool call, and one that fails validation
-needs a turn to retry). `runAll` gives parallel phases equal shares of the budget left when the
-fan-out starts. See the Limitations section of the README for what this mitigates and what it does
-not.
+- **One `PhaseRecord` per model call**, listed in the order the calls *started*, never the order
+  they finished, so a fan-out's phase list is stable and a review made while an executor waits on
+  it is listed after the executor. `startedAtMs` comes from the call itself, so parallel phases
+  share one timeline.
+- **`annotate`**, which adds what the strategy read from a phase's reply to its record: `meta`
+  (a plan's step count, a verdict, a winner, a reviewer's decision), `degraded`, `retriedBy`.
+- **A fallback answer** for when the phase meant to give the answer comes back empty: the text
+  of the latest-started *answer-bearing* phase (`main`, `execute`, `worker-*`, `revise-*`,
+  `synthesize`). A planner's, verifier's, selector's or reviewer's text is never an answer, so it
+  can never stand in for one.
+- **`runAll`** for fan-out, which gives each sibling an equal share of the budget available when
+  the batch starts, so none can be starved by another.
+- **`canContinue()`**, the budget and abort check every strategy makes before another phase.
+
+### Prompt parity
+
+Shared helpers keep the phases symmetric, so that a difference between two architectures is a
+difference in architecture and not in wording:
+
+- `taskBlock(ctx)` quotes `ctx.task.prompt` verbatim into every phase of every architecture.
+- Every *acting* phase — one holding the tools that change state: `single`'s `main`, every
+  `execute`, every `worker-*`, every `revise-*` — gets `ACTING_INSTRUCTIONS` word for word: check
+  the state you are about to change before you change it, and when anything you were given or
+  found conflicts with the task or the domain rules, follow the task and the rules and say so.
+  Before this, only two executors were told to put the task and the rules first, and only
+  `single` was told to check state before changing it.
+- Every acting phase whose reply is the answer ends with the same `FINAL_ANSWER_INSTRUCTION`. The
+  one intended difference: a worker is asked for a report, because its reply goes to the
+  orchestrator, not to the user.
+- What else an acting prompt says is the architecture's own context — the plan it was handed, the
+  issues it must fix, the assignment it was given, that a reviewer gates its actions — and nothing
+  more. `strategies.test.ts` asserts all of this for every architecture.
+
+### Turn budgets
+
+`maxTurns` is set per call, by one policy for every architecture:
+
+| Phase kind | `maxTurns` | Phases |
+| --- | --- | --- |
+| holds tools, acting or read-only | the task's own `maxTurns` (T) | `main`, `execute`, `worker-*`, `revise-*`, `verify-*`, `propose-*`, `review-*` |
+| no tools, answers through a schema | `SCHEMA_MIN_TURNS` = 3 | `plan`, `decompose`, `select` |
+| no tools, answers in prose | `REASONING_TURNS` = 1 | `synthesize` |
+
+T is the allowance the task's author sized for one agent doing the whole task, so every phase that
+works with tools gets what a single agent would. A schema phase gets three turns because the
+structured reply is itself a tool call and one that fails validation needs a turn to retry; a call
+stops at its first valid reply, so the room costs nothing when it is not needed. A schema phase
+that holds tools (`verify-*`, `review-*`) gets T or three, whichever is more.
+
+The total is therefore **not** equal across architectures, and that is a decision, not an
+oversight:
+
+| Strategy | Most tool-holding turns in one run |
+| --- | --- |
+| `single` | T |
+| `plan-execute` | T |
+| `orchestrator-workers` | N·T, for N ≤ 4 workers |
+| `plan-execute-verify` | 5T: execute, two verify rounds, two revisions (each verify round can be asked once more, up to 7T) |
+| `propose-select` | 4T: three proposers and the executor |
+| `gated-execute` | T + R·T, for R reviews (one per state-changing call) |
+
+A run-wide turn ledger would make an architecture's phases compete for turns in an order that
+depends on how early phases happened to go, and a reviewer or verifier starved of turns would fail
+for reasons that have nothing to do with its design. What *is* shared is the run's cost and
+wall-clock ceiling: every call of every architecture draws on the same per-run budget, and it is
+cost, not turns, that the comparison holds fixed. Turns spent are recorded on every run
+(`RunRecord.turns`, and per phase), so a reader can see where an architecture's extra allowance
+went.
+
+Two architectures split the shared budget between calls that run at the same time. `runAll` gives
+parallel siblings equal shares. `gated-execute`'s executor reserves half of the budget available
+when it starts (`EXECUTOR_BUDGET_SHARE`) and leaves the rest to its reviews, which run while it
+waits; each review reserves at most half of what is then available.
+
+### The architectures
 
 Phase names as they appear in traces and reports:
 
@@ -166,8 +237,12 @@ Phase names as they appear in traces and reports:
 | `single` | `main` |
 | `plan-execute` | `plan` → `execute` |
 | `orchestrator-workers` | `decompose` → `worker-<id>` x N (parallel, depth 1) → `synthesize` |
-| `plan-execute-verify` | `plan` → `execute` → (`verify` → `revise-<n>`) x ≤2 |
-| `propose-select` | `propose-1..3` (parallel, depth 1) → `select` → `execute` |
+| `plan-execute-verify` | `plan` → `execute` → `verify-1` → `revise-1` → `verify-2` → `revise-2`, stopping at the first verdict that does not call for a revision; `verify-<n>-retry` when a verdict had to be asked for again |
+| `propose-select` | `propose-1..3` (parallel, depth 1, one lens each) → `select` → `execute` (no `execute` on a task with nothing to mutate) |
+| `gated-execute` | `execute`, with a `review-<n>` (depth 1) for each state-changing call, made while the executor waits |
+
+`propose-select` was published as `debate-select`; its proposers never see one another, so there
+was never a debate. `LEGACY_STRATEGY_IDS` maps the old id, which old run sets keep, to the new one.
 
 ## 4. `runQuery` — the choke point
 
@@ -179,7 +254,7 @@ own `query()` call, a leaderboard difference could just as easily be a differenc
 — one strategy inheriting a setting, another accounting for cost differently, a third silently
 allowed a tool the others were not.
 
-Held identical for all five architectures, on every call:
+Held identical for every architecture, on every call:
 
 | Concern | Mechanism |
 | --- | --- |
@@ -216,6 +291,15 @@ blocks it. It is not redundant as *evidence*: the hook writes a `tool_denied` tr
 increments a counter that ends up on the run record as `deniedToolCalls`. Without it, "this
 architecture never tried to leave the sandbox" and "this architecture tried repeatedly and was
 stopped" would look identical in the data, and they are a real behavioural difference.
+
+The same hook is also the seam for reviewing actions before they run. A call whose spec carries
+`reviewToolCall` has every tool call the allowlist permits (harness tools aside) held until the
+reviewer decides; a denial goes back to the model as that tool's result, with the reviewer's
+reason. `gated-execute` is built on it. A reviewer's denial is the architecture's decision, not a
+sandbox violation, so it is neither traced as `tool_denied` nor counted in `deniedToolCalls`. A
+review that throws becomes a denial, because the CLI lets a call through when its hook throws, and
+the hook's matcher gets a long timeout so that a review is bounded by the run's wall-clock cap
+rather than by the CLI's hook timeout.
 
 ## 6. Budget and trace
 
@@ -277,12 +361,33 @@ The runner's own checks (`harness.*`) read the trace call by call: no call faile
 ended without a result; the guard never denied `StructuredOutput` or any tool the session itself
 offered; every MCP server a call was given reported `connected`, and no other server loaded; every
 schema call that ran to the end got its structured output; no phase was marked `degraded` by its
-strategy; and, for graded runs, at least one grading call returned a usable verdict. The
-strategy's `fidelityChecks`, when it has them, add the architecture's own invariants — a non-empty
-plan, a fan-out that happened, a readable selection.
+strategy; and, for graded runs, at least one grading call returned a usable verdict. A schema
+call whose strategy asked for its reply again (`PhaseRecord.retriedBy`) is judged by the retry,
+which is checked like any other schema call.
+
+Every strategy adds its own invariants through `fidelityChecks`, read from the phase records the
+strategy annotated and from the tools each session listed when it started:
+
+| Strategy | Checks |
+| --- | --- |
+| `single` | `single.tools`: the agent held the whole toolset |
+| `plan-execute` | `.plan`: the plan was read from the schema reply, with at least one step · `.tools`: no tools for the planner, all of them for the executor |
+| `orchestrator-workers` | `.decomposition`: the subtasks were read from the schema reply · `.fan-out`: every planned worker ran (one when the orchestrator chose not to split), none starved while the others ran · `.synthesis`: the synthesis wrote the answer · `.tools` |
+| `plan-execute-verify` | `.plan` · `.verdicts`: every review round's verdict was read from the schema reply, after at most one re-ask · `.loop`: every verdict calling for a revision got one, and no revision ran without one · `.tools`: read-only tools for the verifier |
+| `propose-select` | `.proposals`: all three proposers ran, one per lens, none starved · `.selection`: the selector chose a valid proposal number through the schema · `.tools`: read-only tools for the proposers, none for the selector |
+| `gated-execute` | `.reviewed`: every state change in the journal had been allowed by a review · `.decisions`: every review gave its decision through the schema · `.tools`: read-only tools for the reviewers |
+
+Whenever a strategy carries on with a substitute instead of what a phase was meant to produce — a
+plan written in prose or not at all, a decomposition it could not read, a default winner, a
+verdict it could not read even when asked again, a selector or synthesis that wrote no answer, a
+review with no readable decision — it records that on the phase as `degraded`, and both
+`harness.not-degraded` and the strategy's own check fail. Nothing defaults silently: an unreadable
+verdict is never approval, and an action no reviewer could decide on is denied.
 
 Running out of turns, budget or time is not an integrity failure. Such a run is a valid, losing
-data point; excluding it would flatter exactly the architectures that fail that way.
+data point; excluding it would flatter exactly the architectures that fail that way. A phase the
+run's limits cut short is therefore never marked degraded, and a fidelity check about a phase that
+was cut short, or never started because the run had stopped, passes.
 
 `failureMode` names why a run did not pass, and every member is one the pipeline produces:
 
