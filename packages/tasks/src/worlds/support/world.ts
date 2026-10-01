@@ -20,6 +20,10 @@ export interface SupportUser {
   department: string;
   seniority: Seniority;
   role: 'requester' | 'engineer';
+  /** Line manager, when the world models reporting lines. */
+  managerId?: string;
+  /** Employment type, when the world models it. */
+  employment?: 'employee' | 'contractor';
 }
 
 export interface OnCallShift {
@@ -34,6 +38,8 @@ export interface KbArticle {
   title: string;
   tags: string[];
   body: string;
+  /** The article that replaced this one. A superseded article is kept for the record. */
+  supersededBy?: string;
 }
 
 /** One cell of the severity table: what (service, impact) is worth. */

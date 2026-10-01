@@ -145,6 +145,8 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
         `department: ${user.department}`,
         `seniority: ${user.seniority}`,
         `role: ${user.role}`,
+        ...(user.employment ? [`employment: ${user.employment}`] : []),
+        ...(user.managerId ? [`manager: ${userLabel(world, user.managerId)}`] : []),
         `rotations: ${rotations.length ? rotations.join(', ') : '-'}`,
       ].join('\n');
     },
@@ -214,6 +216,9 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
           [
             `${entry.article.id} - ${entry.article.title}`,
             `tags: ${entry.article.tags.join(', ')}`,
+            ...(entry.article.supersededBy
+              ? [`status: superseded by ${entry.article.supersededBy}`]
+              : []),
             entry.article.body,
           ].join('\n'),
         )
