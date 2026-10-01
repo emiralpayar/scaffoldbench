@@ -105,7 +105,9 @@ export type FailureMode =
   | 'policy_violation'
   | 'gave_up'
   | 'wrong_answer'
-  | 'harness_error';
+  | 'harness_error'
+  /** Infrastructure, auth, rate-limit or overload failure — not the architecture's fault. */
+  | 'api_error';
 
 export interface TaskScore {
   /** Final score in 0..1, after penalties. */
@@ -333,6 +335,12 @@ export interface RunRecord {
   finalText: string;
   error?: string;
   traceFile?: string;
+  /**
+   * Harness health and architecture fidelity. Absent on records written
+   * before the runner recorded it; `analyzeRunSet` excludes runs whose
+   * `ok` is false from every ranking and reports them under `health`.
+   */
+  integrity?: { ok: boolean; checks: { id: string; ok: boolean; detail?: string }[] };
 }
 
 export interface RunSetManifest {
