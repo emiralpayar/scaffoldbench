@@ -5,14 +5,12 @@ import { addedTo, anyOf, blastRadiusRule, within, type ChangeFilter } from '../.
 import { AIRLINE_HANDBOOK } from './handbook';
 import { AIRLINE_INSTRUCTIONS, createAirlineTools } from './tools';
 import {
-  INSURANCE_CASH_WINDOW_DAYS,
   MAX_CHECKED_BAGS_ALLOWED,
-  REFUNDABLE_CABINS,
   baggageFeeCents,
-  cancellationServiceFeeCents,
+  cancellationAmountCents,
+  cashRefundPermitted,
   createAirlineWorld,
   currentFareCents,
-  daysBetween,
   findCabin,
   findFlight,
   findReservation,
@@ -334,31 +332,18 @@ export const airlineMediumTask: Task = defineToolUseTask<AirlineWorld>({
 const HARD_RESERVATION = 'R3311';
 
 /**
- * Cash back to the card is permitted only when one of three independent doors
- * is open. The seed closes all three for R3311: the booking is months old, a
- * basic economy fare is not refundable on its own, and the insurance that would
- * override that fare rule only pays cash outside its window, which this
- * cancellation is inside. What remains is travel credit.
+ * What the customer is owed, and in what form, computed from the seed so the
+ * agent's own ledger entries cannot move the target. The seed closes all
+ * three doors to cash for R3311: the booking is months old, basic economy is
+ * not refundable on its own, and the insurance that would override that only
+ * pays cash outside its window, which this cancellation is inside.
  */
-function cashRefundPermitted(world: AirlineWorld, reservation: Reservation): boolean {
-  if (daysBetween(reservation.bookedOn, world.today) <= 0) return true;
-  if (REFUNDABLE_CABINS.includes(reservation.cabin)) return true;
-  if (!reservation.insurancePurchased) return false;
-  const departure = reservation.segments[0]?.date;
-  if (departure === undefined) return false;
-  return daysBetween(world.today, departure) >= INSURANCE_CASH_WINDOW_DAYS;
-}
-
-/** What the customer is actually owed, and in what form. */
-function expectedSettlement(
-  world: AirlineWorld,
-  reservation: Reservation,
-): { method: 'original_payment' | 'travel_credit'; amountCents: number } {
-  const amountCents =
-    reservation.paidCents - cancellationServiceFeeCents(tierOf(world, reservation));
+function expectedSettlement(): { method: 'original_payment' | 'travel_credit'; amountCents: number } {
+  const seed = createAirlineWorld();
+  const reservation = reservationOrThrow(seed, HARD_RESERVATION);
   return {
-    method: cashRefundPermitted(world, reservation) ? 'original_payment' : 'travel_credit',
-    amountCents,
+    method: cashRefundPermitted(seed, reservation) ? 'original_payment' : 'travel_credit',
+    amountCents: cancellationAmountCents(seed, reservation),
   };
 }
 
@@ -390,10 +375,9 @@ export const airlineHardTask: Task = defineToolUseTask<AirlineWorld>({
       label: 'Settled with exactly one ledger entry, in the right form and for the right amount',
       weight: 4,
       check: (world) => {
-        const reservation = reservationOrThrow(world, HARD_RESERVATION);
         const entry = onlyEntry(world, HARD_RESERVATION);
         if (!entry) return false;
-        const expected = expectedSettlement(world, reservation);
+        const expected = expectedSettlement();
         return (
           entry.kind === 'refund' &&
           entry.method === expected.method &&
@@ -401,9 +385,7 @@ export const airlineHardTask: Task = defineToolUseTask<AirlineWorld>({
         );
       },
       detail: (world) => {
-        const reservation = findReservation(world, HARD_RESERVATION);
-        if (!reservation) return undefined;
-        const expected = expectedSettlement(world, reservation);
+        const expected = expectedSettlement();
         return `expected a single ${expected.method} entry of ${expected.amountCents} cents; ledger holds ${ledgerFor(world, HARD_RESERVATION).length} entries`;
       },
     },
