@@ -2,6 +2,8 @@ import { aggregate, comparisonVerdict, paretoFrontier } from './stats';
 import type { Aggregate, Verdict } from './stats';
 import type { FailureMode, RunRecord, TaskCategory } from './types';
 
+export * from './analysisInference';
+
 /** Everything the site needs about one strategy, precomputed at report time. */
 export interface StrategySummary {
   strategyId: string;
