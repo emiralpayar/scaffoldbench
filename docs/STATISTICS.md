@@ -46,8 +46,10 @@ over tasks of each task's mean:
 ```
 
 where $R_t$ are the arm's healthy repeats of task $t$ and $T$ the number of tasks. When every
-cell is present this is the plain mean of all runs. When some are missing it still weights every
-task equally, so a strategy that lost cells is not averaged over a different task mix.
+cell is present this is the plain mean of all runs. When some repeats are missing it still weights
+every task equally, so a strategy that lost a few runs is not averaged over a different task mix.
+An arm that lost every run of a task is averaged over fewer tasks; `cells` shows it, and the
+paired contrasts below only ever use the cells both arms have.
 
 The population this generalizes to is **tasks like these**, not "these nine tasks re-run forever".
 That is why the task, not the run, is resampled. In the first published run set
@@ -192,13 +194,13 @@ permutation test.
 - *Bootstrap*, by inverting the expanded percentile interval, so that $p \le \alpha$ exactly when
   the $1 - \alpha$ interval excludes 0 (up to Monte Carlo resolution). With $q$ the share of
   replicates at or below $\theta_0$ (ties count half),
-  $p_{>} = F_{t,T-1}\big(\Phi^{-1}(q)\,/\sqrt{T/(T-1)}\big)$. Deep in a tail, where fewer than 20
-  replicates lie beyond $\theta_0$, the replicate count can only say "fewer than 1 in $B$", and
-  would floor every p-value near $1/B$. A large Holm family could then never reject. There, the
-  tail area comes from a normal fit to the replicates; through the expansion that is the one-sample
-  $t$-test. Interval endpoints are always read empirically. With the default 10,000 replicates they
-  sit at least 24 replicates in from six tasks up, where a difference verdict first becomes
-  possible.
+  $p_{>} = F_{t,T-1}\big(\Phi^{-1}(q)\,/\sqrt{T/(T-1)}\big)$. Deep in a tail the replicate
+  count is coarse, and past the last replicate it can only say "fewer than 1 in $B$", which would
+  floor every p-value near $1/B$. A large Holm family could then never reject. So where fewer than
+  20 replicates lie beyond $\theta_0$, the tail area comes from a normal fit to the replicates;
+  through the expansion that is the one-sample $t$-test. Interval endpoints are always read
+  empirically. With the default 10,000 replicates they sit at least 24 replicates in from six
+  tasks up, where a difference verdict first becomes possible.
 - *Sign-flip*: under $H_0$ each task's difference is as likely to have either sign, so the
   observed sum is compared with the sums under all $2^T$ sign assignments. This is Fisher's
   randomization test for paired data, exact under exchangeability. It is enumerated exactly up to
@@ -225,9 +227,10 @@ run-level scenarios of [§8](#8-validation), and up to 13% when a few whole task
 with neither guard in place:
 
 - **Informative tasks.** Equivalence also needs the spread of the difference to rest on at least
-  `minTasks` tasks, because from a handful of lumpy values the bootstrap understates it. Two counts
-  must reach the minimum: the tasks on which the two arms differed in some repeat, and the
-  effective number of tasks carrying the spread,
+  `minTasks` tasks, because from a handful of lumpy values the bootstrap understates it; otherwise
+  $p_{\text{eq}} = 1$ with `caveat: 'few-informative-tasks'`. Two counts must reach the minimum:
+  the tasks on which the two arms differed in some repeat, and the effective number of tasks
+  carrying the spread,
 
   ```math
   n_{\text{spread}} = \frac{\big(\sum_t e_t^2\big)^2}{\sum_t e_t^4}, \qquad e_t = D_t - \hat{\theta}
@@ -306,6 +309,12 @@ and one **metric**, pooled across **every model** in the run set:
 Contrasts without enough tasks to test are left out of the family size. Which hypotheses are
 testable depends on how many tasks ran, not on the outcome.
 
+Every family is adjusted on its own at `alpha`. A conclusion that needs contrasts from two
+primary families at once (say, a `baseline` and a `scale` contrast on pass) has a familywise
+error rate of up to $2\alpha$. A pre-registration that names several primary families should
+either call one of them confirmatory or split $\alpha$ between them by running with a smaller
+`alpha`, which also widens every interval to match.
+
 ## 4. Scaffold or Scale?
 
 **Model order.** Models are ordered from cheapest to most capable: `modelOrder` first if given,
@@ -363,8 +372,9 @@ ranking**:
 `health` reports how many runs were excluded and why: `byReason`, `byStrategy`, `byModel`,
 `byCheck` (the ids of failed integrity checks), `byFailureMode`, and `excludedRuns` with each run's
 reasons. It also gives the run set's `integrity` rate, and `duplicates`: healthy runs that repeated
-a filled cell, where the later run is kept. `summarizeRuns` applies the same exclusion to its
-rankings and counts the excluded runs in `totals.excludedRuns`.
+a filled cell, where the later run is kept (on a tie, the larger run id), so the result does not
+depend on the order of the records. `summarizeRuns` applies the same exclusion to its rankings and
+counts the excluded runs in `totals.excludedRuns`.
 
 ## 7. Power planning
 
@@ -472,7 +482,7 @@ console.log(plan?.repeatsNeeded, plan?.tasksNeeded, plan?.minimumDetectableEffec
 | `alpha` | 0.05 | familywise error rate; intervals are 1 − alpha |
 | `iterations` | 10,000 | bootstrap replicates (and Monte Carlo sign flips above 16 tasks) |
 | `seed` | `0xa11ce` | PRNG seed; same records and seed give identical output |
-| `minTasks` | 5 (never below 2) | fewest tasks, and fewest differing tasks for equivalence |
+| `minTasks` | 5 (never below 2) | fewest tasks for any verdict, and fewest tasks behind the spread for equivalence |
 | `quality` | `'score'` | quality axis of the frontier and of the strategy order |
 | `excludeFailureModes` | `['api_error']` | failure modes that say nothing about the architecture |
 | `interactionModels` | cheapest vs most capable | model pairs for the interaction contrasts |
@@ -520,8 +530,8 @@ for the site and CLI. They are descriptive:
   instances of one template are correlated. The intervals then treat them as more independent than
   they are. A template level of clustering is not implemented.
 - **Repeats are paired by index.** Within a task, repeat r of one arm is paired with repeat r of
-  the other. That only decides which cells count as complete; the task-level difference is the
-  same either way when every cell is present.
+  the other. That decides which cells count as complete and whether a task "differed in some
+  repeat"; the task-level difference is the same either way when every cell is present.
 - **Small-sample bootstrap.** The expanded percentile interval is close to nominal for the
   symmetric scenarios above, but no bootstrap is exact at 5–10 tasks, and skew costs coverage.
   With exponentially distributed task effects (a few tasks where a scaffold costs far more), the
@@ -531,7 +541,12 @@ for the site and CLI. They are descriptive:
 - **Equivalence on few, lumpy differences.** The sign-flip halves of the TOST assume symmetric
   differences. The informative-task rule and the binary floor cover the failure modes the
   simulations found, and the measured rates are in the table. They are guards, not a proof for
-  every distribution. Read an `equivalent` verdict together with its interval and its task count.
+  every distribution. One failure no rule can catch: a gap carried by tasks that one arm loses
+  outright, none of which the run set happened to include. If 5% of tasks were lost outright, 30
+  tasks would contain none of them 21% of the time ($0.95^{30}$), and such a run set cannot be told
+  from two identical arms. That risk falls below $\alpha$ only from
+  $\log \alpha / \log(1 - m)$ tasks on, 59 for a 5-point margin. Read an `equivalent` verdict
+  together with its interval and its task count.
 - **Holm is conservative** when tests are positively correlated, as contrasts sharing a baseline
   are. It never overstates.
 - **Cost is notional.** `costUsd` is the SDK's figure. Ratios within one model are robust to the
