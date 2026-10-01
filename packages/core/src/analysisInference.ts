@@ -32,9 +32,11 @@ export interface InferenceSettings {
 export type ContrastVerdict = 'better' | 'worse' | 'equivalent' | 'inconclusive';
 
 /**
- * Why a contrast could not reach a verdict, when the data decided that:
- * fewer tasks than the minimum; every task moved by the same amount; or
- * fewer tasks than the minimum on which the two arms differed at all.
+ * What the data withheld from a contrast. `too-few-tasks`: fewer tasks than
+ * the minimum, so no verdict. `no-variation`: every task moved by the same
+ * amount, so there is no interval and no equivalence; a difference can
+ * still be shown if that amount is not zero. `few-informative-tasks`: too
+ * few tasks on which the arms differed to show equivalence.
  */
 export type ContrastCaveat = 'too-few-tasks' | 'no-variation' | 'few-informative-tasks';
 
@@ -342,7 +344,7 @@ export interface PairedTest {
   tasks: number;
   /** Mean over tasks of the task-level difference. */
   estimate: number;
-  /** Two-sided (1 − α) expanded percentile interval of the estimate. */
+  /** Two-sided (1 − α) expanded percentile interval; null for one task or when every task moved alike. */
   ci: Interval | null;
   /** Two-sided p for H₀: no difference; the larger of bootstrap and sign-flip. Null when untestable. */
   pDifference: number | null;
@@ -417,10 +419,15 @@ export function pairedTest(
   const tolerance = 1e-9 * Math.max(scale, Math.abs(margin), 1e-12);
   if (hi - lo <= tolerance) {
     // Every task moved by the same amount (often: every task tied). The
-    // bootstrap distribution is a point, which is no evidence about spread,
-    // so neither a winner nor equivalence can be claimed from it. The test
-    // stays in its family with p = 1 so excluding it cannot help the others.
-    return { tasks, estimate, ci, pDifference: 1, pEquivalence: 1, caveat: 'no-variation' };
+    // bootstrap distribution is a point, which says nothing about spread, so
+    // there is no interval and no equivalence. Whether that amount is zero is
+    // still a fair question for the sign-flip test, which needs no spread:
+    // with every task moving the same non-zero way, only the all-plus and
+    // all-minus sign vectors reach the observed sum, so p = 2/2^T exactly.
+    // The test stays in its family either way, so leaving it out cannot help
+    // the others.
+    const pDifference = Math.abs(estimate) > tolerance ? Math.min(1, 2 ** (1 - tasks)) : 1;
+    return { tasks, estimate, ci: null, pDifference, pEquivalence: 1, caveat: 'no-variation' };
   }
 
   const cells = options.cellDiffs?.length === tasks ? options.cellDiffs : undefined;

@@ -187,13 +187,24 @@ describe('pairedTest', () => {
     expect(test.estimate).toBeCloseTo(0.3);
   });
 
-  it('refuses both a winner and equivalence when every task moved by the same amount', () => {
+  it('refuses equivalence and an interval when every task moved by the same amount', () => {
     for (const diffs of [Array(9).fill(0), Array(9).fill(0.1)]) {
       const test = pairedTest(diffs, 0.05, settings);
       expect(test.caveat).toBe('no-variation');
-      expect(test.pDifference).toBe(1);
+      expect(test.ci).toBeNull();
       expect(test.pEquivalence).toBe(1);
     }
+  });
+
+  it('still tests a shared non-zero shift with the exact sign-flip p', () => {
+    // Every task tied: nothing to find.
+    expect(pairedTest(Array(9).fill(0), 0.05, settings).pDifference).toBe(1);
+    // Nine tasks all moving +1 (one arm passes everything, the other nothing):
+    // 2 of 2^9 sign vectors are as extreme, with or without a bootstrap.
+    expect(pairedTest(Array(9).fill(1), 0.05, settings).pDifference).toBe(2 / 2 ** 9);
+    expect(pairedTest(Array(9).fill(-0.4), 0.05, settings).pDifference).toBe(2 / 2 ** 9);
+    // Above the enumeration limit the same closed form holds, not a Monte Carlo floor.
+    expect(pairedTest(Array(40).fill(1), 0.05, settings).pDifference).toBe(2 / 2 ** 40);
   });
 
   it('detects a consistent paired effect that marginal intervals miss', () => {

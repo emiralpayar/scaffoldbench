@@ -28,7 +28,7 @@ Two layers live in [`packages/core`](../packages/core/src):
 | Which interval? | A **cluster bootstrap with Hesterberg's expanded percentile interval**: 10,000 replicates, seeded. |
 | What can a contrast conclude? | **better**, **worse**, **equivalent** (within a stated margin), or **inconclusive**. |
 | Multiplicity? | **Holm** within each family (one metric, one kind of contrast, every model). |
-| When is no verdict given? | Fewer than 5 tasks; every task moved by the same amount; or, for equivalence, fewer than 5 tasks on which the arms differed at all. |
+| When is no verdict given? | Fewer than 5 tasks; every task tied; or, for equivalence, fewer than 5 tasks on which the arms differed at all. |
 | What is left out? | Runs whose `integrity.ok` is false and runs that hit an `api_error`. They are counted under `health`, not ranked. |
 | Quality metrics | Score (partial credit) and pass rate, compared as differences. |
 | Resource metrics | Cost and latency, compared as geometric-mean ratios. |
@@ -235,9 +235,15 @@ exactly the margin arrives as rare, large jumps (8–10% instead of 5% before th
   interaction differences of pass/fail outcomes, because the two models' runs are independent.
 
 **No verdict at all** when there are fewer than `minTasks` (default 5) tasks (`caveat:
-'too-few-tasks'`), or when every task moved by exactly the same amount (`'no-variation'`). In the
-second case the bootstrap distribution is a point, which says nothing about spread. Both tests
-then get $p = 1$, and the contrast stays in its Holm family, so excluding it cannot help the others.
+'too-few-tasks'`).
+
+**Every task moved by exactly the same amount** (`caveat: 'no-variation'`). The bootstrap
+distribution is then a point, which says nothing about spread, so there is no interval (`ci:
+null`) and no equivalence ($p_{\text{eq}} = 1$). Whether the shared amount is zero is still
+testable without any spread. When every task tied, $p = 1$. When every task moved the same
+non-zero way, as when one arm passes every run and the other fails every run, only the all-plus
+and all-minus sign vectors reach the observed sum, and the exact sign-flip $p = 2/2^T$ decides.
+Either way the contrast stays in its Holm family, so leaving it out cannot help the others.
 
 ### 3.4 The verdict
 

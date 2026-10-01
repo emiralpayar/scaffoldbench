@@ -321,8 +321,27 @@ describe('contrasts', () => {
   it('refuses a verdict when every task tied on score', () => {
     const score = contrast(costlyAnalysis.models[0]!.vsBaseline, 'score', 'plan-execute');
     expect(score.estimate).toBe(0);
+    expect(score.ci).toBeNull();
     expect(score.verdict).toBe('inconclusive');
     expect(score.caveat).toBe('no-variation');
+  });
+
+  it('calls a clean sweep better even though every task moved by the same amount', () => {
+    // single fails every run of eight tasks; plan-execute passes every run.
+    // The task differences are all exactly +1: no interval, but the exact
+    // sign-flip p is 2/2^8, and that is a difference.
+    const sweep = grid({
+      strategies: ['single', 'plan-execute'],
+      tasks: 8,
+      repeats: 2,
+      cell: ({ strategyId }) => (strategyId === 'single' ? { passed: false, score: 0, failureMode: 'wrong_answer' } : {}),
+    });
+    const pass = contrast(analyzeRunSet(sweep, fast).models[0]!.vsBaseline, 'pass', 'plan-execute');
+    expect(pass.estimate).toBe(1);
+    expect(pass.ci).toBeNull();
+    expect(pass.caveat).toBe('no-variation');
+    expect(pass.pValue).toBe(2 / 2 ** 8);
+    expect(pass.verdict).toBe('better');
   });
 
   it('calls a consistent score gain better and a negligible one equivalent', () => {
