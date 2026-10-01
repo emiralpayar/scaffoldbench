@@ -7,7 +7,7 @@ import { PageHeader, Stat } from '../../../components/Layout';
 import { RunSetBanner } from '../../../components/RunSetMeta';
 import { ForestPlot, forestDomain } from '../../../components/charts/ForestPlot';
 import { analyzeForSite } from '../../../lib/analysis';
-import { describeModel, forestRows, modelTableRows } from '../../../lib/chartData';
+import { describeModel, describeUnverifiedModel, forestRows, modelTableRows } from '../../../lib/chartData';
 import { formatInt, formatUsd } from '../../../lib/format';
 import { modelLabel, modelShortName } from '../../../lib/models';
 import { loadRunSet } from '../../../lib/server/runSet';
@@ -25,6 +25,7 @@ const VERDICT_LABEL = {
   inconclusive: { text: 'not separable', className: 'text-muted' },
   control: { text: 'control', className: 'text-ink-2' },
   '—': { text: '—', className: 'text-muted' },
+  unverified: { text: 'no verdict', className: 'text-muted' },
 } as const;
 
 export default async function ResultsPage() {
@@ -36,6 +37,8 @@ export default async function ResultsPage() {
   const allRows = analysis.models.flatMap((model) => forestRows(model));
   const domain = allRows.length > 0 ? forestDomain(allRows) : undefined;
   const spent = data.records.reduce((sum, record) => sum + record.costUsd, 0);
+  // Without fidelity checks a row may not be the design it is named after.
+  const verified = data.verification !== 'unverified';
 
   return (
     <>
@@ -47,7 +50,7 @@ export default async function ResultsPage() {
         lede="Each architecture is compared with the single-agent control on the same tasks and repeats. Intervals are bootstrapped over tasks, so a lucky task cannot pass for a better design."
         aside={
           <div className="flex flex-wrap gap-x-8 gap-y-4">
-            <Stat label="Ranked runs" value={formatInt(health.rankable)} />
+            <Stat label={verified ? 'Ranked runs' : 'Runs'} value={formatInt(health.rankable)} />
             <Stat label="Models" value={data.models.length} />
             <Stat label="Spent" value={formatUsd(spent)} />
           </div>
@@ -75,7 +78,9 @@ export default async function ResultsPage() {
               </h2>
               <span className="num text-[0.8125rem] text-muted">{modelLabel(model.model)} · {model.model}</span>
             </div>
-            <p className="prose-serif mb-6 max-w-3xl">{describeModel(model)}</p>
+            <p className="prose-serif mb-6 max-w-3xl">
+              {verified ? describeModel(model) : describeUnverifiedModel(model)}
+            </p>
 
             <div className="card p-5 sm:p-6">
               <ForestPlot
@@ -91,7 +96,11 @@ export default async function ResultsPage() {
                 <thead>
                   <tr className="border-b border-rule text-left">
                     {['Architecture', 'Runs', 'Score', 'Interval', 'Pass', 'Cost / run', 'Latency', 'Δ vs single', 'Interval', 'Cost ×', 'Verdict'].map((head, index) => (
-                      <th key={index} scope="col" className={`eyebrow whitespace-nowrap px-3 py-2.5 font-normal ${index === 0 ? '' : 'text-right'}`}>
+                      <th
+                        key={index}
+                        scope="col"
+                        className={`eyebrow whitespace-nowrap px-3 py-2.5 font-normal ${index === 0 ? 'sticky left-0 z-[1] bg-surface' : 'text-right'}`}
+                      >
                         {head}
                       </th>
                     ))}
@@ -99,12 +108,18 @@ export default async function ResultsPage() {
                 </thead>
                 <tbody>
                   {rows.map((row) => {
-                    const verdict = VERDICT_LABEL[row.verdict];
+                    const verdict =
+                      verified || row.verdict === 'control' || row.verdict === '—'
+                        ? VERDICT_LABEL[row.verdict]
+                        : VERDICT_LABEL.unverified;
                     return (
                       <tr key={row.strategyId} className="border-b border-rule last:border-0">
-                        <th scope="row" className="px-3 py-2.5 text-left font-normal">
+                        {/* Pinned, so a phone scrolling to the deltas still sees whose they are. */}
+                        <th scope="row" className="sticky left-0 z-[1] bg-surface px-3 py-2.5 text-left font-normal">
                           <span className="flex items-center gap-2.5">
-                            <ArchitectureGlyph id={row.strategyId} width={30} />
+                            <span className="hidden sm:contents">
+                              <ArchitectureGlyph id={row.strategyId} width={30} />
+                            </span>
                             <span className="whitespace-nowrap text-ink">{row.label}</span>
                             {row.onFrontier ? (
                               <span className="chip !px-1.5 !py-0 !text-[0.625rem]" title="On the mean score-against-cost frontier for this model">

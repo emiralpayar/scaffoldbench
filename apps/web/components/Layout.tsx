@@ -9,7 +9,7 @@ export function PageHeader({
   mono = false,
 }: {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   lede?: string;
   aside?: ReactNode;
   mono?: boolean;

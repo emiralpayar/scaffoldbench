@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Estimate, ModelAnalysis, SiteAnalysis } from '../lib/analysis';
 import {
   describeModel,
+  describeUnverifiedModel,
   modelTableRows,
   payoffData,
   payoffDomains,
@@ -144,6 +145,12 @@ describe('headline prose', () => {
   it('describes one model with a proper list', () => {
     const text = describeModel(model('claude-haiku-4-5-20251001', ['better', 'better', 'better']));
     expect(text).toContain('Plan-execute, Orchestrator-workers and Plan-execute-verify score reliably above');
+  });
+
+  it('draws no verdict from a run set without fidelity checks', () => {
+    const text = describeUnverifiedModel(model('claude-sonnet-5-5', ['better', 'equivalent', 'worse']));
+    expect(text).toContain('Sonnet 5.5');
+    expect(text).not.toMatch(/\b(better|worse|equivalent|reliably)\b/);
   });
 
   it('says nothing about scale when there is only one model', () => {

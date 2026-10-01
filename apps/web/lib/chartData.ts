@@ -292,6 +292,15 @@ export function modelTableRows(model: ModelAnalysis, baselineId: string): ModelT
 }
 
 /** What one model's numbers support, in a sentence or two, and nothing more. */
+/**
+ * The reading for a model in a run set without fidelity checks. Its
+ * intervals are real arithmetic on what ran, but nothing shows that what ran
+ * was the design each row is named after, so no verdict is drawn from them.
+ */
+export function describeUnverifiedModel(model: ModelAnalysis): string {
+  return `These ${modelShortName(model.model)} runs carry no fidelity checks, so nothing shows that each architecture executed its design. The numbers below describe what ran; they support no verdict about the designs.`;
+}
+
 export function describeModel(model: ModelAnalysis): string {
   const name = modelShortName(model.model);
   const better = model.contrasts.filter((c) => c.verdict === 'better');
