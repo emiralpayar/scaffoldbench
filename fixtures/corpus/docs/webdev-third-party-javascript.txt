@@ -43,6 +43,8 @@ Scripts with defer wait to run until the browser is done parsing the HTML.
 
 Using these attributes can significantly speed up page load. For example, Telegraph deferred all their scripts, including ads and analytics, and improved the ad loading time by an average of four seconds.
 
+Note: Analytics scripts are usually loaded early so you don't miss any valuable analytics data. Fortunately, there are patterns to initialize analytics lazily while retaining early page-load data.
+
 Establish early connections to required origins
 
 You can save 100–500 ms by establishing early connections to important third-party origins.
@@ -54,6 +56,8 @@ preconnect
 <link rel="preconnect"> tells the browser that your page wants to establish a connection to another origin, and that you'd like the process to start as soon as possible. When the browser requests a resource from the pre-connected origin, the download starts immediately.
 
 <link rel="preconnect" href="https://cdn.example.com">
+
+Caution: Preconnect to only critical domains the page will soon, because the browser closes any connection that isn't used within 10 seconds. Unnecessary preconnecting can delay other important resources, so limit the number of preconnected domains and test the impact of preconnecting.
 
 dns-prefetch
 
@@ -82,6 +86,8 @@ You can also set third-party content to load only when users first scroll to tha
 
 Intersection Observer is a browser API that efficiently detects when an element enters or exits the browser's viewport, and you can use it to implement this technique. lazysizes is a popular JavaScript library for lazy loading images and iframes. It supports YouTube embeds and widgets. It also has optional support for Intersection Observer.
 
+Caution: Be careful when lazy loading resources with JavaScript. If JavaScript fails to load, perhaps because of flaky network conditions, your resources don't load at all.
+
 Using the loading attribute for lazy loading images and iframes is a great alternative to JavaScript techniques, and it has recently become available in Chrome 76!
 
 Optimize how you serve third-party scripts
@@ -107,6 +113,8 @@ Self-hosting third-party scripts is an option that gives you more control over a
 For example, Casper managed to shave 1.7 seconds off load times by self-hosting an A/B testing script.
 
 Self-hosting comes with one big downside though: scripts can go out of date and won't get automatic updates when there's an API change or a security fix.
+
+Caution: Manually updating scripts can add a lot of overhead to your development process, and you might miss out on important updates. If you aren't using CDN hosting to serve all your third-party resources, you're also missing out on edge-caching and you have to optimize your server's compression.
 
 Use service workers to cache scripts from third-party servers
 

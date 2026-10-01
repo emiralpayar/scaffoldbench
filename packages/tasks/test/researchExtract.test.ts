@@ -104,17 +104,29 @@ describe('extractDocument', () => {
     const html = [
       '<html><head><title>Doc &amp; Title</title></head><body>',
       '<header>site header</header><nav>menu</nav>',
-      '<article class="content"><h1>Heading</h1><aside>related</aside><p>Body text.</p>',
+      '<article class="content"><h1>Heading</h1><aside class="toc">related</aside><p>Body text.</p>',
       '<div class="feedback">Was this helpful?</div><footer>page footer</footer></article>',
       '<footer>site footer</footer></body></html>',
     ].join('');
     const out = extractDocument(html, {
       kind: 'html',
       root: { tag: 'article', attr: 'class', value: 'content' },
-      drop: [{ tag: 'div', attr: 'class', value: 'feedback' }],
+      drop: [
+        { tag: 'div', attr: 'class', value: 'feedback' },
+        { tag: 'aside', attr: 'class', value: 'toc' },
+      ],
     });
     expect(out.title).toBe('Doc & Title');
     expect(out.text).toBe('Heading\n\nBody text.');
+  });
+
+  it('keeps an <aside> unless the site says it is furniture: web.dev writes its notes in them', () => {
+    const html =
+      '<body><article>Scripts block parsing.<aside class="note"><strong>Note:</strong>&nbsp;Module scripts are ' +
+      'deferred by default.</aside><p>More text.</p></article></body>';
+    expect(extractDocument(html, { kind: 'html' }).text).toBe(
+      'Scripts block parsing.\nNote: Module scripts are deferred by default.\n\nMore text.',
+    );
   });
 
   it('treats <?…> and <!…> like the comments a browser takes them for', () => {

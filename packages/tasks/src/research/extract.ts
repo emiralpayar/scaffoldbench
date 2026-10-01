@@ -49,7 +49,12 @@ export interface ExtractedDocument {
   text: string;
 }
 
-/** Elements that never carry article text, removed from every HTML page. */
+/**
+ * Elements that never carry article text, removed from every HTML page.
+ * `<aside>` is not among them: web.dev sets its notes, cautions and key terms
+ * in `<aside>`, and those are article text. A site whose asides are sidebars
+ * drops them in its own extractor.
+ */
 const ALWAYS_DROPPED = [
   'script',
   'style',
@@ -59,7 +64,6 @@ const ALWAYS_DROPPED = [
   'nav',
   'header',
   'footer',
-  'aside',
   'form',
   'button',
   'iframe',
@@ -107,7 +111,8 @@ const RFC_PAGE_HEADER = /^RFC \d+ {2,}.* {2,}[A-Z][a-z]+ \d{4}\s*$/;
  * Older RFCs are paginated for line printers: every 58 lines a footer, a form
  * feed and a running header interrupt the text, often mid-sentence. Those
  * three lines are layout, not content, and leaving them in would break any
- * sentence quoted across a page boundary. Nothing else is touched.
+ * sentence quoted across a page boundary. Otherwise only whitespace changes:
+ * trailing spaces go, and the blank lines a page break leaves become one.
  */
 export function rfcPlainText(raw: string): string {
   const lines = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
@@ -245,7 +250,7 @@ export function dropElements(html: string, matcher: ElementMatcher): string {
 // ---------------------------------------------------------------------------
 
 const BLOCK_TAGS = new Set([
-  'p', 'div', 'section', 'article', 'main', 'ul', 'ol', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody',
+  'p', 'div', 'section', 'article', 'aside', 'main', 'ul', 'ol', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody',
   'tfoot', 'caption', 'blockquote', 'figure', 'figcaption', 'details', 'summary', 'hr', 'address',
 ]);
 

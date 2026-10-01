@@ -28,9 +28,9 @@ export const LICENSES: Record<LicenseId, LicenseInfo> = {
     name: 'IETF Trust Legal Provisions (BCP 78)',
     url: 'https://trustee.ietf.org/license-info',
     terms:
-      'RFCs may be copied and distributed in full without modification. The text is reproduced as ' +
-      'published, with its own copyright notice; only the print pagination of older RFCs (page ' +
-      'footers, form feeds and running headers) is removed.',
+      'RFCs may be copied and distributed in full without modification (TLP section 3.c). The text is ' +
+      'reproduced as published, with its own copyright notice; only the print pagination of older RFCs ' +
+      '(page footers, form feeds and running headers) is removed, with the blank lines around it.',
   },
   'us-government-work': {
     name: 'Work of the U.S. Government (public domain in the United States, 17 U.S.C. § 105)',
@@ -89,9 +89,11 @@ const RFC_EXTRACTOR: Extractor = { kind: 'rfc-text' };
  * The plain-text rendering is the archival one and needs no HTML clean-up.
  * Every common address of the same RFC is an alias, because an agent that
  * types `datatracker.ietf.org/doc/html/rfc9110` is asking for this document,
- * not for a different one.
+ * not for a different one. `stream` names the body that produced it when that
+ * is not the IETF (RFC 9106 is an IRTF document); every stream's RFCs carry
+ * the same IETF Trust copyright and licence.
  */
-function rfc(number: number, title: string, options: { httpwg?: boolean } = {}): CorpusSource {
+function rfc(number: number, title: string, options: { httpwg?: boolean; stream?: 'IRTF' } = {}): CorpusSource {
   const name = `rfc${number}`;
   return {
     id: name,
@@ -107,7 +109,7 @@ function rfc(number: number, title: string, options: { httpwg?: boolean } = {}):
       ...(options.httpwg ? [`https://httpwg.org/specs/${name}.html`] : []),
     ],
     title: `RFC ${number}: ${title}`,
-    publisher: 'IETF / RFC Editor',
+    publisher: `${options.stream ?? 'IETF'} / RFC Editor`,
     license: 'ietf-trust',
     attribution: `RFC ${number}, “${title}”. Copyright (c) IETF Trust and the persons identified as the document authors.`,
     extract: RFC_EXTRACTOR,
@@ -118,6 +120,8 @@ const MDN_EXTRACTOR: Extractor = {
   kind: 'html',
   root: { tag: 'main', attr: 'id', value: 'content' },
   drop: [
+    // The table of contents and the navigation sidebar; MDN's notes are `div.notecard`.
+    { tag: 'aside' },
     { tag: 'div', attr: 'class', value: 'article-footer' },
     { tag: 'mdn-survey' },
   ],
@@ -298,5 +302,5 @@ export const CORPUS_SOURCES: CorpusSource[] = [
       dropLines: [/^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$/],
     },
   },
-  rfc(9106, 'Argon2 Memory-Hard Function for Password Hashing and Proof-of-Work Applications'),
+  rfc(9106, 'Argon2 Memory-Hard Function for Password Hashing and Proof-of-Work Applications', { stream: 'IRTF' }),
 ];

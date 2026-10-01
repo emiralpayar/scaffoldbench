@@ -21,6 +21,8 @@ A parser-blocking resource interrupts the HTML parser, such as a <script> elemen
 
 When using external JavaScript files (without async or defer— or type=module which is defer by default), the parser is blocked from when the file is discovered until it is downloaded, parsed, and executed. When using inline JavaScript, the parser is similarly blocked until the inline script is parsed and executed.
 
+Note: A parser-blocking <script> must also wait for any in-flight render-blocking CSS resources to arrive and be parsed before the browser can execute it. This is also by design, as a script may access styles declared in the render-blocking style sheet (for example, by using element.getComputedStyle()).
+
 The preload scanner
 
 The preload scanner is a browser optimization in the form of a secondary HTML parser that scans the raw HTML response to find and speculatively fetch resources before the primary HTML parser would otherwise discover them. For example, the preload scanner would allow the browser to start downloading a resource specified in an <img> element, even when the HTML parser is blocked while fetching and processing resources such as CSS and JavaScript.
@@ -33,6 +35,8 @@ To take advantage of the preload scanner, critical resources should be included 
 - CSS @import declarations.
 
 These resource loading patterns are all late-discovered resources, and therefore don't benefit from the preload scanner. Avoid them whenever possible. If avoiding such patterns isn't possible, however, you may be able to use a preload hint to avoid resource discovery delays.
+
+Note: The preload resource hint is covered in the next module on resource hints.
 
 CSS
 
@@ -59,6 +63,8 @@ h2 {
 /* Minified CSS: */
 h1,h2{color:#000}h1{font-size:2em}h2{font-size:1.5em}
 
+Note: Some advanced CSS minifiers may employ additional optimizations, such as coalescing redundant rules into multiple selectors. However, such advanced CSS optimizations can be risky, and may not work or scale well with all CSS approaches or design systems.
+
 In its most basic form, CSS minification is an effective optimization that could improve your website's FCP, and perhaps even LCP in some cases. Tools such as bundlers can automatically perform this optimization for you in production builds.
 
 Remove unused CSS
@@ -70,6 +76,8 @@ To discover unused CSS for the current page, use the Coverage tool in Chrome Dev
 The coverage tool in Chrome DevTools is useful for detecting CSS (and JavaScript) unused by the current page. It can be used to split CSS files into multiple resources to be loaded by different pages, as opposed to shipping a much larger CSS bundle that can delay rendering of the page.
 
 Removing unused CSS has a two-fold effect: in addition to reducing download time, you're optimizing render tree construction, as the browser needs to process fewer CSS rules.
+
+Important: Depending on the architecture of your website, it may not be possible to completely eliminate unused CSS—nor should you expect to. Focus on big wins: if you see a large part of a CSS file that is unused by the current page, it may either be used by a different page (which you can move to a different file altogether), or be deleted entirely if the CSS is no longer being used in your project.
 
 Avoid CSS @import declarations
 
@@ -87,9 +95,13 @@ The reason for this is that in order for an @import declaration to be discovered
 
 In most cases, you can replace the @import by using a <link rel="stylesheet"> element. <link> elements allow style sheets to be downloaded concurrently and reduces overall load time, as opposed to @import declarations, which downloads style sheets consecutively.
 
+Note: If you need to use @import—such as for cascade layers or third-party style sheets—you can mitigate the delay by using the preload directive for the imported style sheet. Additionally, CSS preprocessors—such as SASS or LESS—commonly use the @import syntax as part of a developer experience improvement that allows for separate and more modularized source files. However, when a CSS preprocessor encounters @import declarations, the referenced files are bundled and written into a single style sheet, avoiding the consecutive request penalty that @import causes in plain CSS.
+
 Inline critical CSS
 
 The time it takes to download CSS files can increase a page's FCP. Inlining critical styles in the document <head> eliminates the network request for a CSS resource, and—when done correctly—can improve initial load times when a user's browser cache is not primed. The remaining CSS can be loaded asynchronously, or appended at the end of the <body> element.
+
+Key term: Critical CSS refers to the styles required to render content that is visible within the initial viewport. The initial viewport concept is sometimes referred to as "above the fold". The remaining content on a page is left unstyled while the remaining CSS is loaded asynchronously.
 
 <head>
   <title>Page Title</title>
@@ -100,6 +112,8 @@ The time it takes to download CSS files can increase a page's FCP. Inlining crit
   <!-- Other page markup... -->
   <link rel="stylesheet" href="non-critical.css">
 </body>
+
+Important: Extracting and maintaining critical styles can be difficult. Which styles should be included? Which viewport(s) should be targeted? Can the process be automated? What happens if a user scrolls down before the non-critical CSS has loaded? How are users affected if they experience a FOUC? These are all good questions that should be considered, as your website's architecture may make using critical CSS prohibitively difficult. However, the performance benefits can be worth the effort in some select cases, so investigate whether critical CSS is a viable option for your website!
 
 On the downside, inlining a large amount of CSS adds more bytes to the initial HTML response. Because HTML resources often can't be cached for very long—or at all—this means that the inlined CSS is not cached for subsequent pages that may use the same CSS in external style sheets. Test and measure your page's performance to make sure the trade-offs are worth the effort.
 
@@ -120,6 +134,8 @@ async and defer allow external scripts to load without blocking the HTML parser 
 Sourced from https://html.spec.whatwg.org/multipage/scripting.html
 
 Scripts loaded with async are parsed and executed immediately once downloaded, while scripts loaded with defer are executed when HTML document parsing is finished—this occurs at the same time as the browser's DOMContentLoaded event. Additionally, async scripts may execute out-of-order, while defer scripts are executed in the order in which they appear in the markup.
+
+Note: Scripts loaded using the type="module" attribute are deferred by default, while scripts loaded by injecting <script> markup into the DOM with JavaScript behave like async scripts.
 
 Client-side rendering
 

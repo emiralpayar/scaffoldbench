@@ -473,6 +473,17 @@ describe('shipped corpus integrity', () => {
     }
   });
 
+  it('keeps the article text that sites set in callouts', () => {
+    // web.dev writes notes in <aside>; an extractor that dropped every aside lost them.
+    expect(corpus.document('webdev-optimize-resource-loading')?.text).toContain(
+      'Note: Scripts loaded using the type="module" attribute are deferred by default',
+    );
+    expect(corpus.document('webdev-third-party-javascript')?.text).toContain('Caution: Be careful when lazy loading resources');
+    // MDN's notes are div.notecard, kept; its asides are the two sidebars, dropped.
+    expect(corpus.document('mdn-status-308')?.text).toContain('Note: Some Web applications may use the 308 Permanent Redirect');
+    expect(corpus.document('mdn-status-308')?.text).not.toMatch(/^In this article$/m);
+  });
+
   it('has an exact normalized-offset map for every document', () => {
     // The scorer's fast path; a document without one is still scored exactly, but slowly.
     for (const document of corpus.documents) expect(normalizedOffsets(document.text), document.id).toBeDefined();
