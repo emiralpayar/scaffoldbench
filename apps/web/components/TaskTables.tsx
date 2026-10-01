@@ -12,7 +12,7 @@ import {
   formatScore,
   formatUsd,
 } from '../lib/format';
-import { MiniBar } from './ScoreBar';
+import { MiniBar } from './MiniBar';
 import { Verdict } from './Layout';
 
 export interface StrategyCellRow {

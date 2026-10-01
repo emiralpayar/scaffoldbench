@@ -3,7 +3,7 @@ import type { Penalty, ScoreItem } from '@arena/core';
 import type { PhaseRow } from '../lib/derive';
 import { FULL_CREDIT, formatDuration, formatPercent, formatScore, formatUsd } from '../lib/format';
 import type { RunRecord } from '../lib/records';
-import { MiniBar } from './ScoreBar';
+import { MiniBar } from './MiniBar';
 import { Tag, Verdict } from './Layout';
 
 /** The graded assertions behind a score, each as a pass, a partial or a miss. */

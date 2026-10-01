@@ -2,21 +2,21 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { EmptyState } from '../../../components/EmptyState';
-import { Field, PageHeader, Panel, Tag } from '../../../components/Layout';
+import { EmptyState } from '../../../../components/EmptyState';
+import { Field, PageHeader, Panel, Tag } from '../../../../components/Layout';
 import {
   PenaltyList,
   PhaseTable,
   RunHeadline,
   ScoreBreakdown,
   ScoreMetadata,
-} from '../../../components/RunDetail';
-import { RunSetBanner } from '../../../components/RunSetMeta';
-import { TraceTimeline } from '../../../components/TraceTimeline';
-import { buildPhaseRows, findRun, strategyLabel } from '../../../lib/derive';
-import { formatDuration, formatInt, formatUsd } from '../../../lib/format';
-import { modelShortName } from '../../../lib/models';
-import { EMPTY_PARAM, loadRunSet, loadTrace } from '../../../lib/server/runSet';
+} from '../../../../components/RunDetail';
+import { RunSetBanner } from '../../../../components/RunSetMeta';
+import { TraceTimeline } from '../../../../components/TraceTimeline';
+import { buildPhaseRows, findRun, strategyLabel } from '../../../../lib/derive';
+import { formatDuration, formatInt, formatUsd } from '../../../../lib/format';
+import { modelShortName } from '../../../../lib/models';
+import { EMPTY_PARAM, loadRunSet, loadTrace } from '../../../../lib/server/runSet';
 
 interface Params {
   params: Promise<{ runId: string }>;

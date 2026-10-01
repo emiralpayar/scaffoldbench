@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { EmptyState } from '../../../components/EmptyState';
-import { Field, PageHeader, Panel, Tag } from '../../../components/Layout';
-import { RunSetBanner } from '../../../components/RunSetMeta';
-import type { StrategyCellRow } from '../../../components/TaskTables';
+import { EmptyState } from '../../../../components/EmptyState';
+import { Field, PageHeader, Panel, Tag } from '../../../../components/Layout';
+import { RunSetBanner } from '../../../../components/RunSetMeta';
+import type { StrategyCellRow } from '../../../../components/TaskTables';
 import {
   AssertionTable,
   RunsTable,
   TaskStrategyTable,
-} from '../../../components/TaskTables';
+} from '../../../../components/TaskTables';
 import {
   assertionPassRates,
   defaultModel,
@@ -17,10 +17,10 @@ import {
   modelView,
   selectRunsForTask,
   strategyLabel,
-} from '../../../lib/derive';
-import { formatFailureMode, formatPercent, formatUsd } from '../../../lib/format';
-import { modelShortName } from '../../../lib/models';
-import { EMPTY_PARAM, loadRunSet } from '../../../lib/server/runSet';
+} from '../../../../lib/derive';
+import { formatFailureMode, formatPercent, formatUsd } from '../../../../lib/format';
+import { modelShortName } from '../../../../lib/models';
+import { EMPTY_PARAM, loadRunSet } from '../../../../lib/server/runSet';
 
 interface Params {
   params: Promise<{ taskId: string }>;

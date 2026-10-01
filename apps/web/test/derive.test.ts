@@ -5,69 +5,20 @@ import type { StrategyInfo, TraceEvent } from '@arena/core';
 import {
   assertionPassRates,
   buildCatalog,
-  buildLeaderboardRows,
-  buildMatrix,
-  buildParetoModel,
   buildPhaseRows,
-  describeFindings,
+  defaultModel,
   groupTraceByPhase,
   indexToolResults,
-  matrixKey,
+  modelView,
   parseTraceLines,
+  repeatCells,
+  runOutcome,
   selectRunsForTask,
   sortTasks,
-  summarize as summarizeRuns,
 } from '../lib/derive';
 import { formatDuration, formatUsd } from '../lib/format';
-import type { RunRecord, TaskInfo } from '../lib/records';
-import { emptyCatalog } from '../lib/records';
-
-const BASE_RUN: RunRecord = {
-  runId: 'single__alpha__r1',
-  runSetId: 'set-1',
-  taskId: 'alpha',
-  taskTitle: 'Alpha task',
-  taskCategory: 'tool-use',
-  taskWorld: 'airline',
-  taskDifficulty: 'easy',
-  strategyId: 'single',
-  model: 'claude-sonnet-5',
-  effort: 'high',
-  repeat: 1,
-  startedAt: '2026-01-01T00:00:00.000Z',
-  finishedAt: '2026-01-01T00:00:10.000Z',
-  latencyMs: 10_000,
-  score: 1,
-  passed: true,
-  breakdown: [],
-  penalties: [],
-  failureMode: 'none',
-  scoreMetadata: {},
-  costUsd: 0.1,
-  judgeCostUsd: 0,
-  usage: {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadInputTokens: 0,
-    cacheCreationInputTokens: 0,
-  },
-  turns: 3,
-  toolCalls: 2,
-  deniedToolCalls: 0,
-  subagentCount: 0,
-  phases: [],
-  finalText: 'done',
-};
-
-function run(overrides: Partial<RunRecord>): RunRecord {
-  return { ...BASE_RUN, ...overrides };
-}
-
-const BASE_EVENT: TraceEvent = { seq: 0, tMs: 0, phase: 'main', depth: 0, kind: 'note' };
-
-function event(overrides: Partial<TraceEvent>): TraceEvent {
-  return { ...BASE_EVENT, ...overrides };
-}
+import type { TaskInfo } from '../lib/records';
+import { event, run } from './fixtures';
 
 function strategyInfo(id: string, label: string): StrategyInfo {
   return { id, label, description: `${label} description.` };
@@ -87,30 +38,17 @@ function taskInfo(overrides: Partial<TaskInfo> & Pick<TaskInfo, 'id'>): TaskInfo
 }
 
 // ---------------------------------------------------------------------------
-// Empty results
+// Catalog and ordering
 // ---------------------------------------------------------------------------
 
-describe('empty results', () => {
-  it('produces no leaderboard rows and a paragraph that says so', () => {
-    const summary = summarizeRuns([]);
-    const rows = buildLeaderboardRows(summary, emptyCatalog(), 'all');
-
-    expect(rows).toEqual([]);
-    expect(describeFindings(rows, { runs: 0, taskCount: 0, scope: 'all' })).toMatch(
-      /no runs/i,
-    );
-  });
-
-  it('returns empty collections from every derivation', () => {
-    const summary = summarizeRuns([]);
-
+describe('buildCatalog', () => {
+  it('returns empty collections from every derivation on no data', () => {
     expect(selectRunsForTask([], 'alpha')).toEqual([]);
     expect(assertionPassRates([], 'alpha')).toEqual([]);
     expect(groupTraceByPhase([])).toEqual([]);
     expect(indexToolResults([])).toEqual({});
     expect(parseTraceLines('')).toEqual([]);
-    expect(buildMatrix(summary, emptyCatalog()).tasks).toEqual([]);
-    expect(buildParetoModel([]).points).toEqual([]);
+    expect(buildCatalog(null, [])).toEqual({ strategies: [], tasks: [] });
   });
 
   it('tolerates a missing catalog by reconstructing it from run records', () => {
@@ -132,85 +70,77 @@ describe('empty results', () => {
     expect(catalog.strategies[0]?.label).toBe('Single agent');
     expect(catalog.tasks).toHaveLength(1);
   });
+
+  it('renames a legacy catalog entry instead of listing it twice', () => {
+    const catalog = buildCatalog(
+      { strategies: [strategyInfo('debate-select', 'Parallel proposals')], tasks: [] },
+      [run({ strategyId: 'propose-select' })],
+    );
+    expect(catalog.strategies.map((s) => s.id)).toEqual(['propose-select']);
+  });
 });
 
-// ---------------------------------------------------------------------------
-// A single run
-// ---------------------------------------------------------------------------
-
-describe('a single run', () => {
-  const records = [run({})];
-  const summary = summarizeRuns(records);
-  const catalog = buildCatalog(
-    { strategies: [strategyInfo('single', 'Single agent')], tasks: [taskInfo({ id: 'alpha' })] },
-    records,
-  );
-
-  it('reports n=1 with a degenerate confidence interval and marks it on the frontier', () => {
-    const rows = buildLeaderboardRows(summary, catalog, 'all');
-    const row = rows[0];
-
-    expect(rows).toHaveLength(1);
-    expect(row?.rank).toBe(1);
-    // A known architecture is labelled by the registry, not the catalog, so the
-    // same short name appears on every page whichever run set is shown.
-    expect(row?.label).toBe('Single');
-    expect(row?.runs).toBe(1);
-    expect(row?.score.mean).toBe(1);
-    expect(row?.score.ciLow).toBe(1);
-    expect(row?.score.ciHigh).toBe(1);
-    expect(row?.passRate).toBe(1);
-    expect(row?.scorePerDollar).toBeCloseTo(10, 6);
-    // The only point on the plane cannot be dominated.
-    expect(row?.onFrontier).toBe(true);
-  });
-
-  it('warns in prose that one repeat carries no interval worth reading', () => {
-    const rows = buildLeaderboardRows(summary, catalog, 'all');
-    const prose = describeFindings(rows, { runs: 1, taskCount: 1, scope: 'all' });
-
-    expect(prose).toContain('Single');
-    expect(prose).toMatch(/1 run/);
-    expect(prose).toMatch(/single run|one run|no comparison/i);
-  });
-
-  it('filters a category with no runs down to nothing', () => {
-    expect(buildLeaderboardRows(summary, catalog, 'research')).toEqual([]);
+describe('sortTasks', () => {
+  it('orders tool use before research, then world, then difficulty up to expert', () => {
+    const sorted = sortTasks([
+      taskInfo({ id: 'r', category: 'research', world: 'web' }),
+      taskInfo({ id: 'a-expert', difficulty: 'expert' }),
+      taskInfo({ id: 'a-hard', difficulty: 'hard' }),
+      taskInfo({ id: 'e-easy', world: 'ecommerce' }),
+      taskInfo({ id: 'a-easy' }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(['a-easy', 'a-hard', 'a-expert', 'e-easy', 'r']);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Pareto marking
+// Model scoping and per-repeat outcomes
 // ---------------------------------------------------------------------------
 
-describe('pareto marking', () => {
-  it('excludes a strategy that is beaten on both score and cost', () => {
+describe('modelView', () => {
+  it('never pools models and ranks only rankable runs', () => {
     const records = [
-      run({ runId: 'a__alpha__r1', strategyId: 'cheap-good', score: 1, costUsd: 0.1 }),
-      run({ runId: 'b__alpha__r1', strategyId: 'dear-bad', score: 0.5, costUsd: 0.9, passed: false }),
-      run({ runId: 'c__alpha__r1', strategyId: 'dear-good', score: 1, costUsd: 0.9 }),
+      run({ model: 'claude-haiku-4-5-20251001', score: 0 }),
+      run({ runId: 'b', score: 1 }),
+      run({ runId: 'c', score: 0, failureMode: 'api_error' }),
     ];
-    const summary = summarizeRuns(records);
-    const rows = buildLeaderboardRows(summary, buildCatalog(null, records), 'all');
-    const frontier = rows.filter((r) => r.onFrontier).map((r) => r.strategyId);
+    const view = modelView(records, 'claude-sonnet-5-5');
 
-    expect(frontier).toEqual(['cheap-good']);
+    expect(view.records).toHaveLength(2);
+    expect(view.ranked.map((r) => r.runId)).toEqual(['b']);
+    expect(view.summary.strategies[0]?.score.mean).toBe(1);
   });
 
-  it('orders pareto points by cost and reports the medians used for the quadrants', () => {
-    const records = [
-      run({ runId: 'a__alpha__r1', strategyId: 'a', score: 0.4, costUsd: 0.3 }),
-      run({ runId: 'b__alpha__r1', strategyId: 'b', score: 0.8, costUsd: 0.1 }),
-      run({ runId: 'c__alpha__r1', strategyId: 'c', score: 0.9, costUsd: 0.5 }),
-    ];
-    const rows = buildLeaderboardRows(summarizeRuns(records), buildCatalog(null, records), 'all');
-    const model = buildParetoModel(rows);
+  it('defaults to the middle model so a single-model view is neither the cheapest nor the dearest', () => {
+    expect(defaultModel(['claude-haiku-4-5-20251001', 'claude-sonnet-5-5', 'claude-opus-5-5'])).toBe(
+      'claude-sonnet-5-5',
+    );
+    expect(defaultModel(['claude-sonnet-5'])).toBe('claude-sonnet-5');
+    expect(defaultModel([])).toBeUndefined();
+  });
+});
 
-    expect(model.points).toHaveLength(3);
-    expect(model.frontier.map((p) => p.strategyId)).toEqual(['b', 'c']);
-    expect(model.frontier.map((p) => p.cost)).toEqual([0.1, 0.5]);
-    expect(model.medianCost).toBeCloseTo(0.3, 6);
-    expect(model.medianScore).toBeCloseTo(0.8, 6);
+describe('runOutcome', () => {
+  it('keeps exclusions apart from failures', () => {
+    expect(runOutcome(run({}))).toBe('pass');
+    expect(runOutcome(run({ passed: false, score: 0.5 }))).toBe('partial');
+    expect(runOutcome(run({ passed: false, score: 0 }))).toBe('fail');
+    expect(runOutcome(run({ failureMode: 'api_error', passed: false, score: 0 }))).toBe('api_error');
+    expect(
+      runOutcome(run({ integrity: { ok: false, checks: [] }, passed: true })),
+    ).toBe('excluded');
+  });
+
+  it('lists one cell per repeat, in repeat order', () => {
+    const cells = repeatCells(
+      [run({ runId: 'r2', repeat: 2, score: 0 , passed: false}), run({ runId: 'r1' }), run({ runId: 'x', taskId: 'beta' })],
+      'single',
+      'alpha',
+    );
+    expect(cells.map((c) => [c.runId, c.outcome])).toEqual([
+      ['r1', 'pass'],
+      ['r2', 'fail'],
+    ]);
   });
 });
 
@@ -346,6 +276,14 @@ describe('groupTraceByPhase', () => {
     expect(groups.map((g) => g.depth)).toEqual([0, 1, 2]);
   });
 
+  it('keeps two agents that reuse a phase name apart', () => {
+    const groups = groupTraceByPhase([
+      event({ seq: 0, phase: 'worker', depth: 1, agent: 'a' }),
+      event({ seq: 1, phase: 'worker', depth: 1, agent: 'b' }),
+    ]);
+    expect(groups.map((g) => g.agent)).toEqual(['a', 'b']);
+  });
+
   it('pairs tool results with the call that produced them', () => {
     const results = indexToolResults([
       event({ seq: 0, kind: 'tool_call', toolUseId: 'tu_1', toolName: 'get' }),
@@ -413,88 +351,6 @@ describe('buildPhaseRows', () => {
 
   it('returns nothing when there is neither a phase record nor a trace', () => {
     expect(buildPhaseRows(run({ phases: [] }), [])).toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Matrix
-// ---------------------------------------------------------------------------
-
-describe('buildMatrix', () => {
-  const records = [
-    run({ runId: 'a__alpha__r1', strategyId: 'a', taskId: 'alpha', score: 1 }),
-    run({ runId: 'a__alpha__r2', strategyId: 'a', taskId: 'alpha', repeat: 2, score: 0.5 }),
-    run({
-      runId: 'b__beta__r1',
-      strategyId: 'b',
-      taskId: 'beta',
-      taskCategory: 'research',
-      taskWorld: 'web',
-      score: 0.25,
-    }),
-  ];
-
-  it('keys cells by strategy and task and leaves untested pairs absent', () => {
-    const matrix = buildMatrix(summarizeRuns(records), buildCatalog(null, records));
-
-    expect(matrix.cells[matrixKey('a', 'alpha')]?.meanScore).toBeCloseTo(0.75, 6);
-    expect(matrix.cells[matrixKey('a', 'alpha')]?.runs).toBe(2);
-    expect(matrix.cells[matrixKey('a', 'beta')]).toBeUndefined();
-  });
-
-  it('orders strategies by mean score and tasks by category then difficulty', () => {
-    const matrix = buildMatrix(summarizeRuns(records), buildCatalog(null, records));
-
-    expect(matrix.strategies.map((s) => s.id)).toEqual(['a', 'b']);
-    expect(matrix.tasks.map((t) => t.id)).toEqual(['alpha', 'beta']);
-  });
-
-  it('sorts tool-use tasks ahead of research and easy ahead of hard', () => {
-    const sorted = sortTasks([
-      taskInfo({ id: 'r-easy', category: 'research', world: 'web' }),
-      taskInfo({ id: 'hard', difficulty: 'hard' }),
-      taskInfo({ id: 'easy', difficulty: 'easy' }),
-      taskInfo({ id: 'medium', difficulty: 'medium' }),
-    ]);
-
-    expect(sorted.map((t) => t.id)).toEqual(['easy', 'medium', 'hard', 'r-easy']);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Prose and formatting
-// ---------------------------------------------------------------------------
-
-describe('describeFindings', () => {
-  it('calls an overlap inconclusive and counts how many comparisons are', () => {
-    const records = [
-      run({ runId: 'a1', strategyId: 'a', repeat: 1, score: 0.9 }),
-      run({ runId: 'a2', strategyId: 'a', repeat: 2, score: 0.5 }),
-      run({ runId: 'b1', strategyId: 'b', repeat: 1, score: 0.8, costUsd: 0.4 }),
-      run({ runId: 'b2', strategyId: 'b', repeat: 2, score: 0.4, costUsd: 0.4 }),
-    ];
-    const rows = buildLeaderboardRows(summarizeRuns(records), buildCatalog(null, records), 'all');
-    const prose = describeFindings(rows, { runs: 4, taskCount: 1, scope: 'all' });
-
-    // Every comparison is inconclusive, so the prose must not crown a leader.
-    expect(prose).toMatch(/do not separate/i);
-    expect(prose).not.toMatch(/highest mean|leads/i);
-  });
-
-  it('states a separation when the intervals do not overlap', () => {
-    const records = [
-      run({ runId: 'a1', strategyId: 'a', repeat: 1, score: 1 }),
-      run({ runId: 'a2', strategyId: 'a', repeat: 2, score: 1 }),
-      run({ runId: 'a3', strategyId: 'a', repeat: 3, score: 1 }),
-      run({ runId: 'b1', strategyId: 'b', repeat: 1, score: 0 }),
-      run({ runId: 'b2', strategyId: 'b', repeat: 2, score: 0 }),
-      run({ runId: 'b3', strategyId: 'b', repeat: 3, score: 0 }),
-    ];
-    const rows = buildLeaderboardRows(summarizeRuns(records), buildCatalog(null, records), 'all');
-    const prose = describeFindings(rows, { runs: 6, taskCount: 1, scope: 'all' });
-
-    expect(prose).toMatch(/do not overlap|separates/i);
-    expect(prose).not.toMatch(/1 of 1 pairwise comparisons is inconclusive/);
   });
 });
 

@@ -51,3 +51,8 @@ export function absoluteUrl(pathname: string): string {
 export function sourceUrl(repoPath: string): string | undefined {
   return REPO_URL ? `${REPO_URL}/blob/main/${repoPath}` : undefined;
 }
+
+/** Link to a directory in the repository, or `undefined` without a repository URL. */
+export function treeUrl(repoPath: string): string | undefined {
+  return REPO_URL ? `${REPO_URL}/tree/main/${repoPath}` : undefined;
+}
