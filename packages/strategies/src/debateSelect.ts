@@ -1,7 +1,6 @@
-import { readStructured } from '@arena/core';
+import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
 import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
 import {
-  REASONING_TURNS,
   createPhaseRunner,
   hasMutatingTools,
   joinSections,
@@ -154,7 +153,7 @@ export function createDebateSelectStrategy(deps: Partial<StrategyDeps> = {}): St
           prompt: selectPrompt(ctx, rendered),
           allowedTools: [],
           outputSchema: SELECT_SCHEMA,
-          maxTurns: REASONING_TURNS,
+          maxTurns: SCHEMA_MIN_TURNS,
         }),
         PROPOSER_COUNT,
       );

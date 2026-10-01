@@ -1,7 +1,6 @@
-import { readStructured } from '@arena/core';
+import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
 import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
 import {
-  REASONING_TURNS,
   createPhaseRunner,
   joinSections,
   numbered,
@@ -123,7 +122,7 @@ export function createPlanExecuteVerifyStrategy(deps: Partial<StrategyDeps> = {}
         prompt: planPrompt(ctx),
         allowedTools: [],
         outputSchema: PLAN_SCHEMA,
-        maxTurns: REASONING_TURNS,
+        maxTurns: SCHEMA_MIN_TURNS,
       });
 
       if (!runner.canContinue()) return runner.finish();

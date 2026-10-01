@@ -6,8 +6,9 @@ import type { TraceSink } from './types';
  *
  * A strategy that could shell out or hit the open web would not be solving the
  * task through the sandbox the task defined, and its score would not be
- * comparable to the others. `Agent` is deliberately absent: subagent-based
- * strategies need it, and subagents inherit the same allowlist.
+ * comparable to the others. `runQuery` already offers no built-in tools at all
+ * (it pins `tools` to the harness's own), so this list is the second line of
+ * defence, in case a future SDK starts injecting one regardless.
  */
 export const SANDBOX_DENYLIST: readonly string[] = [
   'Bash',
@@ -37,6 +38,9 @@ export interface SandboxGuardOptions {
   trace: TraceSink;
   phase: string;
   depth: number;
+  agent?: string;
+  /** The call this guard belongs to, stamped on its trace events. */
+  callId?: string;
   onDenied?: (toolName: string) => void;
 }
 
@@ -60,7 +64,7 @@ export function matchesToolList(toolName: string, allowed: readonly string[]): b
  * stopped" — a real behavioural difference between architectures.
  */
 export function createSandboxGuard(options: SandboxGuardOptions): HookCallbackMatcher[] {
-  const { allowedTools, trace, phase, depth, onDenied } = options;
+  const { allowedTools, trace, phase, depth, agent, callId, onDenied } = options;
 
   return [
     {
@@ -75,6 +79,8 @@ export function createSandboxGuard(options: SandboxGuardOptions): HookCallbackMa
           trace.append({
             phase,
             depth,
+            ...(agent !== undefined ? { agent } : {}),
+            ...(callId !== undefined ? { callId } : {}),
             kind: 'tool_denied',
             toolName,
             toolInput: input.tool_input,

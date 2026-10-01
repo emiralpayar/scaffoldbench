@@ -130,7 +130,13 @@ export type FailureMode =
   | 'policy_violation'
   | 'gave_up'
   | 'wrong_answer'
-  | 'harness_error';
+  | 'harness_error'
+  /**
+   * The infrastructure failed — authentication, a rate limit, an overloaded
+   * or erroring API, an unusable model id, or a grader that never answered.
+   * Never the architecture's fault, so never counted as a wrong answer.
+   */
+  | 'api_error';
 
 export interface TaskScore {
   /** Final score in 0..1, after penalties. */
@@ -164,7 +170,22 @@ export interface JudgeResponse<T = unknown> {
   costUsd: number;
 }
 
-export type Judge = <T = unknown>(req: JudgeRequest) => Promise<JudgeResponse<T>>;
+/** Per-call settings the runner passes to a judge. */
+export interface JudgeCallOptions {
+  /**
+   * Subprocess environment for this call, overriding the judge's own. The
+   * runner passes the run's `subprocessEnv`, so a live-demo run is graded on
+   * the visitor's credentials, never the operator's.
+   */
+  env?: Record<string, string | undefined>;
+  /** Abort the call early, e.g. when the whole matrix is being stopped. */
+  signal?: AbortSignal;
+}
+
+export type Judge = <T = unknown>(
+  req: JudgeRequest,
+  options?: JudgeCallOptions,
+) => Promise<JudgeResponse<T>>;
 
 export interface ScoringDeps {
   judge: Judge;
@@ -198,6 +219,7 @@ export interface Task {
 export interface PhaseRecord {
   phase: string;
   label: string;
+  /** Epoch milliseconds at which the call started, so parallel phases share a timeline. */
   startedAtMs: number;
   durationMs: number;
   costUsd: number;
@@ -206,6 +228,14 @@ export interface PhaseRecord {
   model: string;
   aborted: boolean;
   error?: string;
+  /** How the call ended; see `QueryOutcome.subtype`. */
+  subtype?: string;
+  /** Present when the call failed at the API rather than in the architecture. */
+  apiError?: ApiError;
+  /** True when `costUsd` was estimated from streamed usage; see `QueryOutcome.costEstimated`. */
+  costEstimated?: boolean;
+  /** True when the phase asked for structured output and none came back. */
+  structuredMissing?: boolean;
 }
 
 export interface StrategyOutcome {

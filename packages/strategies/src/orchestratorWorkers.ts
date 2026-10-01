@@ -1,4 +1,4 @@
-import { readStructured } from '@arena/core';
+import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
 import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
 import {
   REASONING_TURNS,
@@ -144,7 +144,7 @@ export function createOrchestratorWorkersStrategy(deps: Partial<StrategyDeps> = 
         prompt: decomposePrompt(ctx),
         allowedTools: [],
         outputSchema: DECOMPOSE_SCHEMA,
-        maxTurns: REASONING_TURNS,
+        maxTurns: SCHEMA_MIN_TURNS,
       });
 
       const proposed = readSubtasks(decompose);

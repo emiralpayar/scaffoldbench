@@ -1,12 +1,55 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { Judge, JudgeRequest, JudgeResponse } from './types';
+import type { EffortLevel, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { SANDBOX_DENYLIST } from './guard';
+import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
+import { CallMeter } from './meter';
+import { SCHEMA_MIN_TURNS, parseLooseJson } from './runQuery';
+import type { ApiError, Judge, JudgeCallOptions, JudgeRequest, JudgeResponse } from './types';
+
+/**
+ * Grading effort when none is given. Pinned rather than left to the SDK, whose
+ * default differs by model, so the judge behaves and costs the same whatever
+ * model it runs on. Medium rather than low: rubric grading is reading an
+ * answer against a short list of claims, but no calibration run has yet shown
+ * that a lower setting grades as well.
+ */
+export const DEFAULT_JUDGE_EFFORT: EffortLevel = 'medium';
+
+/** How long one grading call may take before it is abandoned. */
+export const DEFAULT_JUDGE_TIMEOUT_MS = 180_000;
 
 export interface JudgeOptions {
   model: string;
-  /** Called with the USD cost of every judge call, so it stays out of strategy cost. */
+  /**
+   * Called with the USD cost of every judge call — failed and abandoned ones
+   * included — so grading spend is accounted for and stays out of strategy cost.
+   */
   onCost?: (usd: number) => void;
   maxBudgetUsd?: number;
+  effort?: EffortLevel;
+  /**
+   * Environment for the judge's subprocess. A per-call `env` (which the
+   * runner passes from the run's `subprocessEnv`) takes precedence.
+   */
+  env?: Record<string, string | undefined>;
+  timeoutMs?: number;
+}
+
+/**
+ * A judge call that produced no verdict. Carries what the call cost, because
+ * a failed grading call is still billed, and the API failure behind it, if
+ * any, so the runner can tell a grader outage from a malformed reply.
+ */
+export class JudgeError extends Error {
+  readonly costUsd: number;
+  readonly apiError: ApiError | undefined;
+
+  constructor(message: string, details: { costUsd: number; apiError?: ApiError }) {
+    super(message);
+    this.name = 'JudgeError';
+    this.costUsd = details.costUsd;
+    this.apiError = details.apiError;
+  }
 }
 
 /**
@@ -17,58 +60,82 @@ export interface JudgeOptions {
  * architecture look expensive for reasons that have nothing to do with it.
  */
 export function createJudge(options: JudgeOptions): Judge {
-  return async function judge<T>(req: JudgeRequest): Promise<JudgeResponse<T>> {
-    let value: unknown;
-    let costUsd = 0;
-    let text = '';
+  const timeoutMs = options.timeoutMs ?? DEFAULT_JUDGE_TIMEOUT_MS;
 
-    for await (const message of query({
-      prompt: req.prompt,
-      options: {
-        model: options.model,
-        systemPrompt: req.system,
-        allowedTools: [],
-        disallowedTools: ['Bash', 'Read', 'Write', 'Edit', 'WebFetch', 'WebSearch', 'Glob', 'Grep'],
-        permissionMode: 'dontAsk',
-        settingSources: [],
-        persistSession: false,
-        maxTurns: 1,
-        maxBudgetUsd: options.maxBudgetUsd ?? 0.5,
-        outputFormat: { type: 'json_schema', schema: req.schema },
-      },
-    }) as AsyncIterable<SDKMessage>) {
-      if (message.type !== 'result') continue;
-      costUsd = message.total_cost_usd ?? 0;
-      if (message.subtype === 'success') {
-        value = message.structured_output;
-        text = message.result ?? '';
+  return async function judge<T>(
+    req: JudgeRequest,
+    call: JudgeCallOptions = {},
+  ): Promise<JudgeResponse<T>> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    const onAbort = () => controller.abort();
+    if (call.signal?.aborted) controller.abort();
+    call.signal?.addEventListener('abort', onAbort, { once: true });
+
+    const env = call.env ?? options.env;
+    const meter = new CallMeter(options.model);
+
+    try {
+      for await (const message of query({
+        prompt: req.prompt,
+        options: {
+          ...hermeticOptions(),
+          model: options.model,
+          effort: options.effort ?? DEFAULT_JUDGE_EFFORT,
+          systemPrompt: req.system,
+          // No built-in tools and no MCP servers: the judge reads and answers.
+          // The structured-output tool is how it answers.
+          tools: [STRUCTURED_OUTPUT_TOOL],
+          allowedTools: [STRUCTURED_OUTPUT_TOOL],
+          disallowedTools: [...SANDBOX_DENYLIST],
+          mcpServers: {},
+          maxTurns: SCHEMA_MIN_TURNS,
+          maxBudgetUsd: options.maxBudgetUsd ?? 0.5,
+          outputFormat: { type: 'json_schema', schema: req.schema },
+          abortController: controller,
+          ...(env ? { env } : {}),
+        },
+      }) as AsyncIterable<SDKMessage>) {
+        meter.observe(message);
       }
+    } catch (caught) {
+      if (!controller.signal.aborted) meter.noteThrown(caught);
+    } finally {
+      clearTimeout(timer);
+      call.signal?.removeEventListener('abort', onAbort);
     }
 
+    const report = meter.report();
+    const costUsd = report.costUsd;
     options.onCost?.(costUsd);
 
-    if (value === undefined || value === null) {
-      value = parseLooseJson(text);
+    if (controller.signal.aborted && !report.resultSeen) {
+      if (timedOut) {
+        const message = `judge did not answer within ${Math.round(timeoutMs / 1000)}s`;
+        throw new JudgeError(message, {
+          costUsd,
+          apiError: { kind: 'server', retryable: true, message },
+        });
+      }
+      throw new JudgeError('judge call aborted', { costUsd });
     }
-    if (value === undefined) {
-      throw new Error('judge returned no parsable structured output');
+    if (report.apiError) {
+      throw new JudgeError(`judge call failed: ${report.apiError.message}`, {
+        costUsd,
+        apiError: report.apiError,
+      });
     }
 
+    const value = report.structured ?? parseLooseJson(report.text);
+    if (value === undefined || value === null) {
+      throw new JudgeError('judge returned no parsable structured output', { costUsd });
+    }
     return { value: value as T, costUsd };
   };
-}
-
-function parseLooseJson(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced?.[1] ?? text;
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end <= start) return undefined;
-  try {
-    return JSON.parse(candidate.slice(start, end + 1));
-  } catch {
-    return undefined;
-  }
 }
 
 /**

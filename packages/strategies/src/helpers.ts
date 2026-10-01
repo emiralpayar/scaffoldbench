@@ -19,11 +19,16 @@ export interface StrategyDeps {
 }
 
 /**
- * Turn budget for a phase that has no tools.
+ * Turn budget for a phase that has no tools and answers in prose.
  *
  * A tool-less phase cannot productively loop: it thinks once and answers, so
  * anything above one turn is spend without a decision behind it. Applied
  * identically in every strategy so no architecture is quietly given more room.
+ *
+ * A tool-less phase that answers through a JSON schema is different: the
+ * structured reply is itself a tool call, and a reply that fails validation
+ * needs a turn to retry. Those phases use `SCHEMA_MIN_TURNS` from core, which
+ * `runQuery` also enforces as a floor.
  */
 export const REASONING_TURNS = 1;
 
@@ -41,16 +46,21 @@ export function recordPhase(
   return {
     phase,
     label,
-    // Epoch-based, so concurrent phases can be laid out on one timeline; the
-    // run record stores the run's own start time to anchor them against.
-    startedAtMs: Date.now() - outcome.durationMs,
+    // Epoch-based and taken from the call itself, so concurrent phases land
+    // on one timeline where they actually ran — not where they were recorded,
+    // which for a fan-out is after the slowest sibling finished.
+    startedAtMs: outcome.startedAtMs,
     durationMs: outcome.durationMs,
     costUsd: outcome.costUsd,
     turns: outcome.turns,
     toolCalls: outcome.toolCalls,
     model,
     aborted: outcome.aborted,
+    subtype: outcome.subtype,
     ...(outcome.error ? { error: outcome.error } : {}),
+    ...(outcome.apiError ? { apiError: outcome.apiError } : {}),
+    ...(outcome.costEstimated ? { costEstimated: true } : {}),
+    ...(outcome.structuredMissing ? { structuredMissing: true } : {}),
   };
 }
 
@@ -65,7 +75,10 @@ export interface PhaseRunner {
   /** False once the run is out of budget or has been aborted. */
   canContinue(): boolean;
   run(spec: LabeledSpec): Promise<QueryOutcome>;
-  /** Run several phases at once, recording them in spec order. */
+  /**
+   * Run several phases at once, recording them in spec order. Each gets an
+   * equal share of the budget available when the batch starts.
+   */
   runAll(specs: LabeledSpec[]): Promise<QueryOutcome[]>;
   finish(options?: FinishOptions): StrategyOutcome;
 }
@@ -97,8 +110,14 @@ export function createPhaseRunner(ctx: RunContext, deps: Partial<StrategyDeps>):
     },
 
     async runAll(specs: LabeledSpec[]): Promise<QueryOutcome[]> {
+      // Split what is left before any sibling reserves, so the first to start
+      // cannot take everything and the rest cannot each be handed all of it.
+      const share = specs.length > 0 ? ctx.budget.availableUsd / specs.length : 0;
       const settled = await Promise.all(
-        specs.map(async (spec) => ({ spec, outcome: await call(ctx, spec) })),
+        specs.map(async (spec) => ({
+          spec,
+          outcome: await call(ctx, { ...spec, maxBudgetUsd: spec.maxBudgetUsd ?? share }),
+        })),
       );
       // Recorded in spec order rather than completion order, so a fan-out
       // produces the same phase list on every run.

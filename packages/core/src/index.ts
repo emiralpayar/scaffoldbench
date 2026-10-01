@@ -2,6 +2,7 @@ export * from './types';
 export * from './budget';
 export * from './trace';
 export * from './guard';
+export * from './hermetic';
 export * from './apiErrors';
 export * from './pricing';
 export * from './meter';

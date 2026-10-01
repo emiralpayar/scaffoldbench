@@ -30,14 +30,24 @@ import type { StrategyDeps } from '@arena/strategies';
 type RunQueryFn = StrategyDeps['runQuery'];
 
 const BASE_OUTCOME: QueryOutcome = {
+  callId: 'call-0',
   text: '',
   structured: undefined,
+  structuredMissing: false,
   costUsd: 0.01,
+  costEstimated: false,
+  unpricedModels: [],
+  usage: emptyUsage(),
+  byModel: {},
+  budgetUsd: 1,
   turns: 2,
   toolCalls: 1,
   deniedToolCalls: 0,
   aborted: false,
   subtype: 'success',
+  mcpServersExpected: [],
+  mcpServers: [],
+  startedAtMs: 0,
   durationMs: 7,
 };
 

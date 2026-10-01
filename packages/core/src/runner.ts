@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { BudgetTracker } from './budget';
+import { JudgeError } from './judge';
 import {
   RESULTS_DIR,
   SCRATCH_DIR,
@@ -18,10 +19,12 @@ import {
 import { buildSystemPrompt } from './systemPrompt';
 import { TraceCollector } from './trace';
 import type {
+  ApiError,
   EffortLevel,
   FailureMode,
   FixtureMode,
   Judge,
+  JudgeCallOptions,
   JudgeRequest,
   JudgeResponse,
   RunContext,
@@ -215,10 +218,32 @@ async function executeRun(
   let score: TaskScore;
   let outcome = { finalText: '', subagentCount: 0, phases: [] as RunRecord['phases'] };
 
-  const trackedJudge: Judge = async <T,>(req: JudgeRequest): Promise<JudgeResponse<T>> => {
-    const reply = await config.judge<T>(req);
-    judgeCostUsd += reply.costUsd;
-    return reply;
+  let judgeCalls = 0;
+  let judgeFailures = 0;
+  let judgeApiError: ApiError | undefined;
+  const trackedJudge: Judge = async <T,>(
+    req: JudgeRequest,
+    options?: JudgeCallOptions,
+  ): Promise<JudgeResponse<T>> => {
+    judgeCalls += 1;
+    try {
+      // Grading runs on the same credentials as the run itself: the live
+      // demo grades a visitor's run on the visitor's key, never the operator's.
+      const reply = await config.judge<T>(
+        req,
+        config.subprocessEnv ? { ...options, env: config.subprocessEnv } : options,
+      );
+      judgeCostUsd += reply.costUsd;
+      return reply;
+    } catch (caught) {
+      // A failed grading call is still billed.
+      judgeFailures += 1;
+      if (caught instanceof JudgeError) {
+        judgeCostUsd += caught.costUsd;
+        judgeApiError = caught.apiError ?? judgeApiError;
+      }
+      throw caught;
+    }
   };
 
   try {
@@ -255,6 +280,20 @@ async function executeRun(
     const runtimeFailure = inferRuntimeFailure(budget.stopReason, controller.signal.aborted);
     if (runtimeFailure && score.failureMode === 'wrong_answer') {
       score = { ...score, failureMode: runtimeFailure };
+    }
+
+    // Every grading call failed: the score says nothing about the answer, so
+    // it must not be read as a wrong one.
+    if (judgeCalls > 0 && judgeFailures === judgeCalls) {
+      error = judgeApiError
+        ? `judge unavailable: ${judgeApiError.message}`
+        : 'judge returned no usable verdict';
+      score = {
+        ...score,
+        passed: false,
+        failureMode: judgeApiError ? 'api_error' : 'harness_error',
+        metadata: { ...score.metadata, judgeOutage: true },
+      };
     }
   } catch (caught) {
     error = caught instanceof Error ? caught.message : String(caught);
