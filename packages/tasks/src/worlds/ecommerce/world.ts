@@ -8,7 +8,8 @@
 
 export type LoyaltyTier = 'standard' | 'gold' | 'platinum';
 export type RefundMethod = 'card' | 'store_credit';
-export type OrderLineStatus = 'pending' | 'shipped' | 'cancelled' | 'returned';
+/** `backordered`: paid for, waiting for stock, nothing reserved for it yet. */
+export type OrderLineStatus = 'pending' | 'backordered' | 'shipped' | 'cancelled' | 'returned';
 export type OrderStatus = 'pending' | 'partially_shipped' | 'shipped' | 'returned' | 'cancelled';
 
 export interface Product {
@@ -17,6 +18,8 @@ export interface Product {
   /** Current list price. An order line may have been paid at a different price. */
   priceCents: number;
   stock: number;
+  /** Units back from customers that cannot be sold again, when the world tracks them. */
+  damagedStock?: number;
 }
 
 export interface OrderLine {
@@ -34,6 +37,8 @@ export interface OrderLine {
   shippedAt?: string;
   refundedCents: number;
   refundMethod?: RefundMethod;
+  /** When a backordered line is expected to ship, once the store has promised a date. */
+  promisedDate?: string;
 }
 
 export interface Order {
@@ -45,6 +50,10 @@ export interface Order {
   paidCents: number;
   lines: OrderLine[];
   discountCode?: string;
+  /** Ship only when every line can ship at once. */
+  shipComplete?: boolean;
+  /** Held by the risk team: no stock, no shipment, no contact. */
+  riskHold?: boolean;
 }
 
 export interface Customer {
@@ -52,6 +61,10 @@ export interface Customer {
   name: string;
   tier: LoyaltyTier;
   storeCreditCents: number;
+  /** The address the account holder writes from, when the world models email. */
+  email?: string;
+  /** Every store-credit movement, oldest first, when the world keeps one. */
+  creditHistory?: { at: string; amountCents: number; reason: string }[];
 }
 
 export interface InventoryMovement {
@@ -78,6 +91,11 @@ export interface ReturnPolicy {
   outOfWindowMethod: RefundMethod;
   /** Returned goods re-enter stock only when the warehouse receives them. */
   restockOnReceiptOnly: boolean;
+  /**
+   * Percentage of what was paid for returned units that a change-of-mind
+   * return forfeits, when the store charges one. Absent means no fee.
+   */
+  restockingFeePercent?: number;
 }
 
 export interface EcommerceWorld {
@@ -280,7 +298,10 @@ export function recomputeOrderStatus(order: Order): OrderStatus {
   const anyDispatched = active.some(
     (entry) => entry.status === 'shipped' || entry.status === 'returned',
   );
-  const anyPending = active.some((entry) => entry.status === 'pending');
+  // A backordered line has not left either; for the order it counts as pending.
+  const anyPending = active.some(
+    (entry) => entry.status === 'pending' || entry.status === 'backordered',
+  );
   if (anyDispatched && anyPending) return 'partially_shipped';
   if (anyDispatched) return 'shipped';
   return 'pending';
