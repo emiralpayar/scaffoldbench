@@ -68,7 +68,7 @@ on.
 
 ```ts
 interface TaskEnvironment {
-  mcpServers: Record<string, McpServerConfig>;
+  createMcpServers(filter?: { only?: readonly string[] }): Record<string, McpServerConfig>;
   allowedTools: string[];    // mcp__<server>__<tool>, the exact permitted set
   readOnlyTools: string[];   // subset that cannot mutate state
   state: unknown;            // the world the scorer will inspect
@@ -84,6 +84,13 @@ The journal is the scorer's ground truth for "what did the agent actually do", e
 independent of anything the agent claims in prose. Handler exceptions are converted into error
 replies rather than propagating, because a thrown tool would abort the run and make the strategy
 look worse than it was.
+
+`createMcpServers` is a factory, called by `runQuery` once per model call. An in-process MCP
+server accepts one session at a time, so a single instance shared by every phase left parallel
+phases after the first with no tools at all (the first published run set lost two of three
+`debate-select` proposers that way). Each call now gets new server instances whose handlers close
+over the same world and journal, so state is still shared. The `only` filter limits a call to the
+tools it may use: a tool-less phase gets no task server, a read-only phase only the read-only tools.
 
 `readOnlyTools` exists because two architectures need it: `debate-select` hands only read-only
 tools to its three parallel proposers, and `plan-execute-verify` hands only read-only tools to its
@@ -121,9 +128,12 @@ order, so a parallel phase list is stable), and the `canContinue()` budget check
 strategy makes before starting another phase.
 
 Prompt symmetry is enforced by shared helpers rather than by discipline: `taskBlock(ctx)` quotes
-`ctx.task.prompt` verbatim into every phase of every architecture, and `REASONING_TURNS = 1` caps
-every tool-less phase identically. See the Limitations section of the README for what this
-mitigates and what it does not.
+`ctx.task.prompt` verbatim into every phase of every architecture, `REASONING_TURNS = 1` caps
+every tool-less prose phase identically, and every phase that answers through a JSON schema gets
+`SCHEMA_MIN_TURNS = 3` (the structured reply is itself a tool call, and one that fails validation
+needs a turn to retry). `runAll` gives parallel phases equal shares of the budget left when the
+fan-out starts. See the Limitations section of the README for what this mitigates and what it does
+not.
 
 Phase names as they appear in traces and reports:
 
@@ -149,14 +159,15 @@ Held identical for all five architectures, on every call:
 
 | Concern | Mechanism |
 | --- | --- |
-| Tool access | `allowedTools` from the task (or an explicit narrower list), `disallowedTools: SANDBOX_DENYLIST`, `permissionMode: 'dontAsk'` |
-| Hermeticity | `settingSources: []` — no `~/.claude`, no repo settings, no plugins |
-| Cost ceiling | `maxBudgetUsd: ctx.budget.remainingUsd`, so the SDK's per-call limit tracks our run-level ledger |
-| Cost accounting | the terminal `result` message charges `ctx.budget` exactly once |
-| Trace capture | every SDK message is normalized and appended to `ctx.trace` |
+| Tool access | the call's own MCP servers, showing only `allowedTools` from the task (or an explicit narrower list); `tools` pinned so no built-in tool is offered; `disallowedTools: SANDBOX_DENYLIST`, `permissionMode: 'dontAsk'` |
+| Hermeticity | `settingSources: []`, `strictMcpConfig: true` and `settings: { disableClaudeAiConnectors: true }` — no `~/.claude`, no repo settings, no `.mcp.json`, no claude.ai connectors |
+| Cost ceiling | a lease from `ctx.budget.reserve()` is the call's `maxBudgetUsd`, so concurrent calls can never together hold more than the run has left |
+| Cost accounting | the call's own `result` message settles its lease; a call that never gets one (aborted, crashed) is charged for the usage it streamed, priced from a list-price table and flagged `costEstimated` |
+| API failures | auth, rate-limit, overload, server and invalid-request failures come back as `apiError` and never as answer text |
+| Trace capture | every SDK message is normalized and appended to `ctx.trace`, tagged with the call's `callId` |
 | Abort | the parent `AbortSignal` is forwarded, and the stream is cut mid-flight the moment `budget.exceeded` flips |
 | Isolation | `persistSession: false`, per-run `cwd` |
-| Structured output | `outputSchema` → `outputFormat: { type: 'json_schema' }`, read back by `readStructured` |
+| Structured output | `outputSchema` → `outputFormat: { type: 'json_schema' }` with the SDK's `StructuredOutput` tool allowed, read back by `readStructured`; a schema phase that gets none back is flagged `structuredMissing` |
 
 `runQuery` never throws for an out-of-budget or aborted run. It returns an empty `QueryOutcome`
 with `aborted: true` and a reason, so a strategy that runs out of money mid-plan degrades into a
@@ -170,11 +181,12 @@ the schema — a formatting slip should not discard a phase that produced usable
 [`packages/core/src/guard.ts`](../packages/core/src/guard.ts)
 
 `SANDBOX_DENYLIST` blocks the built-in tools — `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`,
-`WebFetch`, `WebSearch` and the rest. `Agent` is deliberately *absent*: subagent-based strategies
-need it, and subagents inherit the same allowlist anyway.
+`WebFetch`, `WebSearch` and the rest. `runQuery` already offers no built-in tools at all, so the
+denylist is the second line of defence.
 
 On top of the denylist and the allowlist there is a `PreToolUse` hook that checks each tool name
-against the allowlist (supporting `mcp__server__*` wildcards) and denies anything outside it. That
+against the allowlist (supporting `mcp__server__*` wildcards, and including `StructuredOutput`
+whenever the call asked for a schema) and denies anything outside it. That
 is redundant as an access control — `permissionMode: 'dontAsk'` with an exact allowlist already
 blocks it. It is not redundant as *evidence*: the hook writes a `tool_denied` trace event and
 increments a counter that ends up on the run record as `deniedToolCalls`. Without it, "this
@@ -184,8 +196,10 @@ stopped" would look identical in the data, and they are a real behavioural diffe
 ## 6. Budget and trace
 
 **`BudgetTracker`** ([`budget.ts`](../packages/core/src/budget.ts)) is the run-level ledger. The SDK
-enforces `maxBudgetUsd` per `query()` call, but an architecture making six calls needs a ceiling
-above them all, and `remainingUsd` is fed back into each subsequent call so the two layers agree.
+enforces `maxBudgetUsd` per `query()` call, but an architecture making six calls, some at once,
+needs a ceiling above them all. Each call reserves a lease out of what is neither spent nor
+reserved, hands it to the SDK as its `maxBudgetUsd`, and settles it with its actual cost. The cap
+is soft by at most one turn per call in flight, because the SDK checks its budget between turns.
 The wall-clock limit is evaluated lazily inside `stopReason`, so a stalled run trips even though
 nothing has been charged.
 
@@ -193,8 +207,10 @@ nothing has been charged.
 `TraceEvent[]`. The normalizer is deliberately decoupled from the SDK's `SDKMessage` union — that
 union has dozens of members and grows between releases, and anything unrecognized is skipped
 rather than thrown. Stored traces therefore stay readable across SDK upgrades, and so does the
-viewer. Events carry `phase`, `depth` (0 for the main thread, 1 for a subagent), `seq` and `tMs`,
-which is what lets the UI lay parallel phases out on one timeline.
+viewer. Events carry `phase`, `callId`, `depth` (0 for the main thread, 1 for a subagent), `seq`
+and `tMs`, which is what lets the UI lay parallel phases out on one timeline. `callId` is what ties
+an event to its call when concurrent calls interleave: usage and salvaged text are never read back
+from the shared trace, only from each call's own stream.
 
 ## 7. Scoring
 
@@ -218,7 +234,12 @@ gradings and reduces each item by median. The citation half calls `auditCitation
 extracted from the answer against the URLs actually opened — collected from both the trace and the
 journal, because a retrieval made inside a subagent may never surface in the parent trace. Judge
 spend is routed through a wrapper in the runner so it accrues to `judgeCostUsd` and never to the
-strategy's `costUsd`.
+strategy's `costUsd`; a grading call that fails is still billed. The wrapper also runs the judge on
+the run's own `subprocessEnv`, so a live-demo run is graded on the visitor's key. The judge itself
+([`judge.ts`](../packages/core/src/judge.ts)) is hermetic like every agent call, offers no tools
+beyond the structured-output one, runs at a pinned effort and gives up after a timeout. A run whose
+every grading call failed is labelled `api_error` (or `harness_error` when the judge answered but
+never usably) rather than `wrong_answer`.
 
 ## 8. The fixture layer
 
