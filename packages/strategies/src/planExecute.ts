@@ -1,12 +1,33 @@
-import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
-import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
+import { SCHEMA_MIN_TURNS, parseLooseJson } from '@arena/core';
+import type {
+  FidelityInput,
+  IntegrityCheck,
+  QueryOutcome,
+  RunContext,
+  Strategy,
+  StrategyOutcome,
+} from '@arena/core';
 import {
+  fail,
+  metaNumber,
+  metaString,
+  pass,
+  phase,
+  phaseNamed,
+  toolSurfaceCheck,
+  unjudged,
+} from './fidelity';
+import {
+  ACTING_INSTRUCTIONS,
+  FINAL_ANSWER_INSTRUCTION,
   createPhaseRunner,
+  interrupted,
   joinSections,
   numbered,
   stringList,
   tagged,
   taskBlock,
+  type PhaseRunner,
   type StrategyDeps,
 } from './helpers';
 
@@ -26,6 +47,7 @@ export const PLAN_SCHEMA: Record<string, unknown> = {
       type: 'array',
       description: 'Ordered, concrete actions for the executor to carry out.',
       items: { type: 'string' },
+      minItems: 1,
     },
     rationale: {
       type: 'string',
@@ -48,30 +70,132 @@ export function planPrompt(ctx: RunContext): string {
   );
 }
 
-export function executePrompt(ctx: RunContext, plan: string): string {
+export function executePlanPrompt(ctx: RunContext, plan: string): string {
   return joinSections(
     taskBlock(ctx),
-    tagged('plan', plan),
+    tagged('plan', plan === '' ? '(the planning step produced no plan)' : plan),
     'Carry out the task following the plan above. The plan was written without access to the ' +
-      'tools, so treat it as guidance rather than instruction: if what you find contradicts it, ' +
-      'do what the task and the rules require and say so. When you are finished, reply with your ' +
-      'final answer.',
+      'tools, so treat it as guidance rather than instruction.',
+    ACTING_INSTRUCTIONS,
+    FINAL_ANSWER_INSTRUCTION,
   );
+}
+
+/** How the plan was read: through the schema, out of prose, or not at all. */
+export type PlanSource = 'schema' | 'prose' | 'none';
+
+export interface PlanReading {
+  /** The plan as the executor is handed it; empty when there was none. */
+  text: string;
+  steps: number;
+  source: PlanSource;
+  /** What the executor got instead of a schema plan, when it did. */
+  fallback?: string;
 }
 
 /**
  * The plan as text for the executor.
  *
- * Structured output is the happy path, but a model that answers in prose still
- * produced a usable plan, and throwing it away would cost a phase for nothing.
+ * The schema reply is the plan. A planner that answered in prose still wrote
+ * something the executor can use, so it is passed on rather than thrown away
+ * — but it is a fallback, and the reading says so.
  */
-export function planText(outcome: QueryOutcome): string {
-  const parsed = readStructured<{ steps?: unknown; rationale?: unknown }>(outcome);
-  const steps = stringList(parsed?.steps, MAX_PLAN_STEPS);
-  if (steps.length === 0) return outcome.text.trim();
+export function readPlan(outcome: Pick<QueryOutcome, 'structured' | 'text'>): PlanReading {
+  const fromSchema = planFrom(outcome.structured);
+  if (fromSchema && fromSchema.steps.length > 0) {
+    return { text: render(fromSchema), steps: fromSchema.steps.length, source: 'schema' };
+  }
 
-  const rationale = typeof parsed?.rationale === 'string' ? parsed.rationale.trim() : '';
-  return joinSections(numbered(steps), rationale === '' ? '' : `Rationale: ${rationale}`);
+  const fromProse = planFrom(parseLooseJson(outcome.text));
+  if (fromProse && fromProse.steps.length > 0) {
+    return {
+      text: render(fromProse),
+      steps: fromProse.steps.length,
+      source: 'prose',
+      fallback: 'the plan came back as JSON in prose, not through the schema; its steps were used',
+    };
+  }
+
+  const prose = outcome.text.trim();
+  if (prose !== '') {
+    return {
+      text: prose,
+      steps: 0,
+      source: 'prose',
+      fallback: 'the plan came back as prose, not through the schema; the executor got it as written',
+    };
+  }
+
+  return {
+    text: '',
+    steps: 0,
+    source: fromSchema ? 'schema' : 'none',
+    fallback: fromSchema
+      ? 'the plan had no steps; the executor ran without one'
+      : 'the planner produced no plan; the executor ran without one',
+  };
+}
+
+interface ParsedPlan {
+  steps: string[];
+  rationale: string;
+}
+
+function planFrom(value: unknown): ParsedPlan | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { steps, rationale } = value as { steps?: unknown; rationale?: unknown };
+  return {
+    steps: stringList(steps, MAX_PLAN_STEPS),
+    rationale: typeof rationale === 'string' ? rationale.trim() : '',
+  };
+}
+
+function render(plan: ParsedPlan): string {
+  return joinSections(numbered(plan.steps), plan.rationale === '' ? '' : `Rationale: ${plan.rationale}`);
+}
+
+/**
+ * Run the planning phase and record how its plan was read. Shared with
+ * plan-execute-verify, whose first two phases are this architecture's.
+ */
+export async function runPlanPhase(runner: PhaseRunner, ctx: RunContext): Promise<string> {
+  const outcome = await runner.run({
+    phase: 'plan',
+    label: 'Plan',
+    prompt: planPrompt(ctx),
+    allowedTools: [],
+    outputSchema: PLAN_SCHEMA,
+    maxTurns: SCHEMA_MIN_TURNS,
+  });
+  const reading = readPlan(outcome);
+  runner.annotate(outcome, {
+    meta: { steps: reading.steps, source: reading.source },
+    ...(reading.fallback !== undefined && !interrupted(outcome) ? { degraded: reading.fallback } : {}),
+  });
+  return reading.text;
+}
+
+/** The plan was a plan: read through the schema, with at least one step. */
+export function planCheck(id: string, input: FidelityInput): IntegrityCheck {
+  const plan = phaseNamed(input, 'plan');
+  const excused = unjudged(id, input, plan, 'the plan');
+  if (excused || !plan) return excused ?? fail(id, 'the plan never ran');
+
+  const steps = metaNumber(plan, 'steps') ?? 0;
+  if (metaString(plan, 'source') === 'schema' && steps > 0) {
+    return pass(id, `a ${steps}-step plan, read from the schema reply`);
+  }
+  return fail(id, plan.degraded ?? 'the plan was not read from a schema reply');
+}
+
+export function planExecuteFidelityChecks(input: FidelityInput): IntegrityCheck[] {
+  return [
+    planCheck('plan-execute.plan', input),
+    toolSurfaceCheck('plan-execute.tools', input, [
+      { role: 'planner', matches: phase('plan'), tools: [] },
+      { role: 'executor', matches: phase('execute'), tools: input.env.allowedTools },
+    ]),
+  ];
 }
 
 export function createPlanExecuteStrategy(deps: Partial<StrategyDeps> = {}): Strategy {
@@ -79,26 +203,20 @@ export function createPlanExecuteStrategy(deps: Partial<StrategyDeps> = {}): Str
     id: 'plan-execute',
     label: 'Plan then execute',
     description: DESCRIPTION,
+    fidelityChecks: planExecuteFidelityChecks,
 
     async run(ctx: RunContext): Promise<StrategyOutcome> {
       const runner = createPhaseRunner(ctx, deps);
       if (!runner.canContinue()) return runner.finish();
 
-      const plan = await runner.run({
-        phase: 'plan',
-        label: 'Plan',
-        prompt: planPrompt(ctx),
-        allowedTools: [],
-        outputSchema: PLAN_SCHEMA,
-        maxTurns: SCHEMA_MIN_TURNS,
-      });
-
+      const plan = await runPlanPhase(runner, ctx);
       if (!runner.canContinue()) return runner.finish();
 
       const execute = await runner.run({
         phase: 'execute',
         label: 'Execute',
-        prompt: executePrompt(ctx, planText(plan)),
+        prompt: executePlanPrompt(ctx, plan),
+        answers: true,
       });
 
       return runner.finish({ finalText: execute.text });

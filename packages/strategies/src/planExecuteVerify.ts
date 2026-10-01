@@ -1,6 +1,16 @@
-import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
-import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
+import { readStructured } from '@arena/core';
+import type {
+  FidelityInput,
+  IntegrityCheck,
+  QueryOutcome,
+  RunContext,
+  Strategy,
+  StrategyOutcome,
+} from '@arena/core';
+import { phase, phasePrefix, toolSurfaceCheck } from './fidelity';
 import {
+  ACTING_INSTRUCTIONS,
+  FINAL_ANSWER_INSTRUCTION,
   createPhaseRunner,
   joinSections,
   numbered,
@@ -9,7 +19,7 @@ import {
   taskBlock,
   type StrategyDeps,
 } from './helpers';
-import { PLAN_SCHEMA, executePrompt, planPrompt, planText } from './planExecute';
+import { executePlanPrompt, planCheck, runPlanPhase } from './planExecute';
 
 const DESCRIPTION =
   'Plan, execute, then hand the work to a verifier that holds only the read-only tools and has ' +
@@ -67,9 +77,11 @@ export function revisePrompt(ctx: RunContext, answer: string, issues: string[]):
     taskBlock(ctx),
     tagged('your_previous_attempt', answer === '' ? '(nothing was reported)' : answer),
     tagged('issues_found', numbered(issues)),
-    'A verifier checked the real state against the task and reported the issues above. Fix them ' +
-      'with the tools available, changing only what the issues call for. If an issue is mistaken, ' +
-      'leave the work alone and say why. Then reply with your final answer to the task.',
+    'A verifier checked the real state against the task and reported the issues above. Fix them, ' +
+      'changing only what the issues call for. If an issue is mistaken, leave the work alone and ' +
+      'say why.',
+    ACTING_INSTRUCTIONS,
+    FINAL_ANSWER_INSTRUCTION,
   );
 }
 
@@ -106,31 +118,37 @@ export function readVerdict(outcome: QueryOutcome): Verdict {
   return { approved, issues, severity };
 }
 
+export function planExecuteVerifyFidelityChecks(input: FidelityInput): IntegrityCheck[] {
+  return [
+    planCheck('plan-execute-verify.plan', input),
+    toolSurfaceCheck('plan-execute-verify.tools', input, [
+      { role: 'planner', matches: phase('plan'), tools: [] },
+      { role: 'executor', matches: phase('execute'), tools: input.env.allowedTools },
+      { role: 'verifier', matches: phase('verify'), tools: input.env.readOnlyTools },
+      { role: 'reviser', matches: phasePrefix('revise-'), tools: input.env.allowedTools },
+    ]),
+  ];
+}
+
 export function createPlanExecuteVerifyStrategy(deps: Partial<StrategyDeps> = {}): Strategy {
   return {
     id: 'plan-execute-verify',
     label: 'Plan, execute, verify, revise',
     description: DESCRIPTION,
+    fidelityChecks: planExecuteVerifyFidelityChecks,
 
     async run(ctx: RunContext): Promise<StrategyOutcome> {
       const runner = createPhaseRunner(ctx, deps);
       if (!runner.canContinue()) return runner.finish();
 
-      const plan = await runner.run({
-        phase: 'plan',
-        label: 'Plan',
-        prompt: planPrompt(ctx),
-        allowedTools: [],
-        outputSchema: PLAN_SCHEMA,
-        maxTurns: SCHEMA_MIN_TURNS,
-      });
-
+      const plan = await runPlanPhase(runner, ctx);
       if (!runner.canContinue()) return runner.finish();
 
       const execute = await runner.run({
         phase: 'execute',
         label: 'Execute',
-        prompt: executePrompt(ctx, planText(plan)),
+        prompt: executePlanPrompt(ctx, plan),
+        answers: true,
       });
 
       // The answer is whatever the last acting phase said, never the verifier's
@@ -156,6 +174,7 @@ export function createPlanExecuteVerifyStrategy(deps: Partial<StrategyDeps> = {}
           phase: `revise-${round + 1}`,
           label: `Revise (round ${round + 1})`,
           prompt: revisePrompt(ctx, answer.trim(), verdict.issues),
+          answers: true,
         });
         if (revision.text.trim() !== '') answer = revision.text;
       }

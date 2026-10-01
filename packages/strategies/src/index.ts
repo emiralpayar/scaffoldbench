@@ -5,17 +5,30 @@ import { orchestratorWorkersStrategy } from './orchestratorWorkers';
 import { planExecuteVerifyStrategy } from './planExecuteVerify';
 import { debateSelectStrategy } from './debateSelect';
 
-export type { StrategyDeps, LabeledSpec, PhaseRunner } from './helpers';
-export { createPhaseRunner, recordPhase } from './helpers';
+export type { StrategyDeps, LabeledSpec, PhaseNote, PhaseRunner } from './helpers';
+export {
+  ACTING_INSTRUCTIONS,
+  FINAL_ANSWER_INSTRUCTION,
+  REASONING_TURNS,
+  createPhaseRunner,
+  interrupted,
+  recordPhase,
+} from './helpers';
 
-export { createSingleStrategy, singleStrategy } from './single';
-export { createPlanExecuteStrategy, planExecuteStrategy } from './planExecute';
+export { createSingleStrategy, singleFidelityChecks, singleStrategy } from './single';
+export {
+  createPlanExecuteStrategy,
+  planExecuteFidelityChecks,
+  planExecuteStrategy,
+} from './planExecute';
 export {
   createOrchestratorWorkersStrategy,
+  orchestratorWorkersFidelityChecks,
   orchestratorWorkersStrategy,
 } from './orchestratorWorkers';
 export {
   createPlanExecuteVerifyStrategy,
+  planExecuteVerifyFidelityChecks,
   planExecuteVerifyStrategy,
 } from './planExecuteVerify';
 export { createDebateSelectStrategy, debateSelectStrategy } from './debateSelect';

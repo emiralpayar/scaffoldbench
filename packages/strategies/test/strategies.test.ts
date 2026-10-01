@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyUsage } from '@arena/core';
+import { SCHEMA_MIN_TURNS, emptyUsage } from '@arena/core';
 import type {
   BudgetLedger,
   QueryOutcome,
@@ -13,8 +13,12 @@ import type {
   TraceSink,
 } from '@arena/core';
 import {
+  ACTING_INSTRUCTIONS,
+  FINAL_ANSWER_INSTRUCTION,
+  REASONING_TURNS,
   STRATEGIES,
   createDebateSelectStrategy,
+  createPhaseRunner,
   createOrchestratorWorkersStrategy,
   createPlanExecuteStrategy,
   createPlanExecuteVerifyStrategy,
@@ -72,7 +76,7 @@ function createFake(script: Script): Fake {
       calls.push(spec);
       const partial = await script(spec, index);
       fake.resolved += 1;
-      return { ...BASE_OUTCOME, ...partial };
+      return { ...BASE_OUTCOME, callId: `call-${index + 1}`, ...partial };
     },
     phase(name: string): QuerySpec {
       const found = calls.find((call) => call.phase === name);
@@ -218,6 +222,23 @@ const genericScript: Script = (spec) => {
   return { text: `${spec.phase} answer` };
 };
 
+/** `genericScript`, except that the first verdict rejects the work, so a revision runs. */
+function rejectingFirstVerdict(): Script {
+  let verdicts = 0;
+  return (spec, index) => {
+    if (spec.phase.startsWith('verify') && verdicts++ === 0) {
+      return {
+        text: 'not yet',
+        structured: { approved: false, issues: ['refund amount is wrong'], severity: 'blocking' },
+      };
+    }
+    return genericScript(spec, index);
+  };
+}
+
+/** Phases that hold the tools that change state. */
+const ACTING_PHASE = /^(main|execute|worker-.*|revise-\d+)$/;
+
 const allFactories: { id: string; create: (deps: Partial<StrategyDeps>) => Strategy }[] = [
   { id: 'single', create: createSingleStrategy },
   { id: 'plan-execute', create: createPlanExecuteStrategy },
@@ -279,23 +300,63 @@ describe('plan-execute', () => {
     expect(prompt).toContain('refund it');
   });
 
-  it('falls back to the raw plan text when structured output is undefined', async () => {
-    const fake = createFake((spec) =>
-      spec.phase === 'plan'
-        ? { text: 'first check the order, then refund it', structured: undefined }
-        : { text: 'done' },
-    );
-    await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+  it('records how many steps the plan had and that it came through the schema', async () => {
+    const fake = createFake(genericScript);
+    const outcome = await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
-    expect(fake.phase('execute').prompt).toContain('first check the order, then refund it');
+    const plan = outcome.phases.find((phase) => phase.phase === 'plan');
+    expect(plan?.meta).toEqual({ steps: 2, source: 'schema' });
+    expect(plan?.degraded).toBeUndefined();
+    expect(plan?.callId).toBe('call-1');
   });
 
-  it('still executes when the plan phase produced nothing at all', async () => {
+  it('hands on a prose plan, and records that it fell back to one', async () => {
+    const fake = createFake((spec) =>
+      spec.phase === 'plan'
+        ? { text: 'first check the order, then refund it', structured: undefined, structuredMissing: true }
+        : { text: 'done' },
+    );
+    const outcome = await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phase('execute').prompt).toContain('first check the order, then refund it');
+    const plan = outcome.phases.find((phase) => phase.phase === 'plan');
+    expect(plan?.meta).toEqual({ steps: 0, source: 'prose' });
+    expect(plan?.degraded).toMatch(/came back as prose/);
+  });
+
+  it('reads steps out of JSON in prose, and records that it had to', async () => {
+    const fake = createFake((spec) =>
+      spec.phase === 'plan'
+        ? { text: 'Plan: {"steps": ["read it", "refund it"], "rationale": "r"}', structuredMissing: true }
+        : { text: 'done' },
+    );
+    const outcome = await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(fake.phase('execute').prompt).toContain('1. read it');
+    const plan = outcome.phases.find((phase) => phase.phase === 'plan');
+    expect(plan?.meta).toEqual({ steps: 2, source: 'prose' });
+    expect(plan?.degraded).toMatch(/JSON in prose/);
+  });
+
+  it('still executes when the plan phase produced nothing at all, and records it', async () => {
     const fake = createFake((spec) => (spec.phase === 'plan' ? { text: '' } : { text: 'done anyway' }));
     const outcome = await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(fake.phases()).toEqual(['plan', 'execute']);
+    expect(fake.phase('execute').prompt).toContain('(the planning step produced no plan)');
     expect(outcome.finalText).toBe('done anyway');
+    expect(outcome.phases[0]?.degraded).toBe('the planner produced no plan; the executor ran without one');
+  });
+
+  it('does not call a plan the run’s limits cut short degraded', async () => {
+    const fake = createFake((spec) =>
+      spec.phase === 'plan'
+        ? { text: '', subtype: 'error_max_budget_usd', structuredMissing: true }
+        : { text: 'done' },
+    );
+    const outcome = await createPlanExecuteStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(outcome.phases[0]?.degraded).toBeUndefined();
   });
 });
 
@@ -390,7 +451,16 @@ describe('orchestrator-workers', () => {
     expect(prompt).toContain('worker-notify report');
   });
 
-  it('falls back to a single worker when decomposition returns nothing', async () => {
+  it('records the decomposition it fanned out', async () => {
+    const fake = createFake(threeSubtasks);
+    const outcome = await createOrchestratorWorkersStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    const decompose = outcome.phases.find((phase) => phase.phase === 'decompose');
+    expect(decompose?.meta).toEqual({ subtasks: 3, workers: 3, source: 'schema' });
+    expect(decompose?.degraded).toBeUndefined();
+  });
+
+  it('falls back to a single worker when the decomposition cannot be read, and records it', async () => {
     const fake = createFake((spec) =>
       spec.phase === 'decompose' ? { structured: { subtasks: [] } } : { text: `${spec.phase} report` },
     );
@@ -400,20 +470,27 @@ describe('orchestrator-workers', () => {
     expect(workers).toHaveLength(1);
     expect(outcome.subagentCount).toBe(1);
     expect(fake.calls).toHaveLength(3);
+    const decompose = outcome.phases.find((phase) => phase.phase === 'decompose');
+    expect(decompose?.meta).toEqual({ subtasks: 0, workers: 1, source: 'none' });
+    expect(decompose?.degraded).toBe('the decomposition could not be read; one worker was given the whole task');
   });
 
-  it('falls back to a single worker when decomposition returns one subtask', async () => {
+  it('gives one worker the whole task when the orchestrator chooses not to split it', async () => {
     const fake = createFake((spec) =>
       spec.phase === 'decompose'
         ? { structured: { subtasks: [{ id: 'only', goal: 'Do half of it.' }] } }
         : { text: `${spec.phase} report` },
     );
-    await createOrchestratorWorkersStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+    const outcome = await createOrchestratorWorkersStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     const workers = fake.calls.filter((call) => call.phase.startsWith('worker-'));
     expect(workers).toHaveLength(1);
-    // A lone subtask is not a decomposition, so the worker is given the whole task.
+    // A lone subtask covers the whole task, so the worker is given the task itself.
     expect(workers[0]?.prompt).not.toContain('Do half of it.');
+    // Declining to split is the orchestrator's call, not a fallback.
+    const decompose = outcome.phases.find((phase) => phase.phase === 'decompose');
+    expect(decompose?.meta).toEqual({ subtasks: 1, workers: 1, source: 'schema' });
+    expect(decompose?.degraded).toBeUndefined();
   });
 
   it('caps the fan-out at four workers', async () => {
@@ -452,15 +529,29 @@ describe('orchestrator-workers', () => {
     expect(new Set(workers).size).toBe(workers.length);
   });
 
-  it('falls back to the last worker report when synthesize returns nothing', async () => {
+  it('falls back to the last worker report when synthesize is cut short', async () => {
     const fake = createFake((spec) => {
       if (spec.phase === 'decompose') return threeSubtasks(spec, 0);
-      if (spec.phase === 'synthesize') return { text: '', aborted: true };
+      if (spec.phase === 'synthesize') return { text: '', aborted: true, subtype: 'aborted' };
       return { text: `${spec.phase} report` };
     });
     const outcome = await createOrchestratorWorkersStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(outcome.finalText).toBe('worker-notify report');
+    expect(outcome.phases.at(-1)?.degraded).toBeUndefined();
+  });
+
+  it('records a synthesis that came back empty on its own as degraded', async () => {
+    const fake = createFake((spec) => {
+      if (spec.phase === 'decompose') return threeSubtasks(spec, 0);
+      if (spec.phase === 'synthesize') return { text: '' };
+      return { text: `${spec.phase} report` };
+    });
+    const outcome = await createOrchestratorWorkersStrategy({ runQuery: fake.runQuery }).run(makeCtx());
+
+    // The latest-started worker, whichever finished last.
+    expect(outcome.finalText).toBe('worker-notify report');
+    expect(outcome.phases.at(-1)?.degraded).toMatch(/synthesis came back empty/);
   });
 });
 
@@ -656,7 +747,9 @@ describe('debate-select', () => {
     const outcome = await createDebateSelectStrategy({ runQuery: fake.runQuery }).run(makeCtx());
 
     expect(fake.phases()).toEqual(['propose-1', 'propose-2', 'propose-3', 'select', 'execute']);
-    expect(outcome.finalText).toBe('propose-3 proposal');
+    // A proposal is a plan for the executor, never the answer: the executor
+    // said nothing, so there is no answer.
+    expect(outcome.finalText).toBe('');
   });
 });
 
@@ -699,17 +792,67 @@ describe('every strategy', () => {
     expect(outcome.phases).toEqual([]);
   });
 
-  it.each(allFactories)('$id keeps the answer of the last productive phase', async ({ create }) => {
-    // Everything after the first call comes back empty and aborted, as it would
-    // once the wall clock trips mid-run.
+  it.each(allFactories)('$id keeps the acting phase’s answer when the run is cut short after it', async ({ create }) => {
+    // The first acting phase answers; everything after it comes back empty
+    // and aborted, as it would once the wall clock trips mid-run.
+    let acted = false;
+    const fake = createFake((spec, index) => {
+      if (ACTING_PHASE.test(spec.phase)) {
+        acted = true;
+        return { text: 'acting answer' };
+      }
+      if (acted) return { text: '', aborted: true, subtype: 'aborted' };
+      return genericScript(spec, index);
+    });
+    const outcome = await create({ runQuery: fake.runQuery }).run(makeCtx());
+
+    expect(outcome.finalText).toBe('acting answer');
+  });
+
+  it.each(allFactories)('$id never answers with a plan, a verdict or a choice', async ({ create }) => {
+    // Every phase that is not an answer says something; every acting phase,
+    // and the synthesis, comes back empty.
     const fake = createFake((spec, index) =>
-      index === 0
-        ? { ...(genericScript(spec, index) as Partial<QueryOutcome>), text: 'first phase answer' }
-        : { text: '', aborted: true, subtype: 'aborted' },
+      ACTING_PHASE.test(spec.phase) || spec.phase === 'synthesize'
+        ? { text: '' }
+        : { ...(genericScript(spec, index) as Partial<QueryOutcome>), text: `${spec.phase} notes` },
     );
     const outcome = await create({ runQuery: fake.runQuery }).run(makeCtx());
 
-    expect(outcome.finalText).toBe('first phase answer');
+    expect(outcome.finalText).toBe('');
+  });
+
+  it.each(allFactories)('$id gives every acting phase the same instructions', async ({ create }) => {
+    const fake = createFake(rejectingFirstVerdict());
+    await create({ runQuery: fake.runQuery }).run(makeCtx());
+
+    const acting = fake.calls.filter((call) => ACTING_PHASE.test(call.phase));
+    expect(acting.length).toBeGreaterThan(0);
+    for (const call of acting) {
+      expect(call.prompt).toContain(ACTING_INSTRUCTIONS);
+      // A worker reports to the orchestrator; every other acting phase answers the task.
+      if (call.phase.startsWith('worker-')) {
+        expect(call.prompt).toMatch(/Your report is all the orchestrator will see\.$/);
+      } else {
+        expect(call.prompt.endsWith(FINAL_ANSWER_INSTRUCTION)).toBe(true);
+      }
+    }
+    for (const call of fake.calls.filter((c) => !ACTING_PHASE.test(c.phase))) {
+      expect(call.prompt).not.toContain(ACTING_INSTRUCTIONS);
+    }
+  });
+
+  it.each(allFactories)('$id gives every phase the turns the shared policy sets', async ({ create }) => {
+    const fake = createFake(rejectingFirstVerdict());
+    await create({ runQuery: fake.runQuery }).run(makeCtx());
+
+    for (const call of fake.calls) {
+      const toolless = call.allowedTools !== undefined && call.allowedTools.length === 0;
+      if (toolless && call.outputSchema) expect(call.maxTurns, call.phase).toBe(SCHEMA_MIN_TURNS);
+      else if (toolless) expect(call.maxTurns, call.phase).toBe(REASONING_TURNS);
+      // Anything holding tools gets the task's own allowance.
+      else expect(call.maxTurns, call.phase).toBeUndefined();
+    }
   });
 
   it.each(allFactories)('$id never restates the task instead of quoting it', async ({ create }) => {
@@ -721,6 +864,62 @@ describe('every strategy', () => {
       expect(call.prompt).toContain(ctx.task.prompt);
       expect(call.label ?? '').not.toBe('');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The phase runner
+// ---------------------------------------------------------------------------
+
+describe('createPhaseRunner', () => {
+  it('lists a phase where it started, not where it finished', async () => {
+    const gate = deferred();
+    const fake = createFake(async (spec) => {
+      if (spec.phase === 'slow') await gate.promise;
+      return { text: spec.phase };
+    });
+    const runner = createPhaseRunner(makeCtx(), { runQuery: fake.runQuery });
+
+    const slow = runner.run({ phase: 'slow', label: 'Slow', prompt: 'go' });
+    // A call made while the slow one waits — as a review is — finishes first.
+    await runner.run({ phase: 'quick', label: 'Quick', prompt: 'go' });
+    gate.release();
+    await slow;
+
+    expect(runner.phases.map((phase) => phase.phase)).toEqual(['slow', 'quick']);
+  });
+
+  it('falls back to the latest-started answer, whichever finished last', async () => {
+    const gate = deferred();
+    const fake = createFake(async (spec) => {
+      if (spec.phase === 'first') await gate.promise;
+      return { text: `${spec.phase} answer` };
+    });
+    const runner = createPhaseRunner(makeCtx(), { runQuery: fake.runQuery });
+
+    const first = runner.run({ phase: 'first', label: 'First', prompt: 'go', answers: true });
+    await runner.run({ phase: 'second', label: 'Second', prompt: 'go', answers: true });
+    await runner.run({ phase: 'notes', label: 'Notes', prompt: 'go' });
+    gate.release();
+    await first;
+
+    expect(runner.finish().finalText).toBe('second answer');
+  });
+
+  it('adds what the strategy read to the phase’s record', async () => {
+    const fake = createFake(() => ({ text: 'x' }));
+    const runner = createPhaseRunner(makeCtx(), { runQuery: fake.runQuery });
+
+    const outcome = await runner.run({ phase: 'plan', label: 'Plan', prompt: 'go' });
+    runner.annotate(outcome, { meta: { steps: 0 }, degraded: 'no plan', retriedBy: 'plan-retry' });
+    runner.annotate(outcome, { meta: { source: 'none' } });
+
+    expect(runner.phases[0]).toMatchObject({
+      callId: 'call-1',
+      meta: { steps: 0, source: 'none' },
+      degraded: 'no plan',
+      retriedBy: 'plan-retry',
+    });
   });
 });
 

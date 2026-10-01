@@ -1,6 +1,8 @@
 import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
 import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
 import {
+  ACTING_INSTRUCTIONS,
+  FINAL_ANSWER_INSTRUCTION,
   createPhaseRunner,
   hasMutatingTools,
   joinSections,
@@ -72,14 +74,14 @@ export function selectPrompt(ctx: RunContext, proposals: string): string {
   );
 }
 
-export function executePrompt(ctx: RunContext, selected: string): string {
+export function executeSelectionPrompt(ctx: RunContext, selected: string): string {
   return joinSections(
     taskBlock(ctx),
     tagged('selected_plan', selected),
     'The investigation above was done with read-only tools, so nothing has been changed yet. ' +
-      'Carry out the selected plan with the full toolset, confirming anything it assumes before ' +
-      'you rely on it. If what you find contradicts the plan, do what the task and the rules ' +
-      'require and say so. When you are finished, reply with your final answer.',
+      'Carry out the selected plan, confirming anything it assumes before you rely on it.',
+    ACTING_INSTRUCTIONS,
+    FINAL_ANSWER_INSTRUCTION,
   );
 }
 
@@ -178,7 +180,8 @@ export function createDebateSelectStrategy(deps: Partial<StrategyDeps> = {}): St
       const execute = await runner.run({
         phase: 'execute',
         label: 'Execute',
-        prompt: executePrompt(ctx, plan),
+        prompt: executeSelectionPrompt(ctx, plan),
+        answers: true,
       });
 
       return runner.finish({ finalText: execute.text, subagentCount });
