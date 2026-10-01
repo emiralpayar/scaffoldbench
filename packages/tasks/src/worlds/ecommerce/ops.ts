@@ -114,7 +114,22 @@ export interface ScheduledMessage {
   message: InboxMessage;
 }
 
+/**
+ * A dated amendment to the handbook or the return policy. In force from
+ * `effectiveFrom` to `effectiveTo` inclusive (`null`: until further notice),
+ * within the scope its text states.
+ */
+export interface PolicyUpdate {
+  id: string;
+  title: string;
+  publishedOn: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  body: string;
+}
+
 export interface EcommerceOpsWorld extends EcommerceWorld {
+  policyUpdates: PolicyUpdate[];
   purchaseOrders: PurchaseOrder[];
   returns: ReturnAuthorization[];
   receipts: ReturnReceipt[];
@@ -129,6 +144,7 @@ export interface EcommerceOpsWorld extends EcommerceWorld {
 export function emptyStoreOps(base: EcommerceWorld): EcommerceOpsWorld {
   return {
     ...base,
+    policyUpdates: [],
     purchaseOrders: [],
     returns: [],
     receipts: [],
@@ -150,6 +166,22 @@ export const ECOMMERCE_OPS_INSTRUCTIONS = [
 const REPLACED = new Set(['refund_order', 'restock_item', 'apply_store_credit', 'get_customer']);
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Long lists come back in pages of this size, as a real back office would serve them. */
+const PAGE_SIZE = 8;
+
+const pageSchema = z.number().int().min(1).optional().describe('1-based page number, default 1');
+
+/** One page of rows under a header naming the page, or an error for a page that does not exist. */
+function paged(rows: string[], page: number | undefined, noun: string): string | ReturnType<typeof fail> {
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const current = page ?? 1;
+  if (current > pages) return fail(`page ${current} does not exist; there are ${pages}`);
+  return [
+    `${rows.length} ${noun}; page ${current} of ${pages}:`,
+    ...rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
+  ].join('\n');
+}
 
 export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledToolSpec[] {
   const findReturn = (id: unknown) => world.returns.find((rma) => rma.id === readString(id));
@@ -186,6 +218,39 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
       },
     },
     {
+      name: 'list_policy_updates',
+      description: 'List dated policy updates with the dates they are in force.',
+      schema: {},
+      readOnly: true,
+      handler: () => {
+        if (world.policyUpdates.length === 0) return 'no policy updates';
+        return [
+          `${world.policyUpdates.length} policy update(s), today=${world.today}:`,
+          ...world.policyUpdates.map(
+            (update) =>
+              `  ${update.id} "${update.title}" published ${update.publishedOn}, in force ${update.effectiveFrom} to ${update.effectiveTo ?? 'further notice'}`,
+          ),
+        ].join('\n');
+      },
+    },
+    {
+      name: 'get_policy_update',
+      description: 'Read the full text of one policy update.',
+      schema: { updateId: z.string() },
+      readOnly: true,
+      handler: (args: { updateId?: unknown }) => {
+        const update = world.policyUpdates.find((entry) => entry.id === readString(args.updateId));
+        if (!update) return fail(`unknown policy update "${readString(args.updateId)}"`);
+        return [
+          `${update.id} - ${update.title}`,
+          `published: ${update.publishedOn}`,
+          `in force: ${update.effectiveFrom} to ${update.effectiveTo ?? 'further notice'}`,
+          '',
+          update.body,
+        ].join('\n');
+      },
+    },
+    {
       name: 'list_purchase_orders',
       description:
         'List purchase orders from suppliers: product, quantity, and whether received or still in transit with its expected arrival.',
@@ -206,11 +271,10 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
     },
     {
       name: 'list_backorders',
-      description:
-        'List every order line waiting for stock (status backordered), with its order, customer and the date the order was placed.',
-      schema: { productId: z.string().optional() },
+      description: `List every order line waiting for stock (status backordered), with its order, customer and the date the order was placed. Results are paged, ${PAGE_SIZE} lines per page.`,
+      schema: { productId: z.string().optional(), page: pageSchema },
       readOnly: true,
-      handler: (args: { productId?: unknown }) => {
+      handler: (args: { productId?: unknown; page?: number }) => {
         const productId = readString(args.productId);
         const rows = world.orders.flatMap((order) =>
           order.lines
@@ -224,26 +288,26 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
             ),
         );
         if (rows.length === 0) return 'no backordered lines';
-        return [`${rows.length} backordered line(s):`, ...rows].join('\n');
+        return paged(rows, args.page, 'backordered line(s)');
       },
     },
     {
       name: 'list_returns',
-      description:
-        'List return authorizations (RMAs), optionally by status (open, investigating, closed).',
-      schema: { status: z.enum(['open', 'investigating', 'closed']).optional() },
+      description: `List return authorizations (RMAs), optionally by status (open, investigating, closed). Results are paged, ${PAGE_SIZE} per page.`,
+      schema: { status: z.enum(['open', 'investigating', 'closed']).optional(), page: pageSchema },
       readOnly: true,
-      handler: (args: { status?: unknown }) => {
+      handler: (args: { status?: unknown; page?: number }) => {
         const status = readString(args.status);
         const matches = world.returns.filter((rma) => !status || rma.status === status);
         if (matches.length === 0) return 'no returns match';
-        return [
-          `${matches.length} return(s), today=${world.today}:`,
-          ...matches.map(
+        return paged(
+          matches.map(
             (rma) =>
               `  ${rma.id} order=${rma.orderId} line=${rma.lineId} qty=${rma.quantity} requestedOn=${rma.requestedOn} reason=${rma.reason} status=${rma.status}`,
           ),
-        ].join('\n');
+          args.page,
+          `return(s), today=${world.today}`,
+        );
       },
     },
     {
@@ -264,21 +328,23 @@ export function createEcommerceOpsTools(world: EcommerceOpsWorld): JournaledTool
     },
     {
       name: 'list_return_receipts',
-      description:
-        'List what the warehouse has received against return authorizations, with the grade it gave the goods.',
-      schema: { rmaId: z.string().optional() },
+      description: `List what the warehouse has received against return authorizations, with the grade it gave the goods, oldest first. Results are paged, ${PAGE_SIZE} per page.`,
+      schema: { rmaId: z.string().optional(), page: pageSchema },
       readOnly: true,
-      handler: (args: { rmaId?: unknown }) => {
+      handler: (args: { rmaId?: unknown; page?: number }) => {
         const rmaId = readString(args.rmaId);
-        const matches = world.receipts.filter((receipt) => !rmaId || receipt.rmaId === rmaId);
+        const matches = world.receipts
+          .filter((receipt) => !rmaId || receipt.rmaId === rmaId)
+          .sort((a, b) => a.receivedOn.localeCompare(b.receivedOn));
         if (matches.length === 0) return rmaId ? `nothing received against ${rmaId}` : 'no receipts';
-        return [
-          `${matches.length} receipt(s):`,
-          ...matches.map(
+        return paged(
+          matches.map(
             (receipt) =>
               `  ${receipt.rmaId} receivedOn=${receipt.receivedOn} qty=${receipt.quantity} grade=${receipt.grade} productReceived=${receipt.productReceived}`,
           ),
-        ].join('\n');
+          args.page,
+          'receipt(s)',
+        );
       },
     },
     {

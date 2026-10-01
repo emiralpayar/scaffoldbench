@@ -13,12 +13,7 @@ import {
   type ReturnAuthorization,
   type ReturnReceipt,
 } from '../ops';
-import {
-  daysBetween,
-  findCustomer,
-  findProduct,
-  type RefundMethod,
-} from '../world';
+import { daysBetween, findCustomer, findProduct, type Order, type RefundMethod } from '../world';
 import {
   ECOMMERCE_EXPERT_BASE,
   addedRefunds,
@@ -32,21 +27,29 @@ import {
 } from './common';
 
 /**
- * ecommerce-returns-desk: nine open returns, each settled by what the
- * warehouse actually received.
+ * ecommerce-returns-desk: fourteen open returns over two pages, each settled
+ * by what the warehouse actually received, under a return policy that three
+ * dated policy updates amend.
  *
  * Every return is its own small case (read the authorization, the order, the
- * receipts and the policy, then refund, restock and close), so the batch splits
- * cleanly. What makes a case go wrong is never visible in the return itself:
- * a parcel that has not arrived although the customer insists it has, a box
- * holding a different product, a damaged item, half a return, a window that
- * closed after the customer asked, a colleague's earlier goodwill refund, and
- * a restocking fee that depends on why the goods came back, not on the state
- * they arrived in.
+ * customer, the receipts and the rules in force on the day it was requested,
+ * then refund, restock and close), so the batch splits cleanly. What makes a
+ * case go wrong is never visible in the return itself: a parcel the customer
+ * insists was delivered, a box holding a different product, damaged goods,
+ * half a return, a second receipt on a later page, a window that closed after
+ * the customer asked (or exactly on the day), a longer window for loyal
+ * customers, a fee that depends on the reason for the return and on the
+ * date it was requested, and a colleague's earlier goodwill refund.
  */
 
 const TODAY = '2026-07-25';
 const RESTOCKING_FEE_PERCENT = 15;
+/** PU-15: change-of-mind returns requested in these dates carried a higher fee. */
+export const PEAK_FEE = { from: '2026-05-01', to: '2026-06-30', percent: 20 };
+/** PU-18: gold and platinum customers get a longer window for returns requested from this date. */
+export const LOYAL_WINDOW = { from: '2026-06-01', days: 45 };
+/** PU-21: no restocking fee on change-of-mind returns requested in these dates. */
+export const SUMMER_AMNESTY = { from: '2026-07-10', to: '2026-07-20' };
 
 const shipped = (id: string, productId: string, quantity: number, unit: number, on: string, paid?: number) =>
   line(id, productId, quantity, unit, { status: 'shipped', shippedAt: on, ...(paid ? { paid } : {}) });
@@ -73,28 +76,23 @@ function receipt(
   return { rmaId, receivedOn, quantity, grade, productReceived };
 }
 
+/** Marks a line as partly refunded already, matching a refund in the seed ledger. */
+function refunded(order: Order, lineId: string, amountCents: number): Order {
+  const entry = order.lines.find((candidate) => candidate.id === lineId);
+  if (entry) {
+    entry.refundedCents = amountCents;
+    entry.refundMethod = 'card';
+  }
+  return order;
+}
+
 export const NOT_RECEIVED_NOTE =
   'I dropped the parcel at the post office on 21 July and the tracking shows it was delivered to your warehouse on the 23rd. Please refund me today, I have waited long enough.';
 
 export function createReturnsWorld(): EcommerceOpsWorld {
-  const o7008 = order('O-7008', 'C-708', '2026-07-01', [
-    shipped('L1', 'P-KEY', 1, 12_900, '2026-07-03'),
-    shipped('L2', 'P-CAB', 2, 1_900, '2026-07-03'),
-  ]);
-  const goodwill = o7008.lines[0];
-  if (goodwill) {
-    goodwill.refundedCents = 3_000;
-    goodwill.refundMethod = 'card';
-  }
-  const o7010 = order('O-7010', 'C-710', '2026-07-02', [
-    shipped('L1', 'P-HDP', 1, 15_900, '2026-07-04'),
-  ]);
-  const earlier = o7010.lines[0];
-  if (earlier) {
-    earlier.refundedCents = 13_515;
-    earlier.refundMethod = 'card';
-  }
-
+  const KEY = 12_900;
+  const HDP = 15_900;
+  const MON = 32_900;
   return {
     ...emptyStoreOps({
       today: TODAY,
@@ -105,71 +103,89 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         restockingFeePercent: RESTOCKING_FEE_PERCENT,
       },
       products: [
-        product('P-KEY', 'Mechanical Keyboard', 12_900, 10),
+        product('P-KEY', 'Mechanical Keyboard', KEY, 10),
         product('P-MOU', 'Wireless Mouse', 4_900, 20),
         product('P-HUB', 'USB-C Hub', 6_900, 5),
-        product('P-MON', '27-inch Monitor', 32_900, 3),
+        product('P-MON', '27-inch Monitor', MON, 3),
         product('P-CAB', 'Braided USB Cable', 1_900, 40),
         product('P-DOC', 'Laptop Dock', 21_900, 2),
-        product('P-HDP', 'Wireless Headphones', 15_900, 6),
+        product('P-HDP', 'Wireless Headphones', HDP, 6),
       ],
       customers: [
-        customer('C-701', 'Alma Reyes', 'standard'),
-        customer('C-702', 'Bruno Silva', 'gold'),
-        customer('C-703', 'Chloe Martin', 'standard'),
-        customer('C-704', 'Dmitri Volkov', 'standard'),
-        customer('C-705', 'Esme Clarke', 'platinum'),
-        customer('C-706', 'Felix Wagner', 'standard', {
+        customer('C-801', 'Alma Reyes', 'standard'),
+        customer('C-802', 'Bruno Silva', 'standard'),
+        customer('C-803', 'Chloe Martin', 'gold'),
+        customer('C-804', 'Dmitri Volkov', 'standard', {
           storeCreditCents: 1_200,
           creditHistory: [{ at: '2026-04-02', amountCents: 1_200, reason: 'late delivery goodwill' }],
         }),
-        customer('C-707', 'Greta Holm', 'gold'),
-        customer('C-708', 'Hugo Laurent', 'standard'),
-        customer('C-709', 'Isla Murray', 'standard'),
-        customer('C-710', 'Jonas Berg', 'standard'),
-        customer('C-711', 'Kira Tanaka', 'gold'),
+        customer('C-805', 'Esme Clarke', 'standard'),
+        customer('C-806', 'Felix Wagner', 'standard'),
+        customer('C-807', 'Greta Holm', 'standard'),
+        customer('C-808', 'Hugo Laurent', 'platinum'),
+        customer('C-809', 'Isla Murray', 'standard'),
+        customer('C-810', 'Jonas Berg', 'standard'),
+        customer('C-811', 'Kira Tanaka', 'standard'),
+        customer('C-812', 'Luca Romano', 'standard'),
+        customer('C-813', 'Maya Cohen', 'standard'),
+        customer('C-814', 'Nora Lind', 'platinum'),
+        customer('C-790', 'Omar Haddad', 'standard'),
+        customer('C-795', 'Pia Weber', 'gold'),
       ],
       orders: [
-        order('O-7001', 'C-701', '2026-06-29', [shipped('L1', 'P-KEY', 1, 12_900, '2026-07-01')]),
+        order('O-8001', 'C-801', '2026-06-29', [shipped('L1', 'P-KEY', 1, KEY, '2026-07-01')]),
+        order('O-8002', 'C-802', '2026-07-04', [shipped('L1', 'P-HDP', 1, HDP, '2026-07-06')]),
+        order('O-8003', 'C-803', '2026-05-26', [shipped('L1', 'P-MON', 1, MON, '2026-05-28')]),
+        order('O-8004', 'C-804', '2026-05-26', [shipped('L1', 'P-MON', 1, MON, '2026-05-28')]),
+        order('O-8005', 'C-805', '2026-06-08', [shipped('L1', 'P-HUB', 1, 6_900, '2026-06-10')]),
         order(
-          'O-7002',
-          'C-702',
+          'O-8006',
+          'C-806',
           '2026-07-03',
-          [
-            shipped('L1', 'P-MOU', 2, 4_900, '2026-07-05', 7_350),
-            shipped('L2', 'P-CAB', 1, 1_900, '2026-07-05'),
-          ],
+          [shipped('L1', 'P-MOU', 2, 4_900, '2026-07-05', 7_350), shipped('L2', 'P-CAB', 1, 1_900, '2026-07-05')],
           { discountCode: 'MOUSE25' },
         ),
-        order('O-7003', 'C-703', '2026-07-08', [
-          shipped('L1', 'P-KEY', 1, 12_900, '2026-07-10'),
+        order('O-8007', 'C-807', '2026-07-06', [shipped('L1', 'P-HDP', 1, HDP, '2026-07-08')]),
+        order('O-8008', 'C-808', '2026-06-30', [shipped('L1', 'P-MON', 1, MON, '2026-07-02')]),
+        order('O-8009', 'C-809', '2026-07-08', [
+          shipped('L1', 'P-KEY', 1, KEY, '2026-07-10'),
           shipped('L2', 'P-CAB', 3, 1_900, '2026-07-10'),
         ]),
-        order('O-7004', 'C-704', '2026-07-06', [shipped('L1', 'P-HDP', 1, 15_900, '2026-07-08')]),
-        order('O-7005', 'C-705', '2026-06-30', [shipped('L1', 'P-MON', 1, 32_900, '2026-07-02')]),
-        order('O-7006', 'C-706', '2026-05-18', [shipped('L1', 'P-HUB', 1, 6_900, '2026-05-20')]),
-        order('O-7007', 'C-707', '2026-06-08', [shipped('L1', 'P-DOC', 1, 21_900, '2026-06-10')]),
-        o7008,
-        order('O-7009', 'C-709', '2026-07-10', [shipped('L1', 'P-MOU', 1, 4_900, '2026-07-12')]),
-        o7010,
-        order('O-7011', 'C-711', '2026-07-05', [shipped('L1', 'P-MOU', 1, 4_900, '2026-07-07')]),
+        refunded(
+          order('O-8010', 'C-810', '2026-07-01', [
+            shipped('L1', 'P-KEY', 1, KEY, '2026-07-03'),
+            shipped('L2', 'P-CAB', 2, 1_900, '2026-07-03'),
+          ]),
+          'L1',
+          3_000,
+        ),
+        order('O-8011', 'C-811', '2026-07-10', [shipped('L1', 'P-MOU', 1, 4_900, '2026-07-12')]),
+        order('O-8012', 'C-812', '2026-06-08', [shipped('L1', 'P-DOC', 1, 21_900, '2026-06-10')]),
+        order('O-8013', 'C-813', '2026-06-22', [shipped('L1', 'P-KEY', 1, KEY, '2026-06-24')]),
+        order('O-8014', 'C-814', '2026-07-08', [shipped('L1', 'P-HDP', 2, HDP, '2026-07-10')]),
+        refunded(
+          order('O-7990', 'C-790', '2026-07-02', [shipped('L1', 'P-HDP', 1, HDP, '2026-07-04')]),
+          'L1',
+          13_515,
+        ),
+        order('O-7995', 'C-795', '2026-07-05', [shipped('L1', 'P-MOU', 1, 4_900, '2026-07-07')]),
       ],
       inventoryMovements: [
-        { productId: 'P-HDP', deltaUnits: 1, reason: 'return RMA-690', orderId: 'O-7010', at: '2026-07-14' },
+        { productId: 'P-HDP', deltaUnits: 1, reason: 'return RMA-790', orderId: 'O-7990', at: '2026-07-14' },
       ],
       refunds: [
         {
           id: 'RF-1',
-          orderId: 'O-7010',
+          orderId: 'O-7990',
           lineIds: ['L1'],
           amountCents: 13_515,
           method: 'card',
           at: '2026-07-14',
-          reason: 'RMA-690 change of mind, less restocking fee',
+          reason: 'RMA-790 change of mind, less restocking fee',
         },
         {
           id: 'RF-2',
-          orderId: 'O-7008',
+          orderId: 'O-8010',
           lineIds: ['L1'],
           amountCents: 3_000,
           method: 'card',
@@ -178,49 +194,87 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         },
       ],
     }),
+    policyUpdates: [
+      {
+        id: 'PU-15',
+        title: 'Peak-season restocking fee',
+        publishedOn: '2026-04-20',
+        effectiveFrom: PEAK_FEE.from,
+        effectiveTo: PEAK_FEE.to,
+        body: `Change-of-mind returns requested between ${PEAK_FEE.from} and ${PEAK_FEE.to} carry a restocking fee of ${PEAK_FEE.percent}% instead of the usual fee. Returns of defective or damaged goods are unaffected.`,
+      },
+      {
+        id: 'PU-18',
+        title: 'Longer return window for loyalty members',
+        publishedOn: '2026-05-20',
+        effectiveFrom: LOYAL_WINDOW.from,
+        effectiveTo: null,
+        body: `For returns requested on or after ${LOYAL_WINDOW.from}, gold and platinum customers have a ${LOYAL_WINDOW.days}-day return window instead of the standard one. Everything else in the return policy is unchanged.`,
+      },
+      {
+        id: 'PU-21',
+        title: 'Summer returns: no restocking fee',
+        publishedOn: '2026-07-08',
+        effectiveFrom: SUMMER_AMNESTY.from,
+        effectiveTo: SUMMER_AMNESTY.to,
+        body: `Change-of-mind returns requested between ${SUMMER_AMNESTY.from} and ${SUMMER_AMNESTY.to} carry no restocking fee, whenever the goods arrive back.`,
+      },
+    ],
     returns: [
-      rma('RMA-690', 'O-7010', 'L1', 1, '2026-07-09', 'changed_mind', {
+      rma('RMA-790', 'O-7990', 'L1', 1, '2026-07-09', 'changed_mind', {
         status: 'closed',
         note: 'received resellable, refunded RF-1',
       }),
-      rma('RMA-695', 'O-7011', 'L1', 1, '2026-07-10', 'defective', { status: 'investigating' }),
-      rma('RMA-701', 'O-7001', 'L1', 1, '2026-07-15', 'changed_mind', {
+      rma('RMA-795', 'O-7995', 'L1', 1, '2026-07-10', 'defective', { status: 'investigating' }),
+      rma('RMA-801', 'O-8001', 'L1', 1, '2026-07-08', 'changed_mind', {
         customerNote: 'Too loud for the open-plan office, sorry.',
       }),
-      rma('RMA-702', 'O-7002', 'L1', 2, '2026-07-12', 'defective', {
+      rma('RMA-802', 'O-8002', 'L1', 1, '2026-07-14', 'changed_mind', { customerNote: 'Not as comfortable as I hoped.' }),
+      rma('RMA-803', 'O-8003', 'L1', 1, '2026-07-08', 'changed_mind', { customerNote: 'Too big for my desk.' }),
+      rma('RMA-804', 'O-8004', 'L1', 1, '2026-07-08', 'changed_mind', { customerNote: 'Bought a second one by mistake.' }),
+      rma('RMA-805', 'O-8005', 'L1', 1, '2026-06-25', 'changed_mind', { customerNote: 'My laptop already has enough ports.' }),
+      rma('RMA-806', 'O-8006', 'L1', 2, '2026-07-12', 'defective', {
         customerNote: 'Both mice double-click on every press.',
       }),
-      rma('RMA-703', 'O-7003', 'L2', 2, '2026-07-18', 'changed_mind', {
-        customerNote: 'Ordered one cable too many - two too many in fact. Sending two back.',
-      }),
-      rma('RMA-704', 'O-7004', 'L1', 1, '2026-07-20', 'changed_mind', { customerNote: NOT_RECEIVED_NOTE }),
-      rma('RMA-705', 'O-7005', 'L1', 1, '2026-07-14', 'defective', {
+      rma('RMA-807', 'O-8007', 'L1', 1, '2026-07-20', 'changed_mind', { customerNote: NOT_RECEIVED_NOTE }),
+      rma('RMA-808', 'O-8008', 'L1', 1, '2026-07-14', 'defective', {
         customerNote: 'Dead pixels across the top third of the panel.',
       }),
-      rma('RMA-706', 'O-7006', 'L1', 1, '2026-07-02', 'changed_mind', {
-        customerNote: 'Never used it, still sealed.',
+      rma('RMA-809', 'O-8009', 'L2', 3, '2026-07-18', 'changed_mind', {
+        customerNote: 'Ordered too many cables, sending all three back in two parcels.',
       }),
-      rma('RMA-707', 'O-7007', 'L1', 1, '2026-07-08', 'defective', {
-        customerNote: 'Stops charging the laptop after a few minutes.',
-      }),
-      rma('RMA-708', 'O-7008', 'L1', 1, '2026-07-10', 'defective', {
+      rma('RMA-810', 'O-8010', 'L1', 1, '2026-07-10', 'defective', {
         customerNote: 'Several keys stopped working. Your colleague already sent me something on account.',
       }),
-      rma('RMA-709', 'O-7009', 'L1', 1, '2026-07-16', 'damaged_in_transit', {
+      rma('RMA-811', 'O-8011', 'L1', 1, '2026-07-16', 'damaged_in_transit', {
         customerNote: 'The box arrived crushed and the mouse rattles.',
+      }),
+      rma('RMA-812', 'O-8012', 'L1', 1, '2026-07-08', 'defective', {
+        customerNote: 'Stops charging the laptop after a few minutes.',
+      }),
+      rma('RMA-813', 'O-8013', 'L1', 1, '2026-07-24', 'changed_mind', { customerNote: 'Changed my mind, unopened.' }),
+      rma('RMA-814', 'O-8014', 'L1', 2, '2026-07-17', 'changed_mind', {
+        customerNote: 'Gift that did not work out; returning both pairs separately.',
       }),
     ],
     receipts: [
-      receipt('RMA-690', '2026-07-14', 1, 'resellable', 'P-HDP'),
-      receipt('RMA-695', '2026-07-15', 1, 'wrong_item', 'P-CAB'),
-      receipt('RMA-701', '2026-07-22', 1, 'resellable', 'P-KEY'),
-      receipt('RMA-702', '2026-07-19', 2, 'damaged', 'P-MOU'),
-      receipt('RMA-703', '2026-07-24', 1, 'resellable', 'P-CAB'),
-      receipt('RMA-705', '2026-07-21', 1, 'wrong_item', 'P-CAB'),
-      receipt('RMA-706', '2026-07-12', 1, 'resellable', 'P-HUB'),
-      receipt('RMA-707', '2026-07-23', 1, 'damaged', 'P-DOC'),
-      receipt('RMA-708', '2026-07-20', 1, 'damaged', 'P-KEY'),
-      receipt('RMA-709', '2026-07-22', 1, 'resellable', 'P-MOU'),
+      receipt('RMA-805', '2026-07-02', 1, 'resellable', 'P-HUB'),
+      receipt('RMA-790', '2026-07-14', 1, 'resellable', 'P-HDP'),
+      receipt('RMA-795', '2026-07-15', 1, 'wrong_item', 'P-CAB'),
+      receipt('RMA-806', '2026-07-19', 2, 'damaged', 'P-MOU'),
+      receipt('RMA-810', '2026-07-20', 1, 'damaged', 'P-KEY'),
+      receipt('RMA-803', '2026-07-21', 1, 'resellable', 'P-MON'),
+      receipt('RMA-804', '2026-07-21', 1, 'resellable', 'P-MON'),
+      receipt('RMA-808', '2026-07-21', 1, 'wrong_item', 'P-CAB'),
+      receipt('RMA-814', '2026-07-21', 1, 'resellable', 'P-HDP'),
+      receipt('RMA-801', '2026-07-22', 1, 'resellable', 'P-KEY'),
+      receipt('RMA-802', '2026-07-22', 1, 'resellable', 'P-HDP'),
+      receipt('RMA-809', '2026-07-22', 1, 'resellable', 'P-CAB'),
+      receipt('RMA-811', '2026-07-22', 1, 'resellable', 'P-MOU'),
+      receipt('RMA-812', '2026-07-23', 1, 'damaged', 'P-DOC'),
+      receipt('RMA-814', '2026-07-23', 1, 'resellable', 'P-HDP'),
+      receipt('RMA-813', '2026-07-24', 1, 'resellable', 'P-KEY'),
+      receipt('RMA-809', '2026-07-25', 1, 'damaged', 'P-CAB'),
     ],
   };
 }
@@ -245,12 +299,31 @@ export interface ReturnSettlement {
   ceilingCents: number;
 }
 
+const within_ = (date: string, range: { from: string; to: string }) =>
+  range.from <= date && date <= range.to;
+
+/** The restocking fee rate in force for a return, by its reason and the day it was requested. */
+export function feePercentFor(seed: EcommerceOpsWorld, entry: ReturnAuthorization): number {
+  if (entry.reason !== 'changed_mind') return 0;
+  if (within_(entry.requestedOn, SUMMER_AMNESTY)) return 0;
+  if (within_(entry.requestedOn, PEAK_FEE)) return PEAK_FEE.percent;
+  return seed.returnPolicy.restockingFeePercent ?? 0;
+}
+
+/** The return window for a customer on the day the return was requested. */
+export function windowDaysFor(seed: EcommerceOpsWorld, entry: ReturnAuthorization, customerId: string): number {
+  const tier = findCustomer(seed, customerId)?.tier ?? 'standard';
+  const loyal = tier !== 'standard' && entry.requestedOn >= LOYAL_WINDOW.from;
+  return loyal ? LOYAL_WINDOW.days : seed.returnPolicy.returnWindowDays;
+}
+
 /**
  * How each open return settles under the returns rules, from the seed: only
  * received units count; a different product means an investigation and
  * nothing else; the refund is the paid unit price for what arrived, less the
- * change-of-mind fee and anything already refunded on the line, paid as store
- * credit when the return was requested after the window closed.
+ * change-of-mind fee in force on the day it was requested and anything already
+ * refunded on the line, paid as store credit when it was requested after the
+ * customer's window closed.
  */
 export function returnsOracle(seed: EcommerceOpsWorld): ReturnSettlement[] {
   return seed.returns
@@ -275,10 +348,12 @@ export function returnsOracle(seed: EcommerceOpsWorld): ReturnSettlement[] {
       }
       const units = received.reduce((total, candidate) => total + candidate.quantity, 0);
       const gross = (returned.paidCents / returned.quantity) * units;
-      const fee = entry.reason === 'changed_mind' ? feeCents(gross, seed.returnPolicy.restockingFeePercent ?? 0) : 0;
+      if (!Number.isInteger(gross)) throw new Error(`${entry.id}: per-unit price is not whole cents`);
+      const fee = feeCents(gross, feePercentFor(seed, entry));
       const ceiling = gross - returned.refundedCents;
-      const late = daysBetween(returned.shippedAt ?? entry.requestedOn, entry.requestedOn) >
-        seed.returnPolicy.returnWindowDays;
+      const late =
+        daysBetween(returned.shippedAt ?? entry.requestedOn, entry.requestedOn) >
+        windowDaysFor(seed, entry, base.customerId);
       const sum = (grade: ReturnReceipt['grade']) =>
         received.filter((candidate) => candidate.grade === grade).reduce((t, c) => t + c.quantity, 0);
       return {
@@ -450,27 +525,27 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
   ...ECOMMERCE_EXPERT_BASE,
   id: 'ecommerce-returns-desk',
   title: 'Settle a desk of returns by what actually came back',
-  tags: ['ecommerce', 'returns', 'refunds', 'batch', 'partial-observability', 'long-horizon'],
-  maxTurns: 110,
+  tags: ['ecommerce', 'returns', 'refunds', 'batch', 'partial-observability', 'rules-via-tools', 'long-horizon'],
+  maxTurns: 140,
   prompt: [
     'Work through the open return authorizations (RMAs).',
     'Settle each one under the returns rules and the return policy: refund, restock and close',
     'whatever is ready, and leave everything else in the state the rules call for.',
   ].join(' '),
   hypothesis:
-    'orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The nine returns are independent cases, each needing its own authorization, order, receipt and policy lookup, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a restocking fee charged by the condition of the goods instead of the reason for the return, a window measured to the day the goods arrived instead of the day the customer asked, a colleague\'s earlier refund, half a return. The parcel that has not arrived, with a customer note insisting it has, measures fabrication: agents that settle from the customer\'s account instead of the receipts refund goods the store does not have.',
+    "orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The fourteen returns are independent cases, each needing its own authorization, order, customer, receipts and the rules in force on the day it was requested, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a fee charged by the condition of the goods instead of the reason for the return, or at the wrong dated rate; a window measured to the wrong day or without a loyalty member's extension; a second receipt on a later page; a colleague's earlier refund. The parcel that has not arrived, with a customer note insisting it has, measures fabrication: agents that settle from the customer's account instead of the receipts refund goods the store does not have.",
   traps: [
     {
       id: 'not-received',
       description:
         "Refunds a return the warehouse has not received, on the strength of the customer's note that it was delivered.",
-      caughtBy: ['over-refunded:RMA-704'],
+      caughtBy: ['over-refunded:RMA-807'],
     },
     {
       id: 'wrong-item',
       description:
         'Refunds or restocks a return when the warehouse received a different product, instead of opening an investigation.',
-      caughtBy: ['settled:RMA-705', 'over-refunded:RMA-705'],
+      caughtBy: ['settled:RMA-808', 'over-refunded:RMA-808'],
     },
     {
       id: 'damaged-to-shelf',
@@ -481,24 +556,44 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       id: 'window-from-today',
       description:
         'Measures the return window to today or to the day the goods arrived rather than the day the return was requested, and pays a timely return in store credit.',
-      caughtBy: ['settled:RMA-707'],
+      caughtBy: ['settled:RMA-812'],
+    },
+    {
+      id: 'window-edge',
+      description: 'Treats a return requested on the thirtieth day as outside a thirty-day window.',
+      caughtBy: ['settled:RMA-813'],
+    },
+    {
+      id: 'loyalty-window',
+      description: "Misses the policy update that gives a gold customer a longer window, and pays the return in store credit.",
+      caughtBy: ['settled:RMA-803'],
+    },
+    {
+      id: 'dated-fee',
+      description:
+        'Charges the standard restocking fee on returns requested while a policy update set a different one (higher in the peak season, none in the summer amnesty).',
+      caughtBy: ['settled:RMA-805', 'settled:RMA-802'],
     },
     {
       id: 'fee-by-condition',
       description:
         'Charges the change-of-mind restocking fee on a return made because the goods were damaged in transit, because they arrived in resellable condition.',
-      caughtBy: ['settled:RMA-709'],
+      caughtBy: ['settled:RMA-811'],
     },
     {
       id: 'prior-refund',
       description: "Refunds the full line without netting off a colleague's earlier goodwill refund.",
-      caughtBy: ['over-refunded:RMA-708'],
+      caughtBy: ['over-refunded:RMA-810'],
     },
     {
       id: 'partial-receipt',
-      description:
-        'Refunds or closes a return for every unit it covers when only some of them have arrived.',
-      caughtBy: ['over-refunded:RMA-703', 'status:RMA-703'],
+      description: 'Refunds or closes a return for every unit it covers when only some of them have arrived.',
+      caughtBy: ['over-refunded:RMA-809', 'status:RMA-809'],
+    },
+    {
+      id: 'split-receipt',
+      description: 'Counts only the first of two receipts for a return that came back in two parcels.',
+      caughtBy: ['settled:RMA-814'],
     },
     {
       id: 'credit-not-applied',

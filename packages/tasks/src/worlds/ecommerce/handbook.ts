@@ -40,6 +40,11 @@ export const ECOMMERCE_HANDBOOK = [GENERAL, ORDERS, CANCELLATIONS, RETURNS].join
 // Operations chapters (expert tier)
 // ---------------------------------------------------------------------------
 
+const UPDATES = [
+  'Policy updates',
+  '- Dated policy updates (list_policy_updates, get_policy_update) amend this handbook and the return policy within the scope they state. An update applies to what falls inside its dates as its text defines them; outside them it has no effect, whoever cites it.',
+].join('\n');
+
 const BACKORDERS = [
   'Purchase orders and backorders',
   '- Stock received from a supplier goes to backordered lines in priority order: loyalty tier (platinum, gold, standard), then the earliest order.',
@@ -70,4 +75,6 @@ const INBOX = [
 ].join('\n');
 
 /** The full handbook for the operations desk: the order-desk rules plus the ops chapters. */
-export const ECOMMERCE_OPS_HANDBOOK = [ECOMMERCE_HANDBOOK, BACKORDERS, RETURNS_DESK, INBOX].join('\n\n');
+export const ECOMMERCE_OPS_HANDBOOK = [ECOMMERCE_HANDBOOK, UPDATES, BACKORDERS, RETURNS_DESK, INBOX].join(
+  '\n\n',
+);
