@@ -615,10 +615,22 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       )
       .map((finding) => finding.entryId);
 
-  /** Refunds may only be linked to audited entries; annotations are harmless anywhere. */
+  /** Passengers whose charges are under audit, who may be told the outcome. */
+  const auditedPassengers = new Set(
+    findings.flatMap((finding) => {
+      const booking = generated.world.reservations.find((entry) => entry.id === finding.reservationId);
+      return booking ? [booking.passengerId] : [];
+    }),
+  );
+
+  /**
+   * Refunds may only be linked to audited entries; annotations are harmless
+   * anywhere; telling an audited passenger the outcome is part of the job.
+   */
   const auditChanges: ChangeFilter = anyOf(
     addedTo('ledger', (entry) => entry.kind === 'refund' && audited.has(String(entry.refundOf))),
     (change) => change.path[0] === 'ledger' && change.path[2] === 'auditOutcome',
+    addedTo('notifications', (entry) => auditedPassengers.has(String(entry.passengerId))),
   );
 
   return {

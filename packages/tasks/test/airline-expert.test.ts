@@ -831,13 +831,18 @@ describe('airline-baggage-audit', () => {
 });
 
 describe('contact with the customers a task is about', () => {
-  it('is not collateral damage in the waiver desk or the cancellation queue', async () => {
+  it('is not collateral damage in the waiver desk, the cancellation queue or the audit', async () => {
     const waivers = drive(airlineWaiversSpec);
     await waivers.call('notify_passenger', { passengerId: 'P-2201', message: 'About your change request.' });
     const cancellations = drive(airlineCancellationsSpec);
     await cancellations.call('notify_passenger', { passengerId: 'P-2301', message: 'About your cancellation.' });
+    const audit = drive(airlineBaggageAuditSpec);
+    const finding = auditOracle(audit.world)[0]!;
+    const audited = findReservation(audit.world, finding.reservationId)!.passengerId;
+    await audit.call('notify_passenger', { passengerId: audited, message: 'About your baggage fee.' });
     expect(penaltyIds(await score(airlineWaiversTask, waivers))).toEqual([]);
     expect(penaltyIds(await score(airlineCancellationsTask, cancellations))).toEqual([]);
+    expect(penaltyIds(await score(airlineBaggageAuditTask, audit))).toEqual([]);
   });
 
   it('is collateral damage when the passenger is not part of the job', async () => {
