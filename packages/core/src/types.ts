@@ -236,6 +236,13 @@ export interface PhaseRecord {
   costEstimated?: boolean;
   /** True when the phase asked for structured output and none came back. */
   structuredMissing?: boolean;
+  /**
+   * Set by a strategy when it carried on with a fallback instead of what the
+   * phase was meant to produce — an empty plan, a default winner, a verdict it
+   * could not read — saying what it fell back to. A degraded phase means the
+   * architecture did not run as designed, so the run fails its integrity check.
+   */
+  degraded?: string;
 }
 
 export interface StrategyOutcome {
@@ -252,6 +259,29 @@ export interface Strategy {
   /** One paragraph, rendered on the site next to the leaderboard row. */
   description: string;
   run(ctx: RunContext): Promise<StrategyOutcome>;
+}
+
+/** One verified property of a run. */
+export interface IntegrityCheck {
+  /** Stable id: `harness.*` for the runner's own checks, strategy-specific otherwise. */
+  id: string;
+  ok: boolean;
+  /** What failed, or what was verified, in a sentence. */
+  detail?: string;
+}
+
+/**
+ * Whether a run measured the architecture it claims to measure.
+ *
+ * The first published run set scored five architectures although four of them
+ * never ran as designed; nothing in its records could say so. Integrity is the
+ * record saying so: harness health (every tool server connected, no harness
+ * tool denied, no call lost to the API) plus the strategy's own fidelity
+ * checks. A run with `ok === false` must not be ranked.
+ */
+export interface Integrity {
+  ok: boolean;
+  checks: IntegrityCheck[];
 }
 
 export interface RunContext {
