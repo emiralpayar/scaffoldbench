@@ -15,21 +15,22 @@ export function PageHeader({
   mono?: boolean;
 }) {
   return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-5">
-      <div className="max-w-2xl">
+    <header className="mb-10 grid gap-6 border-b border-rule pb-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <div className="min-w-0 max-w-3xl">
         <p className="eyebrow">{eyebrow}</p>
         <h1
           className={
             mono
-              ? 'mt-1 break-all font-mono text-[19px] leading-tight text-ink'
-              : 'mt-1 font-serif text-[30px] leading-[1.15] tracking-[-0.01em] text-ink'
+              ? 'mt-3 font-mono text-[1.25rem] leading-snug text-ink [overflow-wrap:anywhere] sm:text-[1.5rem]'
+              : 'h1 mt-3 text-ink'
           }
         >
           {title}
         </h1>
-        {lede ? <p className="prose-serif mt-2">{lede}</p> : null}
+        {lede ? <p className="lede mt-4">{lede}</p> : null}
       </div>
-      {aside ? <div className="shrink-0">{aside}</div> : null}
+      {/* min-w-0 rather than shrink-0: a long tag row must wrap, not widen the page. */}
+      {aside ? <div className="min-w-0 max-w-full">{aside}</div> : null}
     </header>
   );
 }
@@ -47,24 +48,24 @@ export function Panel({
   bleed?: boolean;
 }) {
   return (
-    <section className="mb-8 rounded-[3px] border border-rule bg-surface">
+    <section className="card mb-8 overflow-hidden">
       {title ? (
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule px-4 py-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule px-5 py-3">
           <h2 className="eyebrow !text-ink-2">{title}</h2>
-          {note ? <div className="text-[12px] text-muted">{note}</div> : null}
+          {note ? <div className="text-[0.8125rem] text-muted">{note}</div> : null}
         </div>
       ) : null}
-      <div className={bleed ? '' : 'p-4'}>{children}</div>
+      <div className={bleed ? '' : 'p-5'}>{children}</div>
     </section>
   );
 }
 
 const TONE_CLASS = {
-  neutral: 'border-rule text-ink-2',
-  accent: 'border-accent/40 text-accent',
-  good: 'border-good/40 text-good',
-  bad: 'border-bad/40 text-bad',
-  warn: 'border-warn/40 text-warn',
+  neutral: 'border-rule-strong text-ink-2',
+  accent: 'border-focus/45 text-focus',
+  good: 'border-good/45 text-good',
+  bad: 'border-bad/45 text-bad',
+  warn: 'border-warn/50 text-warn',
 } as const;
 
 export function Tag({
@@ -76,7 +77,7 @@ export function Tag({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-[2px] border px-1.5 py-px font-mono text-[10px] uppercase tracking-[0.08em] ${TONE_CLASS[tone]}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[0.6875rem] uppercase leading-normal tracking-[0.08em] ${TONE_CLASS[tone]}`}
     >
       {children}
     </span>
@@ -87,7 +88,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <div className="min-w-0">
       <div className="eyebrow">{label}</div>
-      <div className="num mt-0.5 truncate text-[13px] text-ink">{children}</div>
+      <div className="num mt-1 truncate text-[0.875rem] text-ink">{children}</div>
     </div>
   );
 }
@@ -96,8 +97,10 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   return (
     <div className="min-w-0">
       <div className="eyebrow">{label}</div>
-      <div className="num mt-1 text-[22px] leading-none tracking-[-0.01em] text-ink">{value}</div>
-      {hint ? <div className="mt-1 text-[11px] text-muted">{hint}</div> : null}
+      <div className="mt-1.5 font-sans text-[1.75rem] font-[480] leading-none tracking-[-0.02em] text-ink">
+        {value}
+      </div>
+      {hint ? <div className="mt-1.5 text-[0.75rem] text-muted">{hint}</div> : null}
     </div>
   );
 }
@@ -115,10 +118,10 @@ export function Verdict({ state, children }: { state: VerdictState; children?: R
   const { glyph, className } = VERDICT[state];
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <span aria-hidden className="font-mono text-[12px] leading-none">
+      <span aria-hidden className="font-mono text-[0.8125rem] leading-none">
         {glyph}
       </span>
-      <span className="text-[12px]">{children ?? state}</span>
+      <span className="text-[0.8125rem]">{children ?? state}</span>
     </span>
   );
 }
