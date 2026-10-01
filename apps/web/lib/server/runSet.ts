@@ -20,11 +20,10 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import { REPO_ROOT } from '@arena/core';
-import type { TraceEvent } from '@arena/core';
 
 import { buildCatalog, parseTraceLines } from '../derive';
 import { compareModels } from '../models';
-import type { Catalog, RunRecord, RunSetManifest } from '../records';
+import type { Catalog, RunRecord, RunSetManifest, TraceEvent } from '../records';
 import { hasIntegrity, normalizeRecord, runSetModels } from '../records';
 
 /** The committed run set whose traces exposed the harness bug: Act 1's evidence. */
@@ -236,6 +235,24 @@ export function loadPostmortemRunSet(): Promise<RunSetData | null> {
 }
 
 /**
+ * Where a run's trace lives, if it is inside the run set's directory. A
+ * record's `traceFile` is data, so a path that escapes the directory is
+ * refused rather than read.
+ */
+function traceFileOf(data: Pick<RunSetData, 'dir'>, record: RunRecord): string | null {
+  if (!isSafeSegment(record.runId)) return null;
+  const relative = record.traceFile ?? path.join('traces', `${record.runId}.jsonl`);
+  const file = path.resolve(data.dir, relative);
+  return file.startsWith(path.resolve(data.dir) + path.sep) ? file : null;
+}
+
+/** Whether the run's trace is in this checkout, without reading it. */
+export function hasTrace(data: Pick<RunSetData, 'dir'>, record: RunRecord): boolean {
+  const file = traceFileOf(data, record);
+  return file !== null && existsSync(file);
+}
+
+/**
  * Traces are gitignored by default, so a missing file is the normal case rather
  * than an error. `null` means "not committed"; `[]` means "committed but empty".
  */
@@ -243,13 +260,8 @@ export async function loadTrace(
   data: Pick<RunSetData, 'dir'>,
   record: RunRecord,
 ): Promise<TraceEvent[] | null> {
-  if (!isSafeSegment(record.runId)) return null;
-
-  const dir = data.dir;
-  const relative = record.traceFile ?? path.join('traces', `${record.runId}.jsonl`);
-  const file = path.resolve(dir, relative);
-  if (!file.startsWith(path.resolve(dir) + path.sep)) return null;
-  if (!existsSync(file)) return null;
+  const file = traceFileOf(data, record);
+  if (!file || !existsSync(file)) return null;
 
   try {
     return parseTraceLines(await readFile(file, 'utf8'));

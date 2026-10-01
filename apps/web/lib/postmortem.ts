@@ -10,7 +10,9 @@
  */
 
 import { compareArchitectures } from './architectures';
+import { joinList } from './format';
 import type { RunRecord } from './records';
+import { normalizeError } from './timeline';
 
 export interface Receipt {
   /** What went wrong, as a sentence fragment that reads after the count. */
@@ -174,4 +176,37 @@ function inspect(
   }
 
   return { receipts, deadNodes: [...dead] };
+}
+
+/**
+ * What one legacy run's own records show went wrong, in sentences. For runs
+ * recorded before integrity checks existed, this is the only fidelity signal
+ * there is: errored phases, guard denials, idle proposers, a fan-out that
+ * never happened.
+ */
+export function runReceipts(record: RunRecord): string[] {
+  const out: string[] = [];
+  for (const phase of record.phases) {
+    if (phase.error) out.push(`${phase.label} ended in an error: ${normalizeError(phase.error).toLowerCase()}.`);
+  }
+  if (record.deniedToolCalls > 0) {
+    out.push(
+      `The sandbox guard denied ${record.deniedToolCalls} tool call${record.deniedToolCalls === 1 ? '' : 's'} the harness itself needed.`,
+    );
+  }
+  if (record.strategyId === 'propose-select') {
+    const idle = record.phases.filter((phase) => /^propose-\d+$/.test(phase.phase) && phase.toolCalls === 0);
+    if (idle.length > 0) {
+      out.push(`${joinList(idle.map((phase) => phase.label))} made no tool call.`);
+    }
+  }
+  if (record.strategyId === 'orchestrator-workers') {
+    const workers = record.phases.filter((phase) => phase.phase.startsWith('worker'));
+    if (workers.length <= 1) out.push('The task went to a single worker: the fan-out never happened.');
+  }
+  if (record.strategyId === 'plan-execute-verify' && record.score < 1) {
+    const revised = record.phases.some((phase) => phase.phase.startsWith('revise'));
+    if (!revised) out.push('The run scored below 1.0, and the verifier sent nothing back for revision.');
+  }
+  return out;
 }

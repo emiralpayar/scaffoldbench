@@ -1,24 +1,30 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { STRATEGIES } from '@arena/strategies';
 import { ALL_TASKS } from '@arena/tasks';
 
 import { ArchitectureGlyph } from '../../components/ArchitectureGlyph';
 import { LiveRunner, type LiveOption } from '../../components/LiveRunner';
-import { architectureName, compareArchitectures } from '../../lib/architectures';
-import { formatModelPrice } from '../../lib/models';
+import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
+import { ReplayGallery } from '../../components/timeline/ReplayGallery';
+import { architectureColor, architectureName, compareArchitectures } from '../../lib/architectures';
+import { modelShortName, formatModelPrice } from '../../lib/models';
 import {
   LIVE_DEFAULT_MODEL,
   LIVE_MAX_COST_USD,
   LIVE_MAX_WALL_CLOCK_MS,
   LIVE_MODELS,
 } from '../../lib/server/live';
+import { loadReplays } from '../../lib/server/replays';
 import { LIVE_ENABLED } from '../../lib/site';
+import { timelineFromTrace } from '../../lib/timeline';
+import { buildViewGroups, trimGroups } from '../../lib/traceView';
 
 export const metadata: Metadata = {
-  title: 'Run it yourself',
+  title: 'Replay a run',
   description:
-    'Re-run any cell of the benchmark on your own machine, or run one task live on your own API key when the site is served in server mode.',
+    'Watch recorded benchmark runs play back call by call: parallel subagents, tool calls and the sandbox guard, at real speed or eight times faster. Then re-run any cell yourself.',
 };
 
 const STEPS = [
@@ -30,23 +36,88 @@ const STEPS = [
   { label: 'Open the site on your results', command: 'npm run dev:web' },
 ];
 
-export default function LivePage() {
+export default async function LivePage() {
+  const race = await loadReplays();
+  const entries: ReplayEntry[] = (race?.runs ?? []).map(({ record, trace }) => ({
+    runId: record.runId,
+    strategyId: record.strategyId,
+    name: architectureName(record.strategyId),
+    color: architectureColor(record.strategyId),
+    timeline: timelineFromTrace(trace, record.phases),
+    groups: trimGroups(buildViewGroups(trace)),
+    score: record.score,
+    passed: record.passed,
+  }));
+  // Open on the design with the most going on: the one that fans out.
+  const initial =
+    entries.find((entry) => entry.strategyId === 'propose-select') ??
+    entries.find((entry) => entry.strategyId !== 'single') ??
+    entries[0];
+  const verification = race?.data.verification;
+
   return (
     <div className="container-page pb-20 pt-10 sm:pt-14">
-      <header className="mb-12 max-w-3xl border-b border-rule pb-8">
-        <p className="eyebrow">Run it yourself</p>
-        <h1 className="h1 mt-3 text-ink">Every number here comes from a command you can run.</h1>
+      <header className="mb-10 max-w-3xl border-b border-rule pb-8">
+        <p className="eyebrow">Replay</p>
+        <h1 className="h1 mt-3 text-ink">Watch a run, call by call.</h1>
         <p className="lede mt-5">
-          The leaderboard is an average over many runs. Running one yourself is the quickest way to
-          see what those numbers are made of: the tool calls, the subagents, anything the sandbox
-          guard blocks, and the deterministic score at the end.
+          A score is the end of a story. The replay is the story: which model calls ran, in
+          parallel or not, which tools they called, what the sandbox guard refused, and what the run
+          had spent at every moment. Pick an architecture; every one ran the same task.
         </p>
       </header>
+
+      {race && initial ? (
+        <section aria-labelledby="replay-title" className="mb-20">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <h2 id="replay-title" className="h3 text-ink">
+              {race.taskTitle}
+            </h2>
+            <p className="num text-[0.8125rem] text-muted">
+              {modelShortName(race.model)} · repeat {race.repeat} · run set {race.data.runSetId}
+            </p>
+          </div>
+          {verification === 'synthetic' ? (
+            <div role="note" className="banner banner-warn mb-5">
+              <p className="banner-title">Synthetic trace — not a recording</p>
+              <p className="banner-body">
+                These runs were fabricated by <code className="code-inline">scripts/generate-demo-data.ts</code> to
+                build the site. The shapes are what a replay looks like; nothing here happened.
+              </p>
+            </div>
+          ) : verification === 'unverified' ? (
+            <div role="note" className="banner banner-bad mb-5">
+              <p className="banner-title">From the retracted first run set</p>
+              <p className="banner-body">
+                These are recordings of runs whose architectures mostly did not run as designed. Watch for the
+                proposers with no tools and the selector the guard stopped.{' '}
+                <Link href="/postmortem/" className="link">
+                  What went wrong
+                </Link>
+                .
+              </p>
+            </div>
+          ) : null}
+          <ReplayGallery entries={entries} initial={initial.runId} />
+        </section>
+      ) : (
+        <section aria-labelledby="replay-title" className="mb-20 rounded-[14px] border border-dashed border-rule-strong p-6 sm:p-8">
+          <h2 id="replay-title" className="h3 text-ink">
+            No recorded trace is in this build.
+          </h2>
+          <p className="prose-serif mt-3 max-w-2xl">
+            Replays are drawn from the traces committed under{' '}
+            <code className="code-inline">results/&lt;run set&gt;/traces/</code>. None are, so there is nothing to
+            play back here; every run page still shows its phases and score. Run a cell below and the replay
+            appears for it.
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="local-title" className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div>
           <h2 id="local-title" className="h3 text-ink">
-            On your machine
+            Run it yourself
           </h2>
           <p className="prose-serif mt-3 max-w-2xl">
             Runs use whatever Claude credentials your shell has. Results land in{' '}

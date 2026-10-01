@@ -208,3 +208,24 @@ export function prettyJson(value: unknown): string {
     return String(value);
   }
 }
+
+/**
+ * The same groups with every text cut to `max` characters, for pages that
+ * ship several traces at once and link to the run page for the rest.
+ */
+export function trimGroups(groups: readonly ViewGroup[], max = 2_400): ViewGroup[] {
+  const cut = (text: string) => (text.length > max ? `${text.slice(0, max)}\n\n…` : text);
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item): ViewItem => {
+      switch (item.kind) {
+        case 'error':
+          return { ...item, raw: cut(item.raw) };
+        case 'tool':
+          return item.result ? { ...item, result: { ...item.result, text: cut(item.result.text) } } : item;
+        default:
+          return { ...item, text: cut(item.text) };
+      }
+    }),
+  }));
+}

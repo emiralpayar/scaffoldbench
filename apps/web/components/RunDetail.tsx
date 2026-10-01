@@ -3,6 +3,7 @@ import type { Penalty, ScoreItem } from '@arena/core';
 import type { PhaseRow } from '../lib/derive';
 import { FULL_CREDIT, formatDuration, formatPercent, formatScore, formatUsd } from '../lib/format';
 import type { RunRecord } from '../lib/records';
+import { normalizeError } from '../lib/timeline';
 import { MiniBar } from './MiniBar';
 import { Tag, Verdict } from './Layout';
 
@@ -102,8 +103,11 @@ export function PhaseTable({ rows }: { rows: readonly PhaseRow[] }) {
                   {row.label}
                   {row.aborted ? <span className="ml-2 text-[11px] text-bad">aborted</span> : null}
                   {row.error ? (
-                    <span className="ml-2 text-[11px] text-bad">{row.error}</span>
+                    <span className="ml-2 text-[11px] text-bad" title={row.error}>
+                      {normalizeError(row.error)}
+                    </span>
                   ) : null}
+                  {row.degraded ? <span className="chip-warn ml-2">fell back · {row.degraded}</span> : null}
                 </td>
                 <td className="num px-2 py-1.5 text-right text-ink-2">
                   {formatDuration(row.durationMs)}
