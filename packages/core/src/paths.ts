@@ -81,8 +81,12 @@ export function assertValidRunSetId(runSetId: string): void {
  * Every path helper takes an optional root so a run set can be written
  * somewhere other than `results/` — used by the integration tests and by the
  * live demo, which must never touch published results.
+ *
+ * Every run-set path goes through here, so an id that could climb out of the
+ * root is refused for reading as well as for writing.
  */
 export function runSetDir(runSetId: string, root: string = RESULTS_DIR): string {
+  assertValidRunSetId(runSetId);
   return path.join(root, runSetId);
 }
 

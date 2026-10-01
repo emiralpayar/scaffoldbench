@@ -9,6 +9,8 @@ import {
   isValidRunSetId,
   makeRunId,
   makeRunSetId,
+  manifestPath,
+  runSetDir,
   writeJson,
 } from '@arena/core';
 
@@ -34,6 +36,9 @@ describe('run set ids', () => {
   ])('refuses %s', (_label, id) => {
     expect(isValidRunSetId(id)).toBe(false);
     expect(() => assertValidRunSetId(id)).toThrow(/Invalid run set id/);
+    // Every run-set path is built from the id, for reading as well as writing.
+    expect(() => runSetDir(id, '/results')).toThrow(/Invalid run set id/);
+    expect(() => manifestPath(id, '/results')).toThrow(/Invalid run set id/);
   });
 });
 
