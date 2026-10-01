@@ -219,7 +219,9 @@ export function createTriageWorld(): SupportOpsWorld {
       {
         afterAudit: { action: 'assign_ticket', count: 4 },
         tickets: [
-          ticket('T-2015', TRIAGE_NOW, 'U-715', 'payroll', 'company-wide', 'Payslips missing for every employee', 'Nobody can see their March payslip in the portal this morning. The whole company is affected.'),
+          // Department-wide: sev1 for payroll, but not a company-wide outage, which
+          // the handbook would make a major incident outside this task.
+          ticket('T-2015', TRIAGE_NOW, 'U-715', 'payroll', 'department', 'Payslips missing for the Finance department', 'Nobody in Finance can see their March payslip in the portal this morning.'),
         ],
       },
       {
@@ -412,7 +414,7 @@ export const supportTriageSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     },
     {
       id: 'late-ticket',
-      description: 'Reads the queue once and never sees the tickets that land mid-triage.',
+      description: 'Reads the queue once and never sees the tickets that land mid-triage, one of them sev1.',
       caughtBy: ['severity:T-2015', 'assignee:T-2015', 'severity:T-2016', 'assignee:T-2016'],
     },
     {
