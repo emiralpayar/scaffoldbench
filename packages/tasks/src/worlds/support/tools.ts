@@ -146,6 +146,7 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
         `seniority: ${user.seniority}`,
         `role: ${user.role}`,
         ...(user.employment ? [`employment: ${user.employment}`] : []),
+        ...(user.contractEndsOn ? [`contract ends: ${user.contractEndsOn}`] : []),
         ...(user.managerId ? [`manager: ${userLabel(world, user.managerId)}`] : []),
         `rotations: ${rotations.length ? rotations.join(', ') : '-'}`,
       ].join('\n');

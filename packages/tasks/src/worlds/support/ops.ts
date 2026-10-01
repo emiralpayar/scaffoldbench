@@ -110,6 +110,8 @@ export interface Approval {
   approverId: string;
   level: AccessLevel;
   at: string;
+  /** When the approver withdrew it, if they did. */
+  revokedAt?: string;
 }
 
 export interface AccessGrant {
@@ -120,6 +122,19 @@ export interface AccessGrant {
   level: AccessLevel;
   grantedAt: string;
   expiresAt: string | null;
+}
+
+/**
+ * Records that land while the agent works: once the audit log holds `count`
+ * entries for `action`, the tickets, requests and approvals here join the
+ * world. A desk does not stand still, and an agent that reads the queue once
+ * and never looks again leaves the newcomer unworked.
+ */
+export interface ScheduledArrival {
+  afterAudit: { action: string; count: number };
+  tickets?: Ticket[];
+  accessRequests?: AccessRequest[];
+  approvals?: Approval[];
 }
 
 export interface SupportOpsWorld extends SupportWorld {
@@ -133,6 +148,7 @@ export interface SupportOpsWorld extends SupportWorld {
   accessRequests: AccessRequest[];
   approvals: Approval[];
   grants: AccessGrant[];
+  arrivals: ScheduledArrival[];
 }
 
 export const STANDARD_CALENDAR: BusinessCalendar = {
@@ -156,7 +172,24 @@ export function emptySupportOps(base: SupportWorld): SupportOpsWorld {
     accessRequests: [],
     approvals: [],
     grants: [],
+    arrivals: [],
   };
+}
+
+/** Move scheduled records whose trigger has been reached into the world. Says nothing about it. */
+export function deliverArrivals(world: SupportOpsWorld): void {
+  const due = world.arrivals.filter(
+    (arrival) =>
+      world.auditLog.filter((entry) => entry.action === arrival.afterAudit.action).length >=
+      arrival.afterAudit.count,
+  );
+  if (due.length === 0) return;
+  world.arrivals = world.arrivals.filter((arrival) => !due.includes(arrival));
+  for (const arrival of due) {
+    world.tickets.push(...(arrival.tickets ?? []));
+    world.accessRequests.push(...(arrival.accessRequests ?? []));
+    world.approvals.push(...(arrival.approvals ?? []));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -322,8 +355,25 @@ export function createSupportOpsTools(world: SupportOpsWorld): JournaledToolSpec
     return user?.role === 'engineer' ? user : undefined;
   };
 
+  // Base mutations append to the audit log without knowing about arrivals;
+  // wrapping them lets any audited act bring the next arrival in.
+  const base = createSupportTools(world)
+    .filter((spec) => !REPLACED.has(spec.name))
+    .map((spec): JournaledToolSpec =>
+      spec.readOnly
+        ? spec
+        : {
+            ...spec,
+            handler: async (args: unknown) => {
+              const reply = await spec.handler(args);
+              deliverArrivals(world);
+              return reply;
+            },
+          },
+    );
+
   return [
-    ...createSupportTools(world).filter((spec) => !REPLACED.has(spec.name)),
+    ...base,
 
     // -----------------------------------------------------------------------
     // Reads
@@ -526,7 +576,27 @@ export function createSupportOpsTools(world: SupportOpsWorld): JournaledToolSpec
           `${approvals.length} approval(s) for ${request.id}:`,
           ...approvals.map(
             (approval) =>
-              `  ${approval.id} by ${approval.approverId} ${findUser(world, approval.approverId)?.name ?? ''} level=${approval.level} at ${approval.at}`,
+              `  ${approval.id} by ${approval.approverId} ${findUser(world, approval.approverId)?.name ?? ''} level=${approval.level} at ${approval.at}${approval.revokedAt ? ` REVOKED at ${approval.revokedAt}` : ''}`,
+          ),
+        ].join('\n');
+      },
+    },
+
+    {
+      name: 'list_grants',
+      description: 'Access currently held, optionally for one user or one system.',
+      schema: { userId: z.string().optional(), system: z.string().optional() },
+      readOnly: true,
+      handler: (args: { userId?: string; system?: string }) => {
+        const grants = world.grants.filter(
+          (grant) => (!args.userId || grant.userId === args.userId) && (!args.system || grant.system === args.system),
+        );
+        if (grants.length === 0) return 'No access grants match.';
+        return [
+          `${grants.length} grant(s):`,
+          ...grants.map(
+            (grant) =>
+              `  ${grant.id} user=${grant.userId} system=${grant.system} level=${grant.level} granted=${grant.grantedAt} expires=${grant.expiresAt ?? 'never'} request=${grant.requestId}`,
           ),
         ].join('\n');
       },
@@ -598,6 +668,8 @@ export function createSupportOpsTools(world: SupportOpsWorld): JournaledToolSpec
         const incident = findIncident(world, args.incidentId);
         if (!incident) return fail(`No incident ${args.incidentId}.`);
         incident.updates.push({ at: world.nowIso, body: args.body.trim() });
+        appendAudit(world, 'post_status_update', incident.id, { body: args.body.trim() });
+        deliverArrivals(world);
         return `Status update ${incident.updates.length} published on ${incident.id} at ${world.nowIso}.`;
       },
     },
@@ -712,6 +784,8 @@ export function createSupportOpsTools(world: SupportOpsWorld): JournaledToolSpec
         };
         world.grants.push(grant);
         request.status = 'granted';
+        appendAudit(world, 'grant_access', request.id, { level: grant.level, expiresAt: grant.expiresAt });
+        deliverArrivals(world);
         return `${grant.id}: ${grant.level} on ${grant.system} granted to ${grant.userId} for ${request.id}, expires ${grant.expiresAt ?? 'never'}.`;
       },
     },

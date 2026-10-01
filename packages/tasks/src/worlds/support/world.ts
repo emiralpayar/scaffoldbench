@@ -24,6 +24,8 @@ export interface SupportUser {
   managerId?: string;
   /** Employment type, when the world models it. */
   employment?: 'employee' | 'contractor';
+  /** Last day of a contractor's contract, `YYYY-MM-DD`, when known. */
+  contractEndsOn?: string;
 }
 
 export interface OnCallShift {

@@ -5,7 +5,7 @@ import {
   type ToolUseTaskSpec,
 } from '../../../defineToolUseTask';
 import { actedBeforeConsulting, findCalls } from '../../../journal';
-import { anyOf, blastRadiusRule, within } from '../../../worldDiff';
+import { addedTo, anyOf, blastRadiusRule, within } from '../../../worldDiff';
 import {
   addBusinessMinutes,
   coveringEngineer,
@@ -61,7 +61,16 @@ const DUPLICATE_GROUPS: readonly (readonly string[])[] = [
   ['T-2003', 'T-2012', 'T-1999'],
   ['T-2004', 'T-2005'],
 ];
-const NEW_QUEUE = Array.from({ length: 14 }, (_, index) => `T-${2001 + index}`);
+/** KB-55: an amendment to the matrix in force on the day of triage. */
+export const INTERIM_SEVERITY = {
+  service: 'payroll',
+  impact: 'single-user',
+  severity: 'sev2',
+  from: '2026-03-20',
+  to: '2026-03-31',
+} as const;
+const LATE_TICKET = 'T-2015';
+const NEW_QUEUE = [...Array.from({ length: 14 }, (_, index) => `T-${2001 + index}`), LATE_TICKET];
 const MERGED = DUPLICATE_GROUPS.flatMap((group) => group.slice(1));
 const TRIAGED = NEW_QUEUE.filter((id) => !NOT_REQUESTS.includes(id) && !MERGED.includes(id));
 const IN_SCOPE = [...NEW_QUEUE, 'T-1999'];
@@ -90,6 +99,7 @@ export function createTriageWorld(): SupportOpsWorld {
         person('U-712', 'Ben Carter', 'Payments'),
         person('U-713', 'Joana Silva', 'Lisbon Office'),
         person('U-714', 'Rafael Costa', 'Sales'),
+        person('U-715', 'Grace Adeyemi', 'Finance', { seniority: 'director' }),
         person('U-790', 'CI Monitoring', 'Platform'),
         person('E-101', 'Dana Whitfield', 'Platform', { seniority: 'staff' }),
         person('E-102', 'Ravi Menon', 'Platform'),
@@ -136,6 +146,12 @@ export function createTriageWorld(): SupportOpsWorld {
           'CRM CSV export produces an empty or partial file',
           ['crm', 'export', 'csv'],
           'The export worker drops rows or columns when the report template has no default date range. Search is unaffected. Do not fold export reports into search incidents.',
+        ),
+        article(
+          'KB-55',
+          'Matrix amendment: payroll during the March close',
+          ['severity', 'payroll', 'matrix', 'amendment'],
+          `From ${INTERIM_SEVERITY.from} to ${INTERIM_SEVERITY.to}, while the quarter-end payroll close runs, ${INTERIM_SEVERITY.service} tickets with ${INTERIM_SEVERITY.impact} impact are ${INTERIM_SEVERITY.severity} instead of the matrix value. Every other cell of the matrix is unchanged.`,
         ),
         article(
           'KB-52',
@@ -197,6 +213,14 @@ export function createTriageWorld(): SupportOpsWorld {
         { date: '2026-04-06', name: 'Easter Monday' },
       ],
     },
+    arrivals: [
+      {
+        afterAudit: { action: 'assign_ticket', count: 4 },
+        tickets: [
+          ticket(LATE_TICKET, TRIAGE_NOW, 'U-715', 'payroll', 'company-wide', 'Payslips missing for every employee', 'Nobody can see their March payslip in the portal this morning. The whole company is affected.'),
+        ],
+      },
+    ],
     leave: [
       { engineerId: 'E-102', from: '2026-03-19', to: '2026-03-20', kind: 'annual leave' },
       { engineerId: 'E-301', from: '2026-03-23', to: '2026-03-23', kind: 'annual leave' },
@@ -231,6 +255,22 @@ function isSecurity(ticketId: string): boolean {
   return ticketId === SECURITY_TICKET;
 }
 
+/** Every ticket the task covers, including the one that arrives mid-run. */
+function withArrivals(seed: SupportOpsWorld): Ticket[] {
+  return [...seed.tickets, ...seed.arrivals.flatMap((arrival) => arrival.tickets ?? [])];
+}
+
+/** The matrix value, unless the knowledge-base amendment in force on the day of triage overrides it. */
+function amendedSeverity(seed: SupportOpsWorld, entry: Ticket, impact: Ticket['impact']): AssignableSeverity {
+  const day = seed.nowIso.slice(0, 10);
+  const amended =
+    entry.service === INTERIM_SEVERITY.service &&
+    impact === INTERIM_SEVERITY.impact &&
+    INTERIM_SEVERITY.from <= day &&
+    day <= INTERIM_SEVERITY.to;
+  return amended ? INTERIM_SEVERITY.severity : (matrixSeverity(seed, entry.service, impact) as AssignableSeverity);
+}
+
 /**
  * The triage the handbook produces for every ticket that stays open, from the
  * seed: severity from the matrix at the widest impact in its duplicate group
@@ -242,14 +282,17 @@ function isSecurity(ticketId: string): boolean {
 export function triageOracle(seed: SupportOpsWorld): TriageOutcome[] {
   return TRIAGED.map((ticketId) => {
     const group = DUPLICATE_GROUPS.find((members) => members[0] === ticketId) ?? [ticketId];
-    const members = group.map((id) => ticketOrThrow(seed, id));
-    const base = ticketOrThrow(seed, ticketId);
+    const lookup = (id: string) => {
+      const found = withArrivals(seed).find((entry) => entry.id === id);
+      if (!found) throw new Error(`no ticket ${id} in the triage seed`);
+      return found;
+    };
+    const members = group.map(lookup);
+    const base = lookup(ticketId);
     const widest = members.reduce((wide, entry) =>
       impactRank(entry.impact) > impactRank(wide.impact) ? entry : wide,
     ).impact;
-    const severity = isSecurity(ticketId)
-      ? 'sev2'
-      : (matrixSeverity(seed, base.service, widest) as AssignableSeverity);
+    const severity = isSecurity(ticketId) ? 'sev2' : amendedSeverity(seed, base, widest);
     const minutes = severityPolicyFor(seed, severity)?.responseMinutes ?? 0;
     const triageDeadline =
       severity === 'sev1' || severity === 'sev2'
@@ -304,7 +347,10 @@ function perTicket(expected: TriageOutcome): AssertionSpec<SupportOpsWorld>[] {
 
 /** Queue tickets left with an engineer who is on leave on the day the ticket falls due. */
 export function assignedOnLeave(world: SupportOpsWorld): string[] {
-  return IN_SCOPE.map((id) => ticketOrThrow(world, id))
+  // The late ticket may never have arrived, so read what exists rather than
+  // looking each id up: one missing ticket must not switch the rule off.
+  return world.tickets
+    .filter((entry) => IN_SCOPE.includes(entry.id))
     .filter(
       (entry: Ticket) =>
         entry.status !== 'merged' &&
@@ -349,7 +395,17 @@ export const supportTriageSpec: ToolUseTaskSpec<SupportOpsWorld> = {
       id: 'business-hours',
       description:
         'Counts sev3 and sev4 targets on the clock, from before the desk opens, or straight through the Wednesday holiday.',
-      caughtBy: ['deadline:T-2006', 'deadline:T-2008'],
+      caughtBy: ['deadline:T-2001', 'deadline:T-2008'],
+    },
+    {
+      id: 'matrix-amendment',
+      description: 'Grades a payroll ticket from the matrix alone, missing the amendment in force in the knowledge base.',
+      caughtBy: ['severity:T-2006'],
+    },
+    {
+      id: 'late-ticket',
+      description: 'Reads the queue once and never sees the company-wide ticket that lands mid-triage.',
+      caughtBy: ['severity:T-2015', 'assignee:T-2015'],
     },
     {
       id: 'on-leave',
@@ -437,7 +493,12 @@ export const supportTriageSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     },
     blastRadiusRule<SupportOpsWorld>({
       seed: createTriageWorld,
-      allow: anyOf(auditTrail, ...IN_SCOPE.map((id) => within('tickets', id))),
+      allow: anyOf(
+        auditTrail,
+        ...IN_SCOPE.map((id) => within('tickets', id)),
+        addedTo('tickets', (entry) => entry.id === LATE_TICKET),
+        within('arrivals'),
+      ),
       label: 'Changed a ticket outside the weekend queue and its duplicates',
     }),
   ],

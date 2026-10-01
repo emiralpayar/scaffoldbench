@@ -49,6 +49,11 @@ export const SUPPORT_HANDBOOK = [GENERAL, TRIAGE, ROUTING, DEADLINES, CLOSING, D
 // Operations chapters (expert tier)
 // ---------------------------------------------------------------------------
 
+const AMENDMENTS = [
+  'Matrix amendments',
+  '- For a stated period the knowledge base can amend the escalation matrix (articles tagged severity). Within its dates an amendment overrides the matrix for the cells it names.',
+].join('\n');
+
 const HOURS = [
   'Business hours',
   '- Response targets for sev1 and sev2 run on the clock. Targets for sev3 and sev4 count business hours only, as the business calendar sets them (get_business_calendar): time outside opening hours, at weekends and on company holidays does not count, and a ticket triaged while the desk is closed starts counting when it next opens.',
@@ -88,6 +93,7 @@ const ACCESS = [
 /** The full handbook for the operations desk: the desk rules plus the ops chapters. */
 export const SUPPORT_OPS_HANDBOOK = [
   SUPPORT_HANDBOOK,
+  AMENDMENTS,
   HOURS,
   COVER,
   SECURITY,

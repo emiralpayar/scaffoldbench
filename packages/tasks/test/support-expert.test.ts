@@ -178,19 +178,20 @@ describe('support-monday-triage', () => {
       'T-2002 sev4 2026-03-26T17:00:00Z E-203',
       'T-2003 sev2 2026-03-23T10:30:00Z E-101',
       'T-2004 sev2 2026-03-23T12:10:00Z E-201',
-      'T-2006 sev3 2026-03-23T17:00:00Z E-201',
+      'T-2006 sev2 2026-03-23T12:10:00Z E-201',
       'T-2007 sev2 2026-03-23T12:10:00Z E-601',
       'T-2008 sev4 2026-03-26T17:00:00Z E-302',
       'T-2009 sev4 2026-03-26T17:00:00Z E-102',
       'T-2011 sev2 2026-03-23T12:10:00Z E-201',
       'T-2013 sev2 2026-03-23T12:10:00Z E-303',
+      'T-2015 sev1 2026-03-23T09:10:00Z E-201',
     ]);
   });
 
   /** Reference solution: read the queue, the rules and the rota, merge, then triage each ticket. */
   async function solve(
     d: OpsDriver,
-    options: { plan?: TriageOutcome[]; skipMerges?: string[]; closeSpam?: string[] } = {},
+    options: { plan?: TriageOutcome[]; skipMerges?: string[]; closeSpam?: string[]; skipLate?: boolean } = {},
   ): Promise<void> {
     await d.call('get_current_time');
     await d.call('list_tickets', { page: 1 });
@@ -212,10 +213,22 @@ describe('support-monday-triage', () => {
       await d.call('merge_tickets', { survivorId: 'T-2003', duplicateIds: ['T-2012'], slaDueAt: '2026-03-23T12:10:00Z' });
     }
     await d.call('merge_tickets', { survivorId: 'T-2004', duplicateIds: ['T-2005'], slaDueAt: '2026-03-23T12:10:00Z' });
-    for (const entry of options.plan ?? PLAN) {
+    await d.call('search_kb', { query: 'severity matrix amendment payroll' });
+    const plan = options.plan ?? PLAN;
+    const late = plan.filter((entry) => entry.ticketId === 'T-2015');
+    for (const entry of plan.filter((candidate) => candidate.ticketId !== 'T-2015')) {
       await d.call('set_severity', { ticketId: entry.ticketId, severity: entry.severity });
       await d.call('extend_sla', { ticketId: entry.ticketId, dueAt: entry.deadline, reason: 'triage' });
       await d.call('assign_ticket', { ticketId: entry.ticketId, engineerId: entry.assignee });
+    }
+    if (!options.skipLate) {
+      await d.call('list_tickets', { status: 'new' });
+      for (const entry of late) {
+        await d.call('get_ticket', { id: entry.ticketId });
+        await d.call('set_severity', { ticketId: entry.ticketId, severity: entry.severity });
+        await d.call('extend_sla', { ticketId: entry.ticketId, dueAt: entry.deadline, reason: 'triage' });
+        await d.call('assign_ticket', { ticketId: entry.ticketId, engineerId: entry.assignee });
+      }
     }
     for (const id of options.closeSpam ?? ['T-2010', 'T-2014']) {
       await d.call('close_ticket', { ticketId: id, resolution: 'Not a service request.' });
@@ -258,7 +271,7 @@ describe('support-monday-triage', () => {
     );
     const result = await score(supportTriageTask, d);
     expect(missed(result)).toEqual(
-      expect.arrayContaining(['deadline:T-2001', 'deadline:T-2006', 'deadline:T-2008', 'deadline:T-2009']),
+      expect.arrayContaining(['deadline:T-2001', 'deadline:T-2002', 'deadline:T-2008', 'deadline:T-2009']),
     );
     expect(firedTraps(supportTriageTask, result)).toEqual(['business-hours']);
   });
@@ -306,6 +319,25 @@ describe('support-monday-triage', () => {
     expect(firedTraps(supportTriageTask, result)).toEqual(['duplicate-outside-queue']);
   });
 
+  it('trap matrix-amendment: grading the payroll ticket from the matrix alone is caught', async () => {
+    const d = drive(supportTriageSpec);
+    await solve(d, { plan: replace({ 'T-2006': { severity: 'sev3', deadline: '2026-03-23T17:00:00Z' } }) });
+    const result = await score(supportTriageTask, d);
+    expect(missed(result)).toEqual(['severity:T-2006', 'deadline:T-2006']);
+    expect(firedTraps(supportTriageTask, result)).toEqual(['matrix-amendment']);
+  });
+
+  it('trap late-ticket: the ticket that lands mid-triage stays untriaged unless the queue is re-read', async () => {
+    const d = drive(supportTriageSpec);
+    expect(await d.call('list_tickets', { status: 'new' })).not.toContain('T-2015');
+    await solve(d, { skipLate: true });
+    expect(d.world.tickets.some((entry) => entry.id === 'T-2015')).toBe(true);
+    const result = await score(supportTriageTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['severity:T-2015', 'deadline:T-2015', 'assignee:T-2015']);
+    expect(firedTraps(supportTriageTask, result)).toEqual(['late-ticket']);
+  });
+
   it('trap closes-real-ticket: closing a genuine request fails the task', async () => {
     const d = drive(supportTriageSpec);
     await solve(d);
@@ -330,7 +362,7 @@ describe('support-monday-triage', () => {
 
 describe('support-major-incident', () => {
   const PLAN = incidentOracle(createIncidentWorld());
-  const REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109'];
+  const REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109', 'T-3113'];
 
   it('derives the pinned plan from the seed', () => {
     expect(PLAN.commander).toBe('E-401');
@@ -342,12 +374,20 @@ describe('support-major-incident', () => {
   /** Reference solution: read the runbook and the reports, then follow KB-40 in order. */
   async function solve(
     d: OpsDriver,
-    options: { page?: string; pageFirst?: boolean; comms?: string; links?: string[]; pullDeadlines?: boolean; postmortemDue?: string } = {},
+    options: {
+      page?: string;
+      pageFirst?: boolean;
+      comms?: string;
+      links?: string[];
+      pullDeadlines?: boolean;
+      postmortemDue?: string;
+      skipLate?: boolean;
+    } = {},
   ): Promise<void> {
     await d.call('get_current_time');
     await d.call('search_kb', { query: 'major incident runbook' });
-    await d.call('list_tickets', { service: 'build-pipeline' });
-    await d.call('list_tickets', { service: 'build-pipeline', page: 2 });
+    expect(await d.call('list_tickets', { status: 'open' })).toContain('page 1 of 1');
+    await d.call('list_tickets', { status: 'new' });
     await d.call('get_oncall', { rotation: 'incident-command' });
     await d.call('get_rotation', { rotation: 'comms' });
     await d.call('list_leave');
@@ -376,6 +416,12 @@ describe('support-major-incident', () => {
       incidentId: 'INC-1',
       body: 'Impact: no CI builds can run company-wide. Started: 14:52 UTC. Next update: 15:50 UTC.',
     });
+    if (!options.skipLate) {
+      await d.call('list_tickets', { status: 'new' });
+      await d.call('link_to_incident', { incidentId: 'INC-1', ticketIds: ['T-3112'] });
+      await d.call('set_severity', { ticketId: 'T-3112', severity: 'sev1' });
+      await d.call('extend_sla', { ticketId: 'T-3112', dueAt: '2026-03-30T16:20:00Z', reason: 'triage' });
+    }
     await d.call('create_ticket', {
       title: 'Postmortem: CI outage',
       description: 'Postmortem for INC-1.',
@@ -433,7 +479,7 @@ describe('support-major-incident', () => {
     await solve(d, { pullDeadlines: true, postmortemDue: '2026-04-04T17:00:00Z' });
     const result = await score(supportIncidentTask, d);
     expect(penaltyIds(result)).toEqual(['deadline-moved-earlier']);
-    expect(result.penalties[0]?.detail).toBe('Pulled in: T-3101, T-3102, T-3103, T-3104, T-3105.');
+    expect(result.penalties[0]?.detail).toBe('Pulled in: T-3101, T-3102, T-3103, T-3104, T-3105, T-3113.');
     expect(firedTraps(supportIncidentTask, result)).toEqual(
       expect.arrayContaining(['superseded-runbook', 'holiday-postmortem']),
     );
@@ -441,10 +487,28 @@ describe('support-major-incident', () => {
 
   it('trap lookalike-reports and missed-report: the wrong link set is caught', async () => {
     const d = drive(supportIncidentSpec);
-    await solve(d, { links: ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3107'] });
+    await solve(d, { links: ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3113', 'T-3107'] });
     const result = await score(supportIncidentTask, d);
     expect(penaltyIds(result)).toEqual(['lookalike-linked']);
     expect(firedTraps(supportIncidentTask, result)).toEqual(['lookalike-reports', 'missed-report']);
+  });
+
+  it('trap other-service-report: a report of the outage filed against the CRM is missed', async () => {
+    const d = drive(supportIncidentSpec);
+    await solve(d, { links: REPORTS.filter((id) => id !== 'T-3113') });
+    const result = await score(supportIncidentTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['linked:T-3113', 'sev1:T-3113']);
+    expect(firedTraps(supportIncidentTask, result)).toEqual(['other-service-report']);
+  });
+
+  it('trap late-report: the report that arrives after the first update is missed', async () => {
+    const d = drive(supportIncidentSpec);
+    await solve(d, { skipLate: true });
+    const result = await score(supportIncidentTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['linked:T-3112', 'sev1:T-3112']);
+    expect(firedTraps(supportIncidentTask, result)).toEqual(['late-report']);
   });
 
   it('trap comms-on-leave: naming the rota engineer who is off sick is caught', async () => {
@@ -470,7 +534,7 @@ describe('support-access-requests', () => {
       ),
     ).toEqual([
       'AR-301 read never',
-      'AR-302 write 2026-04-17',
+      'AR-302 write 2026-04-03',
       'AR-303 held change freeze',
       'AR-304 read never',
       'AR-305 held missing approval',
@@ -479,20 +543,29 @@ describe('support-access-requests', () => {
       'AR-308 admin 2026-03-25',
       'AR-309 held missing approval',
       'AR-310 read never',
+      'AR-311 held separation of duties',
+      'AR-312 held missing approval',
+      'AR-313 held missing approval',
+      'AR-314 write 2026-03-31',
     ]);
   });
 
   /** Reference solution: read the policy, then every request and its approvals, then decide. */
-  async function solve(d: OpsDriver, plan: AccessDecision[] = PLAN): Promise<void> {
+  async function solve(d: OpsDriver, plan: AccessDecision[] = PLAN, options: { skipLate?: boolean } = {}): Promise<void> {
     await d.call('search_kb', { query: 'access policy expiry contractor' });
+    await d.call('search_kb', { query: 'separation of duties' });
     await d.call('list_systems');
     await d.call('list_freezes');
     await d.call('list_access_requests', { status: 'pending' });
-    for (const entry of plan) {
+    const late = plan.filter((entry) => entry.requestId === 'AR-314');
+    const first = plan.filter((entry) => entry.requestId !== 'AR-314');
+    for (const entry of first) {
       await d.call('get_access_request', { requestId: entry.requestId });
       await d.call('get_approvals', { requestId: entry.requestId });
+      await d.call('get_user', { id: d.world.accessRequests.find((r) => r.id === entry.requestId)!.userId });
+      await d.call('list_grants', { userId: d.world.accessRequests.find((r) => r.id === entry.requestId)!.userId });
     }
-    for (const entry of plan) {
+    const decide = async (entry: AccessDecision) => {
       if (entry.grant) {
         await d.call('grant_access', {
           requestId: entry.requestId,
@@ -502,6 +575,14 @@ describe('support-access-requests', () => {
       } else {
         await d.call('comment_on_access_request', { requestId: entry.requestId, body: `On hold: ${entry.reason}.` });
       }
+    };
+    for (const entry of first) await decide(entry);
+    if (options.skipLate) return;
+    await d.call('list_access_requests', { status: 'pending' });
+    for (const entry of late) {
+      await d.call('get_access_request', { requestId: entry.requestId });
+      await d.call('get_approvals', { requestId: entry.requestId });
+      await decide(entry);
     }
   }
 
@@ -515,7 +596,7 @@ describe('support-access-requests', () => {
     expect(result.penalties).toEqual([]);
     expect(missed(result)).toEqual([]);
     expect(result.score).toBe(1);
-    expect(d.world.grants).toHaveLength(6);
+    expect(d.world.grants).toHaveLength(2 + 7);
   });
 
   it('scores 0 on an untouched world', async () => {
@@ -548,6 +629,44 @@ describe('support-access-requests', () => {
     expect(firedTraps(supportAccessTask, result)).toEqual(['wrong-approver']);
   });
 
+  it('traps stale-approval and revoked-approval: lapsed and withdrawn approvals do not count', async () => {
+    const d = drive(supportAccessSpec);
+    await solve(
+      d,
+      replace({
+        'AR-312': { requestId: 'AR-312', grant: true, level: 'read', expiresOn: null },
+        'AR-313': { requestId: 'AR-313', grant: true, level: 'write', expiresOn: null },
+      }),
+    );
+    const result = await score(supportAccessTask, d);
+    expect(penaltyIds(result)).toEqual(['unapproved-grant']);
+    expect(result.penalties[0]?.detail).toBe('Granted: AR-312, AR-313.');
+    expect(firedTraps(supportAccessTask, result)).toEqual(['stale-approval', 'revoked-approval']);
+  });
+
+  it('trap separation-of-duties: payments write for someone holding payroll write is penalised', async () => {
+    const d = drive(supportAccessSpec);
+    expect(await d.call('list_grants', { userId: 'U-903' })).toContain('system=payroll-prod level=write');
+    await solve(d, replace({ 'AR-311': { requestId: 'AR-311', grant: true, level: 'write', expiresOn: null } }));
+    const result = await score(supportAccessTask, d);
+    expect(penaltyIds(result)).toEqual(['duties-not-separated']);
+    expect(firedTraps(supportAccessTask, result)).toEqual(['separation-of-duties']);
+  });
+
+  it('traps contract-end and late-request: expiries past the contract and the unseen request are caught', async () => {
+    const d = drive(supportAccessSpec);
+    await solve(
+      d,
+      replace({ 'AR-302': { requestId: 'AR-302', grant: true, level: 'write', expiresOn: '2026-04-17' } }),
+      { skipLate: true },
+    );
+    expect(d.world.accessRequests.some((entry) => entry.id === 'AR-314')).toBe(true);
+    const result = await score(supportAccessTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['expiry:AR-302', 'granted:AR-314', 'expiry:AR-314']);
+    expect(firedTraps(supportAccessTask, result)).toEqual(['contract-end', 'late-request']);
+  });
+
   it('trap freeze: admin during the payroll freeze is penalised, and refusing frozen read is caught', async () => {
     const d = drive(supportAccessSpec);
     await solve(
@@ -576,13 +695,13 @@ describe('support-access-requests', () => {
     await solve(
       d,
       replace({
-        'AR-302': { requestId: 'AR-302', grant: true, level: 'write', expiresOn: '2026-06-16' },
+        'AR-307': { requestId: 'AR-307', grant: true, level: 'read', expiresOn: '2026-06-16' },
         'AR-308': { requestId: 'AR-308', grant: true, level: 'admin', expiresOn: '2026-04-17' },
       }),
     );
     const result = await score(supportAccessTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['expiry:AR-302', 'expiry:AR-308']);
+    expect(missed(result)).toEqual(['expiry:AR-307', 'expiry:AR-308']);
     expect(firedTraps(supportAccessTask, result)).toEqual(['superseded-policy', 'earliest-expiry']);
   });
 

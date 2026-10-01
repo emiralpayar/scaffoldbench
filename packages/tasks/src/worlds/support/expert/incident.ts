@@ -28,8 +28,9 @@ import {
 } from './common';
 
 /**
- * support-major-incident: the build pipeline is down company-wide and nine
- * reports are open about builds. Run the major-incident runbook.
+ * support-major-incident: the build pipeline is down company-wide, ten
+ * reports are open about builds and more arrive. Run the major-incident
+ * runbook.
  *
  * The runbook lives in the knowledge base, next to the older runbook it
  * replaced, so an agent that plans from the handbook alone plans blind. Its
@@ -43,7 +44,7 @@ import {
 
 export const INCIDENT_NOW = '2026-03-30T15:20:00Z';
 const SERVICE = 'build-pipeline';
-const OUTAGE_REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109'];
+const OUTAGE_REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109', 'T-3112', 'T-3113'];
 const LOOKALIKES = ['T-3107', 'T-3108'];
 const POSTMORTEM_BUSINESS_DAYS = 5;
 const NEXT_UPDATE_WITHIN_MINUTES = 30;
@@ -67,6 +68,8 @@ export function createIncidentWorld(): SupportOpsWorld {
         person('U-808', 'Viktor Orban', 'Mobile'),
         person('U-809', 'Release Management', 'Engineering'),
         person('U-810', 'Tessa Moreau', 'Sales'),
+        person('U-811', 'Ben Carter', 'CRM Engineering'),
+        person('U-812', 'Deploy Monitoring', 'Platform'),
         person('E-101', 'Dana Whitfield', 'Platform', { seniority: 'staff' }),
         person('E-102', 'Ravi Menon', 'Platform'),
         person('E-201', 'Ines Kovac', 'Business Apps'),
@@ -174,6 +177,11 @@ export function createIncidentWorld(): SupportOpsWorld {
         }),
         ticket('T-3108', '2026-03-30T15:12:00Z', 'U-808', SERVICE, 'single-user', 'Local build fails after Xcode upgrade', 'Since upgrading Xcode this afternoon my local build fails at the link step.'),
         ticket('T-3109', '2026-03-30T15:15:00Z', 'U-809', SERVICE, 'department', 'Release pipeline blocked: no runners', 'The 15:30 release cannot start: no runners available.'),
+        ticket('T-3113', '2026-03-30T15:13:00Z', 'U-811', 'crm', 'team', 'CRM release blocked', 'The CRM release pipeline cannot start: CI says no build runners are available.', {
+          status: 'open',
+          severity: 'sev3',
+          slaDueAt: '2026-03-31T15:13:00Z',
+        }),
         ticket('T-3110', '2026-03-30T15:00:00Z', 'U-810', 'crm', 'team', 'CRM dashboard slow', 'The sales dashboard takes a minute to load.', {
           status: 'open',
           severity: 'sev3',
@@ -193,6 +201,14 @@ export function createIncidentWorld(): SupportOpsWorld {
         { date: '2026-04-06', name: 'Easter Monday' },
       ],
     },
+    arrivals: [
+      {
+        afterAudit: { action: 'post_status_update', count: 1 },
+        tickets: [
+          ticket('T-3112', INCIDENT_NOW, 'U-812', SERVICE, 'company-wide', 'Deploy jobs failing everywhere', 'Automated alert: every deploy job across all environments is waiting for a runner.'),
+        ],
+      },
+    ],
     leave: [
       { engineerId: 'E-801', from: '2026-03-30', to: '2026-03-31', kind: 'sick leave' },
       { engineerId: 'E-102', from: '2026-04-02', to: '2026-04-02', kind: 'annual leave' },
@@ -225,6 +241,11 @@ export interface IncidentPlan {
  * and a report that had none given one at triage (now plus the sev1 target);
  * the postmortem due at close of business five business days on.
  */
+/** Every ticket the outage involves, including the report that arrives mid-run. */
+function withArrivals(seed: SupportOpsWorld): Ticket[] {
+  return [...seed.tickets, ...seed.arrivals.flatMap((arrival) => arrival.tickets ?? [])];
+}
+
 export function incidentOracle(seed: SupportOpsWorld): IncidentPlan {
   const commander = onCallAt(seed, 'incident-command', seed.nowIso)?.engineerId;
   const commsLead = coveringEngineer(seed, 'comms', seed.nowIso);
@@ -235,7 +256,10 @@ export function incidentOracle(seed: SupportOpsWorld): IncidentPlan {
     commander,
     commsLead,
     deadlines: Object.fromEntries(
-      OUTAGE_REPORTS.map((id) => [id, ticketOrThrow(seed, id).slaDueAt ?? triaged]),
+      OUTAGE_REPORTS.map((id) => [
+        id,
+        withArrivals(seed).find((entry) => entry.id === id)?.slaDueAt ?? triaged,
+      ]),
     ),
     postmortemDue: closeOfBusinessDaysAfter(seed.calendar, seed.nowIso, POSTMORTEM_BUSINESS_DAYS),
   };
@@ -246,7 +270,7 @@ export function incidentOracle(seed: SupportOpsWorld): IncidentPlan {
 // ---------------------------------------------------------------------------
 
 const PLAN = incidentOracle(createIncidentWorld());
-const SEED_TICKETS = new Set(createIncidentWorld().tickets.map((entry) => entry.id));
+const SEED_TICKETS = new Set(withArrivals(createIncidentWorld()).map((entry) => entry.id));
 
 function outageIncident(world: SupportOpsWorld): Incident | undefined {
   return world.incidents.find((incident) => incident.service === SERVICE);
@@ -307,7 +331,7 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     'Take charge of the outage on the service desk side and run it by the book.',
   ].join(' '),
   hypothesis:
-    'propose-select and gated-execute > single > plan-execute. The runbook is only in the knowledge base, beside the older runbook it replaced, so a tool-less planner plans blind. Its paging rule inverts the routing rule the handbook applies everywhere else (on call now, not when a deadline falls), and a page cannot be recalled: architectures that review an action before it executes can stop a wrong page, while a post-hoc verifier can only report it. The rest is bookkeeping a state-grounded verifier can check: which reports are this outage, deadlines that must not move when severity rises, a communications lead on leave, and a postmortem date counted across a weekend and two holidays.',
+    'propose-select and gated-execute > single > plan-execute. The runbook is only in the knowledge base, beside the older runbook it replaced, so a tool-less planner plans blind. Its paging rule inverts the routing rule the handbook applies everywhere else (on call now, not when a deadline falls), and a page cannot be recalled: architectures that review an action before it executes can stop a wrong page, while a post-hoc verifier can only report it. The rest is bookkeeping a state-grounded verifier can check: which reports are this outage (one filed under another service, one that arrives after the first status update), deadlines that must not move when severity rises, a communications lead on leave, and a postmortem date counted across a weekend and two holidays.',
   traps: [
     {
       id: 'page-by-deadline',
@@ -335,6 +359,16 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
       id: 'missed-report',
       description: "Misses an outage report that came in as a new, untriaged ticket.",
       caughtBy: ['linked:T-3106', 'linked:T-3109'],
+    },
+    {
+      id: 'other-service-report',
+      description: 'Looks only at build-pipeline tickets and misses a report of the outage filed against another service.',
+      caughtBy: ['linked:T-3113'],
+    },
+    {
+      id: 'late-report',
+      description: 'Never looks at the queue again after the first status update, missing the report that arrived meanwhile.',
+      caughtBy: ['linked:T-3112'],
     },
     {
       id: 'comms-on-leave',
@@ -461,6 +495,7 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
         auditTrail,
         ...[...OUTAGE_REPORTS, ...LOOKALIKES].map((id) => within('tickets', id)),
         addedTo('tickets'),
+        within('arrivals'),
         addedTo('incidents'),
         within('incidents'),
         addedTo('pages'),
