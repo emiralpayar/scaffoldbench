@@ -94,6 +94,11 @@ function makeBudget(exceeded = false): BudgetLedger {
     exceeded,
     stopReason: exceeded ? 'cost' : undefined,
     remainingUsd: exceeded ? 0 : 5,
+    availableUsd: exceeded ? 0 : 5,
+    reserve: (capUsd?: number) => ({
+      amountUsd: exceeded ? 0 : Math.min(capUsd ?? 5, 5),
+      settle: () => undefined,
+    }),
     charge: () => undefined,
   };
 }

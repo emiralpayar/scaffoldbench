@@ -273,9 +273,30 @@ export interface BudgetLedger {
   readonly turns: number;
   readonly exceeded: boolean;
   readonly stopReason: BudgetStopReason | undefined;
-  /** USD still available for the next `query()` call, never negative. */
+  /** USD not yet spent, never negative. Includes money reserved by calls in flight. */
   readonly remainingUsd: number;
+  /** USD neither spent nor reserved by a call in flight, never negative. */
+  readonly availableUsd: number;
+  /**
+   * Reserve up to `capUsd` (default: everything available) for one call.
+   *
+   * The lease is what the call may spend, and the amount handed to the SDK as
+   * its `maxBudgetUsd`. Because each reservation is taken out of what is
+   * available, the leases of concurrent calls can never add up to more than
+   * the run has left.
+   */
+  reserve(capUsd?: number): BudgetLease;
   charge(delta: ChargeDelta): void;
+}
+
+export interface BudgetLease {
+  /** USD reserved for the call. Zero when nothing was available. */
+  readonly amountUsd: number;
+  /**
+   * Charge what the call actually cost and return the rest of the reservation
+   * to the ledger. Only the first settlement counts.
+   */
+  settle(delta: ChargeDelta): void;
 }
 
 export interface ChargeDelta {
