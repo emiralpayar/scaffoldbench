@@ -244,9 +244,10 @@ npm run check:wiring  # canary: starts a real SDK session and asserts the MCP to
 npm run demo:data     # fabricate a run set so the site can be developed without spending anything
 ```
 
-`npm run demo:data` writes `results/demo-synthetic` with `synthetic: true` in its manifest, and
-the site renders an unmissable banner because of it. Those numbers are invented and exist only so
-the interface can be reviewed. They are not results.
+`npm run demo:data` writes `apps/web/demo-data/demo-synthetic` (gitignored, never `results/`) with
+`synthetic: true` in its manifest. The site reads it only under `ARENA_DEMO=1 npm run dev:web`, and
+renders an unmissable banner because of it. Those numbers are invented and exist only so the
+interface can be reviewed. They are not results.
 
 ---
 
