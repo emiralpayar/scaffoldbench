@@ -39,7 +39,8 @@ import {
 
 /**
  * support-monday-triage: the weekend's queue, fourteen new tickets on two
- * pages, triaged on Monday morning before the desk opens.
+ * pages, triaged on Monday morning before the desk opens, and two more that
+ * arrive during triage.
  *
  * Each ticket is its own chain of lookups (matrix, business calendar, rota,
  * leave) ending in arithmetic, so the batch splits, but not cleanly: two
@@ -69,8 +70,8 @@ export const INTERIM_SEVERITY = {
   from: '2026-03-20',
   to: '2026-03-31',
 } as const;
-const LATE_TICKET = 'T-2015';
-const NEW_QUEUE = [...Array.from({ length: 14 }, (_, index) => `T-${2001 + index}`), LATE_TICKET];
+const LATE_TICKETS = ['T-2015', 'T-2016'];
+const NEW_QUEUE = [...Array.from({ length: 14 }, (_, index) => `T-${2001 + index}`), ...LATE_TICKETS];
 const MERGED = DUPLICATE_GROUPS.flatMap((group) => group.slice(1));
 const TRIAGED = NEW_QUEUE.filter((id) => !NOT_REQUESTS.includes(id) && !MERGED.includes(id));
 const IN_SCOPE = [...NEW_QUEUE, 'T-1999'];
@@ -100,6 +101,7 @@ export function createTriageWorld(): SupportOpsWorld {
         person('U-713', 'Joana Silva', 'Lisbon Office'),
         person('U-714', 'Rafael Costa', 'Sales'),
         person('U-715', 'Grace Adeyemi', 'Finance', { seniority: 'director' }),
+        person('U-716', 'Mateo Rossi', 'Legal'),
         person('U-790', 'CI Monitoring', 'Platform'),
         person('E-101', 'Dana Whitfield', 'Platform', { seniority: 'staff' }),
         person('E-102', 'Ravi Menon', 'Platform'),
@@ -217,7 +219,13 @@ export function createTriageWorld(): SupportOpsWorld {
       {
         afterAudit: { action: 'assign_ticket', count: 4 },
         tickets: [
-          ticket(LATE_TICKET, TRIAGE_NOW, 'U-715', 'payroll', 'company-wide', 'Payslips missing for every employee', 'Nobody can see their March payslip in the portal this morning. The whole company is affected.'),
+          ticket('T-2015', TRIAGE_NOW, 'U-715', 'payroll', 'company-wide', 'Payslips missing for every employee', 'Nobody can see their March payslip in the portal this morning. The whole company is affected.'),
+        ],
+      },
+      {
+        afterAudit: { action: 'assign_ticket', count: 8 },
+        tickets: [
+          ticket('T-2016', TRIAGE_NOW, 'U-716', 'vpn', 'single-user', 'VPN token app asks me to register again', 'The authenticator app for the VPN says my token is unknown and asks me to register it again.'),
         ],
       },
     ],
@@ -404,8 +412,8 @@ export const supportTriageSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     },
     {
       id: 'late-ticket',
-      description: 'Reads the queue once and never sees the company-wide ticket that lands mid-triage.',
-      caughtBy: ['severity:T-2015', 'assignee:T-2015'],
+      description: 'Reads the queue once and never sees the tickets that land mid-triage.',
+      caughtBy: ['severity:T-2015', 'assignee:T-2015', 'severity:T-2016', 'assignee:T-2016'],
     },
     {
       id: 'on-leave',
@@ -496,7 +504,7 @@ export const supportTriageSpec: ToolUseTaskSpec<SupportOpsWorld> = {
       allow: anyOf(
         auditTrail,
         ...IN_SCOPE.map((id) => within('tickets', id)),
-        addedTo('tickets', (entry) => entry.id === LATE_TICKET),
+        addedTo('tickets', (entry) => LATE_TICKETS.includes(String(entry.id))),
         within('arrivals'),
       ),
       label: 'Changed a ticket outside the weekend queue and its duplicates',

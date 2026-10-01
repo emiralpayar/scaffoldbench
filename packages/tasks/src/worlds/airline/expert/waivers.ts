@@ -27,9 +27,9 @@ import {
 } from './common';
 
 /**
- * airline-waiver-desk: ten voluntary change requests, one of them arriving
- * mid-run, settled under dated bulletins that exist only in the bulletin
- * tool.
+ * airline-waiver-desk: eleven voluntary change requests, two of them
+ * arriving mid-run, settled under dated bulletins that exist only in the
+ * bulletin tool.
  *
  * The handbook says bulletins override it within their dates and scope, and
  * nothing more. What each bulletin says is only available by reading it: a
@@ -163,12 +163,14 @@ const REQUESTS: ChangeRequest[] = [
   { requestId: 'Q-308', reservationId: 'R5208', newFlightId: 'AA662', segmentIndex: 0 },
   { requestId: 'Q-309', reservationId: 'R5209', newFlightId: 'AA1406', segmentIndex: 1 },
   { requestId: 'Q-310', reservationId: 'R5210', newFlightId: 'AA216', segmentIndex: 0 },
-  // Arrives in the queue once four requests have been resolved.
+  // These two arrive in the queue once four, then eight, requests have been resolved.
   { requestId: 'Q-311', reservationId: 'R5211', newFlightId: 'AA216', segmentIndex: 0 },
+  { requestId: 'Q-312', reservationId: 'R5212', newFlightId: 'AA662', segmentIndex: 0 },
 ];
 
-/** Resolving this many requests brings the late change request into the queue. */
+/** Resolving this many requests brings the first late change request into the queue. */
 const LATE_ARRIVAL_AFTER = 4;
+const SECOND_ARRIVAL_AFTER = 8;
 
 export function createWaiverWorld(): AirlineOpsWorld {
   const flights: Flight[] = [
@@ -221,6 +223,7 @@ export function createWaiverWorld(): AirlineOpsWorld {
     passenger('P-2209', 'Quinn Adler', 'none'),
     passenger('P-2210', 'Ravi Shah', 'none'),
     passenger('P-2211', 'Sara Holt', 'none'),
+    passenger('P-2212', 'Tomas Reyes', 'silver'),
   ];
   const p = (id: string) => pax.find((entry) => entry.id === id)!;
 
@@ -414,6 +417,11 @@ export function createWaiverWorld(): AirlineOpsWorld {
           paidCents: 33_000,
           bookedOn: '2026-07-15',
         }),
+        reservation('R5212', p('P-2212'), [byId('AA660')], {
+          cabin: 'economy',
+          paidCents: 31_900,
+          bookedOn: '2026-07-02',
+        }),
       ],
       ledger: [],
     }),
@@ -430,6 +438,19 @@ export function createWaiverWorld(): AirlineOpsWorld {
           kind: 'change',
           subject: 'Chicago flight on the 4th',
           message: 'Hello, please move me from AA214 on 4 August to AA216 on the 8th. Thank you, Sara',
+          status: 'open',
+        },
+      },
+      {
+        afterResolved: SECOND_ARRIVAL_AFTER,
+        request: {
+          id: 'Q-312',
+          receivedAt: '2026-07-28T09:30',
+          passengerId: 'P-2212',
+          reservationId: 'R5212',
+          kind: 'change',
+          subject: 'Afternoon flight to Boston',
+          message: 'Could you move me from the morning Boston flight on 5 August (AA660) to the afternoon one, AA662? Tomas',
           status: 'open',
         },
       },
@@ -601,7 +622,7 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
     'Work all of them: make each change the customer asked for and settle it correctly.',
   ].join(' '),
   hypothesis:
-    "plan-execute-verify > single > plan-execute. Every settlement turns on dated bulletins reachable only through tools, two of which can cover the same move, and customers cite waivers that do not cover them; one booking has already used its single waiver move, which only its history shows. A state-grounded verifier that re-reads the bulletins and the booking against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The requests are independent, so orchestrator-workers should match single on score at lower latency, and one arrives mid-run, which only an agent that re-reads the queue will see.",
+    "plan-execute-verify > single > plan-execute. Every settlement turns on dated bulletins reachable only through tools, two of which can cover the same move, and customers cite waivers that do not cover them; one booking has already used its single waiver move, which only its history shows. A state-grounded verifier that re-reads the bulletins and the booking against the ledger can catch a misapplied waiver and charge the remainder; a plan written before any bulletin is read inherits the customers' framing. The requests are independent, so orchestrator-workers should match single on score at lower latency, and two arrive mid-run, which only an agent that re-reads the queue will see.",
   traps: [
     {
       id: 'covered-but-silent',
@@ -668,8 +689,8 @@ export const airlineWaiversSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
     },
     {
       id: 'late-request',
-      description: 'Lists the queue once and never sees the change request that arrives mid-run.',
-      caughtBy: ['resolved:Q-311', 'moved:R5211'],
+      description: 'Lists the queue once and never sees the change requests that arrive mid-run.',
+      caughtBy: ['resolved:Q-311', 'moved:R5211', 'resolved:Q-312', 'moved:R5212'],
     },
     {
       id: 'scope-creep',

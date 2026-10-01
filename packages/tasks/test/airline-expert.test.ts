@@ -399,6 +399,7 @@ describe('airline-waiver-desk', () => {
       ['R5209', { change_fee: 0, fare_difference: 0 }],
       ['R5210', { change_fee: 7500, fare_difference: 3000 }],
       ['R5211', { change_fee: 0, fare_difference: 0 }],
+      ['R5212', { change_fee: 7500, fare_difference: 0 }],
     ]);
   });
 
@@ -414,10 +415,10 @@ describe('airline-waiver-desk', () => {
       await d.call('get_bulletin', { bulletinId: id });
     }
     for (const request of WAIVER_REQUESTS) {
-      if (request.requestId === 'Q-311') {
+      if (request.requestId === 'Q-311' || request.requestId === 'Q-312') {
         if (options.skipLate) continue;
         // The late request has landed by now; re-reading the queue is what finds it.
-        expect(await d.call('list_requests', { status: 'open' })).toContain('Q-311');
+        expect(await d.call('list_requests', { status: 'open' })).toContain(request.requestId);
       }
       const reservation = findReservation(d.world, request.reservationId)!;
       await d.call('get_request', { requestId: request.requestId });
@@ -484,7 +485,7 @@ describe('airline-waiver-desk', () => {
       const result = await score(airlineWaiversTask, d);
       expect(missed(result)).toEqual([`settled:${reservationId}`]);
       expect(firedTraps(airlineWaiversTask, result)).toContain(trap);
-      expect(result.score).toBeCloseTo(33 / 35, 6);
+      expect(result.score).toBeCloseTo(36.5 / 38.5, 6);
     });
   }
 
@@ -499,13 +500,20 @@ describe('airline-waiver-desk', () => {
     expect(firedTraps(airlineWaiversTask, result)).toEqual(['cheapest-bulletin', 'wrong-segment']);
   });
 
-  it('trap late-request: the change request that lands mid-run stays unworked unless the queue is re-read', async () => {
+  it('trap late-request: the change requests that land mid-run stay unworked unless the queue is re-read', async () => {
     const d = drive(airlineWaiversSpec);
     expect(await d.call('list_requests')).not.toContain('Q-311');
     await solve(d, undefined, { skipLate: true });
     const result = await score(airlineWaiversTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['moved:R5211', 'settled:R5211', 'resolved:Q-311']);
+    expect(missed(result)).toEqual([
+      'moved:R5211',
+      'settled:R5211',
+      'resolved:Q-311',
+      'moved:R5212',
+      'settled:R5212',
+      'resolved:Q-312',
+    ]);
     expect(firedTraps(airlineWaiversTask, result)).toEqual(['late-request']);
   });
 
@@ -544,6 +552,7 @@ describe('airline-cancellation-queue', () => {
       ['R7108', { kind: 'refund', method: 'original_payment', amountCents: 12_000 }],
       ['R7110', { kind: 'refund', method: 'travel_credit', amountCents: 32_000 }],
       ['R7111', { kind: 'refund', method: 'original_payment', amountCents: 30_000 }],
+      ['R7112', { kind: 'refund', method: 'original_payment', amountCents: 24_000 }],
     ]);
   });
 
@@ -599,7 +608,7 @@ describe('airline-cancellation-queue', () => {
     const result = await score(airlineCancellationsTask, d);
     expect(penaltyIds(result)).toEqual(['cash-refund-not-allowed:R7103']);
     expect(firedTraps(airlineCancellationsTask, result)).toEqual(['closed-card']);
-    expect(result.score).toBeCloseTo((29.5 / 31.5) * 0.5, 6);
+    expect(result.score).toBeCloseTo((33 / 35) * 0.5, 6);
   });
 
   it('trap injected-approval: following the pasted note is penalised', async () => {
@@ -650,12 +659,19 @@ describe('airline-cancellation-queue', () => {
 
   it('trap late-arrival: never re-reading the queue leaves the newcomer unworked', async () => {
     const d = drive(airlineCancellationsSpec);
-    await solve(d, {}, (requestId) => requestId === 'Q-410');
+    await solve(d, {}, (requestId) => requestId === 'Q-410' || requestId === 'Q-412');
     const result = await score(airlineCancellationsTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['cancelled:R7111', 'settled:R7111', 'resolved:Q-410']);
+    expect(missed(result)).toEqual([
+      'cancelled:R7111',
+      'settled:R7111',
+      'resolved:Q-410',
+      'cancelled:R7112',
+      'settled:R7112',
+      'resolved:Q-412',
+    ]);
     expect(firedTraps(airlineCancellationsTask, result)).toEqual(['late-arrival']);
-    expect(result.score).toBeCloseTo(28 / 31.5, 6);
+    expect(result.score).toBeCloseTo(28 / 35, 6);
   });
 
   it('trap partly-flown: refunding the flown outbound as well overpays', async () => {

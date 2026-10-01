@@ -27,7 +27,7 @@ import {
 } from './common';
 
 /**
- * ecommerce-returns-desk: fifteen open returns over two pages, each settled
+ * ecommerce-returns-desk: sixteen open returns over three pages, each settled
  * by what the warehouse actually received, under a return policy that three
  * dated policy updates amend.
  *
@@ -36,7 +36,7 @@ import {
  * then refund, restock and close), so the batch splits cleanly. What makes a
  * case go wrong is never visible in the return itself: a parcel the customer
  * insists was delivered, which the warehouse logs only partway through the
- * run; a box holding a different product; damaged goods; half a return; a
+ * run, and another logged later still; a box holding a different product; damaged goods; half a return; a
  * second receipt on a later page; a window that closed after the customer
  * asked, or exactly on the day; a longer window for customers who were
  * loyalty members on the day they asked; a fee that depends on the reason for
@@ -54,6 +54,10 @@ export const LOYAL_WINDOW = { from: '2026-06-01', days: 45 };
 export const SUMMER_AMNESTY = { from: '2026-07-10', to: '2026-07-20' };
 /** The missing parcel is logged once this many refunds have been issued in the run. */
 export const LATE_RECEIPT_AFTER_REFUNDS = 5;
+/** A second parcel is logged later still. */
+export const SECOND_RECEIPT_AFTER_REFUNDS = 9;
+/** Refunds already on the ledger when the run starts. */
+const SEED_REFUNDS = 2;
 
 const shipped = (id: string, productId: string, quantity: number, unit: number, on: string, paid?: number) =>
   line(id, productId, quantity, unit, { status: 'shipped', shippedAt: on, ...(paid ? { paid } : {}) });
@@ -134,6 +138,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         customer('C-813', 'Maya Cohen', 'standard'),
         { ...customer('C-814', 'Nora Lind', 'platinum'), tierSince: '2025-11-02' },
         { ...customer('C-815', 'Owen Price', 'platinum'), tierSince: '2026-02-01' },
+        customer('C-816', 'Paolo Ricci', 'standard'),
         customer('C-790', 'Omar Haddad', 'standard'),
         customer('C-795', 'Pia Weber', 'gold'),
       ],
@@ -169,6 +174,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         order('O-8013', 'C-813', '2026-06-22', [shipped('L1', 'P-KEY', 1, KEY, '2026-06-24')]),
         order('O-8014', 'C-814', '2026-07-08', [shipped('L1', 'P-HDP', 2, HDP, '2026-07-10')]),
         order('O-8015', 'C-815', '2026-05-30', [shipped('L1', 'P-KEY', 1, KEY, '2026-06-01')]),
+        order('O-8016', 'C-816', '2026-07-12', [shipped('L1', 'P-MOU', 1, 4_900, '2026-07-14')]),
         refunded(
           order('O-7990', 'C-790', '2026-07-02', [shipped('L1', 'P-HDP', 1, HDP, '2026-07-04')]),
           'L1',
@@ -263,6 +269,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         customerNote: 'Gift that did not work out; returning both pairs separately.',
       }),
       rma('RMA-815', 'O-8015', 'L1', 1, '2026-07-09', 'changed_mind', { customerNote: 'Switched to a low-profile board.' }),
+      rma('RMA-816', 'O-8016', 'L1', 1, '2026-07-21', 'changed_mind', { customerNote: 'Prefer a wired mouse after all.' }),
     ],
     receipts: [
       receipt('RMA-805', '2026-07-02', 1, 'resellable', 'P-HUB'),
@@ -287,8 +294,12 @@ export function createReturnsWorld(): EcommerceOpsWorld {
     // The parcel the customer insisted on is logged while the agent works.
     scheduledReceipts: [
       {
-        afterRefunds: 2 + LATE_RECEIPT_AFTER_REFUNDS,
+        afterRefunds: SEED_REFUNDS + LATE_RECEIPT_AFTER_REFUNDS,
         receipt: receipt('RMA-807', TODAY, 1, 'resellable', 'P-HDP'),
+      },
+      {
+        afterRefunds: SEED_REFUNDS + SECOND_RECEIPT_AFTER_REFUNDS,
+        receipt: receipt('RMA-816', TODAY, 1, 'resellable', 'P-MOU'),
       },
     ],
   };
@@ -533,18 +544,22 @@ function overRefundRule(expected: ReturnSettlement): ForbiddenSpec<EcommerceOpsW
   };
 }
 
-const LATE_ORDER = 'O-8007';
-
 /**
- * True when the late parcel was refunded before the warehouse had logged it.
- * The receipt lands once the run has issued a fixed number of refunds, so a
- * refund for that order among the first ones was paid on the customer's word,
- * whatever the final state looks like.
+ * Returns refunded before the warehouse had logged them. A late parcel's
+ * receipt lands once the run has issued a fixed number of refunds, so a
+ * refund for that order among the earlier ones was paid on the customer's
+ * word, whatever the final state looks like.
  */
-export function refundedBeforeReceipt(journal: readonly ToolCall[]): boolean {
+export function refundedBeforeReceipt(journal: readonly ToolCall[]): string[] {
+  const seed = createReturnsWorld();
   const refunds = findCalls(journal, { name: 'refund_order' });
-  const index = refunds.findIndex((entry) => entry.args.orderId === LATE_ORDER);
-  return index !== -1 && index < LATE_RECEIPT_AFTER_REFUNDS;
+  return seed.scheduledReceipts
+    .filter(({ afterRefunds, receipt: late }) => {
+      const orderId = seed.returns.find((entry) => entry.id === late.rmaId)?.orderId;
+      const index = refunds.findIndex((entry) => entry.args.orderId === orderId);
+      return index !== -1 && index < afterRefunds - SEED_REFUNDS;
+    })
+    .map(({ receipt: late }) => late.rmaId);
 }
 
 /** Products whose sellable stock rose by more than the resellable goods received. */
@@ -574,7 +589,7 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     'whatever is ready, and leave everything else in the state the rules call for.',
   ].join(' '),
   hypothesis:
-    "orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The fifteen returns are independent cases, each needing its own authorization, order, customer, receipts and the rules in force on the day it was requested, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a fee charged by the condition of the goods instead of the reason for the return, or at the wrong dated rate; a window measured to the wrong day, or extended for a customer who was not yet a loyalty member when they asked; a second receipt on a later page; a colleague's earlier refund. The parcel a customer insists has arrived is logged only partway through the run: an agent that refunds on the customer's word pays before the goods exist (scored from the journal), and one that settles from the receipts it read at the start never refunds it at all.",
+    "orchestrator-workers >= single at lower latency; plan-execute-verify > single on accuracy. The sixteen returns are independent cases, each needing its own authorization, order, customer, receipts and the rules in force on the day it was requested, so they split cleanly across workers with nothing shared but the policy. The errors on offer are slips a state-grounded verifier can recompute: a fee charged by the condition of the goods instead of the reason for the return, or at the wrong dated rate; a window measured to the wrong day, or extended for a customer who was not yet a loyalty member when they asked; a second receipt on a later page; a colleague's earlier refund. The parcel a customer insists has arrived is logged only partway through the run, and another later still: an agent that refunds on the customer's word pays before the goods exist (scored from the journal), and one that settles from the receipts it read at the start never refunds them at all.",
   traps: [
     {
       id: 'not-received',
@@ -585,8 +600,8 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     {
       id: 'late-receipt',
       description:
-        'Settles from the receipts it read at the start and never sees the parcel logged while it worked, leaving a received return unrefunded.',
-      caughtBy: ['settled:RMA-807'],
+        'Settles from the receipts it read at the start and never sees the parcels logged while it worked, leaving received returns unrefunded.',
+      caughtBy: ['settled:RMA-807', 'settled:RMA-816'],
     },
     {
       id: 'wrong-item',
@@ -680,7 +695,8 @@ export const ecommerceReturnsSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       // Paid on the customer's word: that the parcel turned up later does not
       // make the refund right when it was made.
       multiplier: 0.5,
-      violated: (_world, journal) => refundedBeforeReceipt(journal),
+      violated: (_world, journal) => refundedBeforeReceipt(journal).length > 0,
+      detail: (_world, journal) => `Refunded before receipt: ${refundedBeforeReceipt(journal).join(', ')}.`,
     },
     {
       id: 'unsellable-restocked',

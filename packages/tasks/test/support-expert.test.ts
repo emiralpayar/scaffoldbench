@@ -185,6 +185,7 @@ describe('support-monday-triage', () => {
       'T-2011 sev2 2026-03-23T12:10:00Z E-201',
       'T-2013 sev2 2026-03-23T12:10:00Z E-303',
       'T-2015 sev1 2026-03-23T09:10:00Z E-201',
+      'T-2016 sev4 2026-03-26T17:00:00Z E-302',
     ]);
   });
 
@@ -215,8 +216,9 @@ describe('support-monday-triage', () => {
     await d.call('merge_tickets', { survivorId: 'T-2004', duplicateIds: ['T-2005'], slaDueAt: '2026-03-23T12:10:00Z' });
     await d.call('search_kb', { query: 'severity matrix amendment payroll' });
     const plan = options.plan ?? PLAN;
-    const late = plan.filter((entry) => entry.ticketId === 'T-2015');
-    for (const entry of plan.filter((candidate) => candidate.ticketId !== 'T-2015')) {
+    const lateIds = ['T-2015', 'T-2016'];
+    const late = plan.filter((entry) => lateIds.includes(entry.ticketId));
+    for (const entry of plan.filter((candidate) => !lateIds.includes(candidate.ticketId))) {
       await d.call('set_severity', { ticketId: entry.ticketId, severity: entry.severity });
       await d.call('extend_sla', { ticketId: entry.ticketId, dueAt: entry.deadline, reason: 'triage' });
       await d.call('assign_ticket', { ticketId: entry.ticketId, engineerId: entry.assignee });
@@ -327,14 +329,21 @@ describe('support-monday-triage', () => {
     expect(firedTraps(supportTriageTask, result)).toEqual(['matrix-amendment']);
   });
 
-  it('trap late-ticket: the ticket that lands mid-triage stays untriaged unless the queue is re-read', async () => {
+  it('trap late-ticket: tickets that land mid-triage stay untriaged unless the queue is re-read', async () => {
     const d = drive(supportTriageSpec);
     expect(await d.call('list_tickets', { status: 'new' })).not.toContain('T-2015');
     await solve(d, { skipLate: true });
-    expect(d.world.tickets.some((entry) => entry.id === 'T-2015')).toBe(true);
+    expect(d.world.tickets.filter((entry) => ['T-2015', 'T-2016'].includes(entry.id))).toHaveLength(2);
     const result = await score(supportTriageTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['severity:T-2015', 'deadline:T-2015', 'assignee:T-2015']);
+    expect(missed(result)).toEqual([
+      'severity:T-2015',
+      'deadline:T-2015',
+      'assignee:T-2015',
+      'severity:T-2016',
+      'deadline:T-2016',
+      'assignee:T-2016',
+    ]);
     expect(firedTraps(supportTriageTask, result)).toEqual(['late-ticket']);
   });
 
@@ -362,7 +371,7 @@ describe('support-monday-triage', () => {
 
 describe('support-major-incident', () => {
   const PLAN = incidentOracle(createIncidentWorld());
-  const REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109', 'T-3113'];
+  const REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109', 'T-3113', 'T-3114'];
 
   it('derives the pinned plan from the seed', () => {
     expect(PLAN.commander).toBe('E-401');
@@ -386,7 +395,8 @@ describe('support-major-incident', () => {
   ): Promise<void> {
     await d.call('get_current_time');
     await d.call('search_kb', { query: 'major incident runbook' });
-    expect(await d.call('list_tickets', { status: 'open' })).toContain('page 1 of 1');
+    expect(await d.call('list_tickets', { status: 'open' })).toContain('page 1 of 2');
+    await d.call('list_tickets', { status: 'open', page: 2 });
     await d.call('list_tickets', { status: 'new' });
     await d.call('get_oncall', { rotation: 'incident-command' });
     await d.call('get_rotation', { rotation: 'comms' });
@@ -479,7 +489,7 @@ describe('support-major-incident', () => {
     await solve(d, { pullDeadlines: true, postmortemDue: '2026-04-04T17:00:00Z' });
     const result = await score(supportIncidentTask, d);
     expect(penaltyIds(result)).toEqual(['deadline-moved-earlier']);
-    expect(result.penalties[0]?.detail).toBe('Pulled in: T-3101, T-3102, T-3103, T-3104, T-3105, T-3113.');
+    expect(result.penalties[0]?.detail).toBe('Pulled in: T-3101, T-3102, T-3103, T-3104, T-3105, T-3113, T-3114.');
     expect(firedTraps(supportIncidentTask, result)).toEqual(
       expect.arrayContaining(['superseded-runbook', 'holiday-postmortem']),
     );
@@ -487,18 +497,18 @@ describe('support-major-incident', () => {
 
   it('trap lookalike-reports and missed-report: the wrong link set is caught', async () => {
     const d = drive(supportIncidentSpec);
-    await solve(d, { links: ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3113', 'T-3107'] });
+    await solve(d, { links: ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3113', 'T-3114', 'T-3107'] });
     const result = await score(supportIncidentTask, d);
     expect(penaltyIds(result)).toEqual(['lookalike-linked']);
     expect(firedTraps(supportIncidentTask, result)).toEqual(['lookalike-reports', 'missed-report']);
   });
 
-  it('trap other-service-report: a report of the outage filed against the CRM is missed', async () => {
+  it('trap other-service-report: reports of the outage filed against other services are missed', async () => {
     const d = drive(supportIncidentSpec);
-    await solve(d, { links: REPORTS.filter((id) => id !== 'T-3113') });
+    await solve(d, { links: REPORTS.filter((id) => id !== 'T-3113' && id !== 'T-3114') });
     const result = await score(supportIncidentTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['linked:T-3113', 'sev1:T-3113']);
+    expect(missed(result)).toEqual(['linked:T-3113', 'sev1:T-3113', 'linked:T-3114', 'sev1:T-3114']);
     expect(firedTraps(supportIncidentTask, result)).toEqual(['other-service-report']);
   });
 

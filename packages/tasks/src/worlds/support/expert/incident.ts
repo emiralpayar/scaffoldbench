@@ -28,8 +28,9 @@ import {
 } from './common';
 
 /**
- * support-major-incident: the build pipeline is down company-wide, ten
- * reports are open about builds and more arrive. Run the major-incident
+ * support-major-incident: the build pipeline is down company-wide, reports
+ * are open about builds and about what builds block elsewhere, and more
+ * arrive. Run the major-incident
  * runbook.
  *
  * The runbook lives in the knowledge base, next to the older runbook it
@@ -44,7 +45,18 @@ import {
 
 export const INCIDENT_NOW = '2026-03-30T15:20:00Z';
 const SERVICE = 'build-pipeline';
-const OUTAGE_REPORTS = ['T-3101', 'T-3102', 'T-3103', 'T-3104', 'T-3105', 'T-3106', 'T-3109', 'T-3112', 'T-3113'];
+const OUTAGE_REPORTS = [
+  'T-3101',
+  'T-3102',
+  'T-3103',
+  'T-3104',
+  'T-3105',
+  'T-3106',
+  'T-3109',
+  'T-3112',
+  'T-3113',
+  'T-3114',
+];
 const LOOKALIKES = ['T-3107', 'T-3108'];
 const POSTMORTEM_BUSINESS_DAYS = 5;
 const NEXT_UPDATE_WITHIN_MINUTES = 30;
@@ -70,6 +82,7 @@ export function createIncidentWorld(): SupportOpsWorld {
         person('U-810', 'Tessa Moreau', 'Sales'),
         person('U-811', 'Ben Carter', 'CRM Engineering'),
         person('U-812', 'Deploy Monitoring', 'Platform'),
+        person('U-813', 'Sanna Virtanen', 'Network Engineering'),
         person('E-101', 'Dana Whitfield', 'Platform', { seniority: 'staff' }),
         person('E-102', 'Ravi Menon', 'Platform'),
         person('E-201', 'Ines Kovac', 'Business Apps'),
@@ -181,6 +194,11 @@ export function createIncidentWorld(): SupportOpsWorld {
           status: 'open',
           severity: 'sev3',
           slaDueAt: '2026-03-31T15:13:00Z',
+        }),
+        ticket('T-3114', '2026-03-30T15:16:00Z', 'U-813', 'vpn', 'team', 'VPN config release stuck', 'Our VPN configuration release is stuck at "queued": CI reports no runners available.', {
+          status: 'open',
+          severity: 'sev3',
+          slaDueAt: '2026-03-31T15:16:00Z',
         }),
         ticket('T-3110', '2026-03-30T15:00:00Z', 'U-810', 'crm', 'team', 'CRM dashboard slow', 'The sales dashboard takes a minute to load.', {
           status: 'open',
@@ -331,7 +349,7 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     'Take charge of the outage on the service desk side and run it by the book.',
   ].join(' '),
   hypothesis:
-    'propose-select and gated-execute > single > plan-execute. The runbook is only in the knowledge base, beside the older runbook it replaced, so a tool-less planner plans blind. Its paging rule inverts the routing rule the handbook applies everywhere else (on call now, not when a deadline falls), and a page cannot be recalled: architectures that review an action before it executes can stop a wrong page, while a post-hoc verifier can only report it. The rest is bookkeeping a state-grounded verifier can check: which reports are this outage (one filed under another service, one that arrives after the first status update), deadlines that must not move when severity rises, a communications lead on leave, and a postmortem date counted across a weekend and two holidays.',
+    'propose-select and gated-execute > single > plan-execute. The runbook is only in the knowledge base, beside the older runbook it replaced, so a tool-less planner plans blind. Its paging rule inverts the routing rule the handbook applies everywhere else (on call now, not when a deadline falls), and a page cannot be recalled: architectures that review an action before it executes can stop a wrong page, while a post-hoc verifier can only report it. The rest is bookkeeping a state-grounded verifier can check: which reports are this outage (two filed under other services, one that arrives after the first status update), deadlines that must not move when severity rises, a communications lead on leave, and a postmortem date counted across a weekend and two holidays.',
   traps: [
     {
       id: 'page-by-deadline',
@@ -362,8 +380,8 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     },
     {
       id: 'other-service-report',
-      description: 'Looks only at build-pipeline tickets and misses a report of the outage filed against another service.',
-      caughtBy: ['linked:T-3113'],
+      description: 'Looks only at build-pipeline tickets and misses reports of the outage filed against other services.',
+      caughtBy: ['linked:T-3113', 'linked:T-3114'],
     },
     {
       id: 'late-report',

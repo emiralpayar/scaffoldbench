@@ -435,6 +435,7 @@ describe('ecommerce-returns-desk', () => {
       'RMA-813 10965 card s1 d0 closed',
       'RMA-814 31800 card s2 d0 closed',
       'RMA-815 10965 card s1 d0 closed',
+      'RMA-816 4165 card s1 d0 closed',
     ]);
   });
 
@@ -454,7 +455,9 @@ describe('ecommerce-returns-desk', () => {
     for (const entry of plan) {
       if (entry.refund) {
         // The warehouse logs the missing parcel mid-run: read the receipts again before settling it.
-        if (entry.rmaId === 'RMA-807') await d.call('list_return_receipts', { rmaId: 'RMA-807' });
+        if (entry.rmaId === 'RMA-807' || entry.rmaId === 'RMA-816') {
+          await d.call('list_return_receipts', { rmaId: entry.rmaId });
+        }
         await d.call('refund_order', {
           orderId: entry.orderId,
           lineIds: [entry.lineId],
@@ -496,7 +499,7 @@ describe('ecommerce-returns-desk', () => {
 
   it('pages the returns and the receipts', async () => {
     const d = drive(ecommerceReturnsSpec);
-    expect(await d.call('list_returns')).toContain('17 return(s), today=2026-07-25; page 1 of 3');
+    expect(await d.call('list_returns')).toContain('18 return(s), today=2026-07-25; page 1 of 3');
     const last = await d.call('list_return_receipts', { page: 3 });
     expect(last).toContain('RMA-809 receivedOn=2026-07-25');
     await d.expectError('list_return_receipts', { page: 4 });
@@ -512,9 +515,9 @@ describe('ecommerce-returns-desk', () => {
     expect(d.world.customers.find((entry) => entry.id === 'C-804')?.storeCreditCents).toBe(1_200 + 27_965);
     expect(d.world.customers.find((entry) => entry.id === 'C-803')?.storeCreditCents).toBe(27_965);
     expect(d.world.receipts.some((entry) => entry.rmaId === 'RMA-807')).toBe(true);
-    expect(findProduct(d.world, 'P-MOU')).toMatchObject({ stock: 21, damagedStock: 2 });
+    expect(findProduct(d.world, 'P-MOU')).toMatchObject({ stock: 22, damagedStock: 2 });
     expect(findProduct(d.world, 'P-CAB')).toMatchObject({ stock: 41, damagedStock: 1 });
-    expect(d.world.refunds).toHaveLength(2 + 14);
+    expect(d.world.refunds).toHaveLength(2 + 15);
   });
 
   it('scores 0 on an untouched world', async () => {
@@ -534,13 +537,20 @@ describe('ecommerce-returns-desk', () => {
     expect(firedTraps(ecommerceReturnsTask, result)).toEqual(['not-received']);
   });
 
-  it('trap late-receipt: settling from the receipts read at the start leaves the late parcel unrefunded', async () => {
+  it('trap late-receipt: settling from the receipts read at the start leaves the late parcels unrefunded', async () => {
     const d = drive(ecommerceReturnsSpec);
     await solve(d, returnsOracle(createReturnsWorld()));
     expect(d.world.receipts.some((entry) => entry.rmaId === 'RMA-807')).toBe(true);
     const result = await score(ecommerceReturnsTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['settled:RMA-807', 'status:RMA-807', 'stock:P-HDP']);
+    expect(missed(result)).toEqual([
+      'settled:RMA-807',
+      'status:RMA-807',
+      'settled:RMA-816',
+      'status:RMA-816',
+      'stock:P-HDP',
+      'stock:P-MOU',
+    ]);
     expect(firedTraps(ecommerceReturnsTask, result)).toEqual(['late-receipt']);
   });
 
@@ -661,12 +671,18 @@ describe('ecommerce-inbox-triage', () => {
     await d.call('reply_to_message', { messageId: 'M-810', body: 'Please write from the email address on your account.' });
     await d.call('reply_to_message', { messageId: 'M-811', body: 'Please send them back; we refund once they arrive.' });
     if (options.skipLate) return;
-    await d.call('list_inbox', { status: 'open' });
+    expect(await d.call('list_inbox', { status: 'open' })).toContain('M-814');
     await d.call('get_message', { messageId: 'M-813' });
     await d.call('cancel_order', { orderId: 'O-6101', lineIds: ['L2'] });
     await d.call('refund_order', { orderId: 'O-6101', lineIds: ['L2'], amountCents: 3_800, method: 'card' });
     await d.call('restock_item', { productId: 'P-CAB', quantity: 2, orderId: 'O-6101' });
     await d.call('reply_to_message', { messageId: 'M-813', body: 'The cables are cancelled and refunded.' });
+    await d.call('get_message', { messageId: 'M-814' });
+    await d.call('get_order', { orderId: 'O-6114' });
+    await d.call('cancel_order', { orderId: 'O-6114' });
+    await d.call('refund_order', { orderId: 'O-6114', lineIds: ['L1'], amountCents: 21_900, method: 'card' });
+    await d.call('restock_item', { productId: 'P-DOC', quantity: 1, orderId: 'O-6114' });
+    await d.call('reply_to_message', { messageId: 'M-814', body: 'O-6114 is cancelled and refunded to your card.' });
   }
 
   it('scores 1 on the reference solution', async () => {
@@ -784,7 +800,14 @@ describe('ecommerce-inbox-triage', () => {
     const result = await score(ecommerceInboxTask, d);
     expect(result.penalties).toEqual([]);
     expect(missed(result).sort()).toEqual(
-      ['cancelled:O-6101/L2', 'refunded:O-6101', 'replied:M-813', 'restocked:O-6101'].sort(),
+      [
+        'cancelled:O-6101/L2',
+        'refunded:O-6101',
+        'replied:M-813',
+        'restocked:O-6101',
+        'cancelled:O-6114',
+        'replied:M-814',
+      ].sort(),
     );
     expect(firedTraps(ecommerceInboxTask, result)).toEqual(['late-message']);
   });
