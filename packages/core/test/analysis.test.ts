@@ -238,13 +238,18 @@ describe('strategy summaries', () => {
     expect(summary.failureModes).toEqual({ none: 9 });
   });
 
-  it('gives an all-pass arm a Wilson interval, not [1, 1]', () => {
+  it('gives an all-pass arm a Wilson interval over its tasks, not [1, 1]', () => {
+    // 18 of 18 runs, but only nine tasks: the runs of a task may all agree
+    // because of the task, so nine is the sample size that is safe.
     const allPass = analyzeRunSet(grid({ strategies: ['single'], tasks: 9, repeats: 2, cell: () => ({}) }), fast);
     const s = allPass.models[0]!.strategies[0]!;
+    const nine = wilsonInterval(9, 9);
     expect(s.score.ciMethod).toBe('wilson');
-    expect(s.score.ci!.low).toBeCloseTo(0.8241, 4);
-    expect(s.passRate.ci!.low).toBeCloseTo(0.8241, 4);
-    expect(s.passHatK[1]!.ci!.low).toBeCloseTo(wilsonInterval(9, 9).low, 12);
+    expect(s.score.ci).toEqual(nine);
+    expect(s.passRate.effectiveRuns).toBe(9);
+    expect(s.passRate.ci).toEqual(nine);
+    expect(nine.low).toBeCloseTo(0.7009, 4);
+    expect(s.passHatK[1]!.ci).toEqual(nine);
   });
 
   it('reports no finite upper bound for cost per solved task when resamples solve nothing', () => {

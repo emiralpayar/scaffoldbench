@@ -506,15 +506,18 @@ export function resolveVerdicts(
  * Mean over tasks of per-task values, with a cluster-bootstrap interval.
  *
  * `bounded` marks a metric that lives in [0, 1]. When every task has the same
- * value the bootstrap has nothing to resample; for a bounded metric sitting
- * at 0 or 1 a Wilson interval over `boundaryUnits` stands in (a mean of [0, 1]
- * values is at least the share of exact 1s, which Wilson bounds), and
- * otherwise no interval is reported rather than a zero-width one.
+ * value the bootstrap has nothing to resample. For a bounded metric sitting
+ * at 0 or 1 a Wilson interval over the tasks stands in (a mean of [0, 1]
+ * values is at least the share of tasks whose every run scored exactly 1,
+ * which Wilson bounds); otherwise no interval is reported rather than a
+ * zero-width one. Tasks, not runs, are the units: with every run alike the
+ * data cannot say how correlated a task's runs are, and only the task count
+ * is safe whatever that correlation is.
  */
 export function clusterMeanEstimate(
   taskValues: readonly number[],
   settings: InferenceSettings,
-  bounded?: { boundaryUnits: number },
+  bounded = false,
 ): Estimate {
   const tasks = taskValues.length;
   const value = tasks === 0 ? Number.NaN : taskValues.reduce((a, v) => a + v, 0) / tasks;
@@ -524,8 +527,7 @@ export function clusterMeanEstimate(
   const hi = Math.max(...taskValues);
   if (hi - lo <= 1e-12 * Math.max(1, Math.abs(hi))) {
     if (bounded && (value <= 1e-12 || value >= 1 - 1e-12)) {
-      const units = bounded.boundaryUnits;
-      const ci = wilsonInterval(value >= 0.5 ? units : 0, units, 1 - settings.alpha);
+      const ci = wilsonInterval(value >= 0.5 ? tasks : 0, tasks, 1 - settings.alpha);
       return { value, ci, ciMethod: 'wilson' };
     }
     return { value, ci: null, ciMethod: 'none' };

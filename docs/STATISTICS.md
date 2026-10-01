@@ -75,8 +75,8 @@ For each arm, `models[i].strategies[j]` (`StrategyAnalysis`) reports the followi
 ([§3.2](#32-the-interval)). When every task has the same value the bootstrap has nothing to
 resample. Rather than a zero-width interval:
 
-- for score sitting exactly at 0 or 1, a Wilson interval over the runs stands in. A mean of values
-  in [0, 1] is at least the share of exact 1s, which Wilson bounds;
+- for score sitting exactly at 0 or 1, a Wilson interval over the tasks stands in. A mean of values
+  in [0, 1] is at least the share of tasks whose every run scored exactly 1, which Wilson bounds;
 - otherwise no interval is reported (`ci: null`, `ciMethod: 'none'`).
 
 `ciMethod` says which of `bootstrap`, `wilson` or `none` produced the interval.
@@ -90,9 +90,15 @@ n_{\text{eff}} = \frac{\hat{p}(1-\hat{p})}{\widehat{\operatorname{Var}}(\hat{p})
 
 That is the binomial variance divided by the task-clustered one, the design-effect device used
 for survey proportions (Kish, 1965; Korn & Graubard, 1998). Since a design effect is at most the
-cluster size, $n_{\text{eff}}$ is kept between the task count $T$ and the run count $N$. At 0% or
-100% the clustered variance cannot be estimated, so $n_{\text{eff}} = N$. Wilson never collapses:
-18 passes in 18 runs gives [0.824, 1], not the [1, 1] a percentile bootstrap reports.
+cluster size, $n_{\text{eff}}$ is kept between the task count $T$ and the run count $N$.
+
+At 0% or 100% the clustered variance cannot be estimated: the data cannot say whether a task's
+runs agree by chance or because the task decides the outcome. So $n_{\text{eff}} = T$, the one
+value that is safe either way. Wilson never collapses: 18 passes in 18 runs over 9 tasks gives
+[0.701, 1], not the [1, 1] a percentile bootstrap reports. Counting the 18 runs instead would
+give [0.824, 1], and in simulation, when the task decides every outcome, that interval covered
+85% of the time; the task count covered 99% ([§8](#8-validation)). The same rule sets the
+boundary intervals for score and pass^k.
 
 **pass^k.** The probability that $k$ independent attempts at a task all pass, which measures
 reliability rather than average ability (Yao et al., 2024, τ-bench). Per task, the unbiased

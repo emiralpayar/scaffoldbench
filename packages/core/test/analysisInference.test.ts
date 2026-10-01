@@ -303,18 +303,19 @@ describe('clusterMeanEstimate', () => {
     expect(est.ci!.high).toBeGreaterThan(0.5);
   });
 
-  it('falls back to Wilson for a bounded metric stuck at 1 or 0', () => {
-    const top = clusterMeanEstimate([1, 1, 1, 1, 1, 1, 1, 1, 1], settings, { boundaryUnits: 18 });
+  it('falls back to Wilson over the tasks for a bounded metric stuck at 1 or 0', () => {
+    // Nine tasks: Wilson(9, 9), however many runs each task had.
+    const top = clusterMeanEstimate([1, 1, 1, 1, 1, 1, 1, 1, 1], settings, true);
     expect(top.ciMethod).toBe('wilson');
-    expect(top.ci!.low).toBeCloseTo(0.8241, 4);
+    expect(top.ci!.low).toBeCloseTo(0.7009, 4);
     expect(top.ci!.high).toBe(1);
-    const bottom = clusterMeanEstimate([0, 0, 0], settings, { boundaryUnits: 3 });
+    const bottom = clusterMeanEstimate([0, 0, 0], settings, true);
     expect(bottom.ci!.low).toBe(0);
-    expect(bottom.ci!.high).toBeGreaterThan(0.4);
+    expect(bottom.ci!.high).toBeCloseTo(0.5615, 4);
   });
 
   it('reports no interval rather than a zero-width one', () => {
-    expect(clusterMeanEstimate([0.82, 0.82, 0.82], settings, { boundaryUnits: 6 })).toEqual({
+    expect(clusterMeanEstimate([0.82, 0.82, 0.82], settings, true)).toEqual({
       value: 0.82,
       ci: null,
       ciMethod: 'none',

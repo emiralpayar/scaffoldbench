@@ -120,7 +120,8 @@ describe(`published run set ${RUN_SET}`, () => {
   it('gives the 18/18 arm a Wilson interval instead of [1, 1]', () => {
     const debate = model.strategies.find((s) => s.strategyId === 'debate-select')!;
     expect(debate.passRate.value).toBe(1);
-    expect(debate.passRate.ci!.low).toBeCloseTo(0.824, 3);
+    // Nine tasks, so Wilson(9, 9); the 18 runs alone would claim [0.824, 1].
+    expect(debate.passRate.ci!.low).toBeCloseTo(0.701, 3);
     expect(debate.score.ciMethod).toBe('wilson');
     expect(summarizeRuns(records).strategies.find((s) => s.strategyId === 'debate-select')!.score.ciLow).toBe(1);
   });

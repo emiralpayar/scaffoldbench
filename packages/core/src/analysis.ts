@@ -311,7 +311,9 @@ function armTasks(arm: ArmCells): ArmTasks {
  * Pass rate (mean over tasks of each task's pass rate) with a Wilson interval
  * on an effective sample size: n_eff = p(1 − p) / Var̂(p̂), the binomial
  * variance over the task-clustered one, kept within [tasks, runs]. At 0% or
- * 100% the clustered variance is not estimable and n_eff is the run count.
+ * 100% the clustered variance is not estimable, and n_eff is the task count:
+ * the one value that is safe however strongly a task's runs agree. Counting
+ * runs there undercovers when outcomes are mostly decided by the task.
  */
 function passRateEstimate(t: ArmTasks, alpha: number): PassRateEstimate {
   const { rates } = t;
@@ -319,9 +321,11 @@ function passRateEstimate(t: ArmTasks, alpha: number): PassRateEstimate {
   const value = rates.reduce((a, r) => a + r, 0) / tasks;
   const passed = t.passes.reduce((a, p) => a + p, 0);
   const runs = t.runs.reduce((a, r) => a + r, 0);
-  let effectiveRuns = runs;
   const clustered = tasks >= 2 ? variance(rates) / tasks : 0;
-  if (clustered > 0 && value > 0 && value < 1) {
+  let effectiveRuns = runs;
+  if (value <= 0 || value >= 1) {
+    effectiveRuns = tasks;
+  } else if (clustered > 0) {
     effectiveRuns = Math.min(runs, Math.max(tasks, (value * (1 - value)) / clustered));
   }
   return {
@@ -375,7 +379,7 @@ function summarizeArm(grid: ModelGrid, arm: ArmCells, inf: InferenceSettings): S
     t.runs.forEach((n, i) => {
       if (n >= k) values.push(passHatKOfTask(t.passes[i] as number, n, k));
     });
-    passHatK.push({ k, tasks: values.length, ...clusterMeanEstimate(values, inf, { boundaryUnits: values.length }) });
+    passHatK.push({ k, tasks: values.length, ...clusterMeanEstimate(values, inf, true) });
   }
 
   const failureModes: Record<string, number> = {};
@@ -393,7 +397,7 @@ function summarizeArm(grid: ModelGrid, arm: ArmCells, inf: InferenceSettings): S
     runs,
     tasks,
     cells: cellAccounting(grid, arm),
-    score: clusterMeanEstimate(taskMeans(arm, 'score'), inf, { boundaryUnits: runs }),
+    score: clusterMeanEstimate(taskMeans(arm, 'score'), inf, true),
     passRate: passRateEstimate(t, inf.alpha),
     passHatK,
     costUsd: clusterMeanEstimate(costs, inf),

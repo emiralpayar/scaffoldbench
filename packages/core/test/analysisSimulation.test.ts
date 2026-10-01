@@ -29,6 +29,7 @@ import {
   quantileSorted,
   resolveVerdicts,
   summarizeRuns,
+  wilsonInterval,
 } from '@arena/core';
 import type { InferenceSettings, RunRecord } from '@arena/core';
 
@@ -263,6 +264,75 @@ describe('error rates of the four-way verdict', () => {
   });
 });
 
+/** A run record carrying only what the analysis reads. */
+function simRecord(fields: {
+  strategyId: string;
+  taskId: string;
+  repeat: number;
+  passed: boolean;
+  score: number;
+  costUsd: number;
+  latencyMs: number;
+}): RunRecord {
+  return {
+    runId: `${fields.strategyId}-${fields.taskId}-${fields.repeat}`,
+    runSetId: 'sim',
+    taskTitle: '',
+    taskCategory: 'tool-use',
+    taskWorld: 'sim',
+    taskDifficulty: 'easy',
+    model: 'm',
+    effort: 'high',
+    startedAt: '',
+    finishedAt: '',
+    breakdown: [],
+    penalties: [],
+    failureMode: fields.passed ? 'none' : 'wrong_answer',
+    scoreMetadata: {},
+    judgeCostUsd: 0,
+    usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    turns: 1,
+    toolCalls: 1,
+    deniedToolCalls: 0,
+    subagentCount: 0,
+    phases: [],
+    finalText: '',
+    ...fields,
+  };
+}
+
+describe('pass-rate interval at the ceiling', () => {
+  it('covers when the task decides the outcome, where counting runs does not', () => {
+    // 9 tasks x 2 repeats; a task is solved in every run or in none, and 80%
+    // of tasks are solvable. 13% of run sets come out 18/18. Wilson over the
+    // 18 runs then says [0.824, 1] and misses 0.8; over the 9 tasks it does not.
+    const rng = makeRng(1_001);
+    const truth = 0.8;
+    let byTasks = 0;
+    let byRuns = 0;
+    const trials = trialsOr(400);
+    for (let s = 0; s < trials; s++) {
+      const records: RunRecord[] = [];
+      for (let t = 0; t < 9; t++) {
+        const passed = rng() < truth;
+        for (let repeat = 1; repeat <= 2; repeat++) {
+          records.push(
+            simRecord({ strategyId: 'single', taskId: `task-${t}`, repeat, passed, score: passed ? 1 : 0, costUsd: 0.05, latencyMs: 1_000 }),
+          );
+        }
+      }
+      const pass = analyzeRunSet(records, { iterations: 200, seed: s + 1 }).models[0]!.strategies[0]!.passRate;
+      if (pass.ci!.low <= truth && truth <= pass.ci!.high) byTasks += 1;
+      // The same interval, except that 0/18 and 18/18 count runs.
+      const atCeiling = pass.passed === 0 || pass.passed === pass.runs;
+      const runsAtCeiling = atCeiling ? wilsonInterval(pass.passed, pass.runs) : pass.ci!;
+      if (runsAtCeiling.low <= truth && truth <= runsAtCeiling.high) byRuns += 1;
+    }
+    expect(report('pass-rate coverage, task-decided 9 x 2, Wilson over tasks at the ceiling', byTasks / trials)).toBeGreaterThan(0.93);
+    expect(report('pass-rate coverage, task-decided 9 x 2, Wilson over runs at the ceiling', byRuns / trials)).toBeLessThan(0.9);
+  });
+});
+
 describe('familywise error across a leaderboard', () => {
   // Five identical strategies, 9 tasks x 2 repeats, every run passes with
   // probability 0.9 — the published run set's shape. Any verdict other than
@@ -273,37 +343,17 @@ describe('familywise error across a leaderboard', () => {
       for (let t = 0; t < 9; t++) {
         for (let repeat = 1; repeat <= 2; repeat++) {
           const passed = rng() < 0.9;
-          records.push({
-            runId: `${strategyId}-${t}-${repeat}`,
-            runSetId: 'sim',
-            taskId: `task-${t}`,
-            taskTitle: '',
-            taskCategory: 'tool-use',
-            taskWorld: 'sim',
-            taskDifficulty: 'easy',
-            strategyId,
-            model: 'm',
-            effort: 'high',
-            repeat,
-            startedAt: '',
-            finishedAt: '',
-            latencyMs: 1_000 + rng() * 100,
-            score: passed ? 1 : 0.8,
-            passed,
-            breakdown: [],
-            penalties: [],
-            failureMode: passed ? 'none' : 'wrong_answer',
-            scoreMetadata: {},
-            costUsd: 0.05 + rng() * 0.01,
-            judgeCostUsd: 0,
-            usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
-            turns: 1,
-            toolCalls: 1,
-            deniedToolCalls: 0,
-            subagentCount: 0,
-            phases: [],
-            finalText: '',
-          });
+          records.push(
+            simRecord({
+              strategyId,
+              taskId: `task-${t}`,
+              repeat,
+              latencyMs: 1_000 + rng() * 100,
+              score: passed ? 1 : 0.8,
+              passed,
+              costUsd: 0.05 + rng() * 0.01,
+            }),
+          );
         }
       }
     }
