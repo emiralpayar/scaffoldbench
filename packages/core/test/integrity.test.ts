@@ -169,11 +169,17 @@ describe('harnessChecks', () => {
     expect(check(checks, HARNESS_CHECK.mcpConnected).ok).toBe(true);
   });
 
-  it('skips the server checks for traces that never recorded what was expected', () => {
-    const trace = call({ servers: [{ name: 'claude.ai Gmail', status: 'needs-auth' }], expected: null });
-    const checks = harnessChecks({ trace, phases: [] });
+  it('judges only failed servers in traces that never recorded which were expected', () => {
+    const unknown = call({ servers: [{ name: 'claude.ai Gmail', status: 'needs-auth' }], expected: null });
+    const checks = harnessChecks({ trace: unknown, phases: [] });
     expect(check(checks, HARNESS_CHECK.mcpConnected).ok).toBe(true);
     expect(check(checks, HARNESS_CHECK.mcpHermetic).ok).toBe(true);
+
+    const failed = call({ servers: [{ name: 'airline', status: 'failed' }], expected: null });
+    expect(check(harnessChecks({ trace: failed, phases: [] }), HARNESS_CHECK.mcpConnected)).toMatchObject({
+      ok: false,
+      detail: 'main (call-1): airline failed',
+    });
   });
 
   it.each([
@@ -275,6 +281,51 @@ describe('tracedCalls', () => {
     expect(calls.map((c) => [c.callId, c.phase, c.end?.subtype, c.deniedTools])).toEqual([
       ['call-1', 'propose-1', 'success', []],
       ['call-2', 'propose-2', 'success', ['Bash']],
+    ]);
+  });
+});
+
+describe('traces from before calls carried an id', () => {
+  /** The shape of the first published run set's propose-select traces, abridged. */
+  function legacyTrace(): TraceEvent[] {
+    const e = (phase: string, rest: Omit<TraceEvent, 'seq' | 'tMs' | 'phase' | 'depth'>) =>
+      event(undefined, phase, rest);
+    const airline = (status: string) => [{ name: 'airline', status }];
+    return [
+      e('propose-1', { kind: 'phase_start' }),
+      e('propose-2', { kind: 'phase_start' }),
+      e('propose-2', { kind: 'system_init', meta: { tools: [], mcpServers: airline('failed') } }),
+      e('propose-1', {
+        kind: 'system_init',
+        meta: { tools: ['mcp__airline__get_reservation'], mcpServers: airline('connected') },
+      }),
+      e('propose-2', { kind: 'phase_end', meta: { subtype: 'success' } }),
+      e('propose-1', { kind: 'phase_end', meta: { subtype: 'success' } }),
+      e('select', { kind: 'phase_start' }),
+      e('select', {
+        kind: 'system_init',
+        meta: { tools: [STRUCTURED_OUTPUT_TOOL, 'mcp__airline__get_reservation'], mcpServers: airline('connected') },
+      }),
+      e('select', { kind: 'tool_denied', toolName: STRUCTURED_OUTPUT_TOOL }),
+      e('select', { kind: 'phase_end', meta: { subtype: 'error_max_turns' } }),
+    ];
+  }
+
+  it('sees no calls unless asked to read the trace as legacy', () => {
+    expect(tracedCalls(legacyTrace())).toEqual([]);
+    expect(tracedCalls(legacyTrace(), { legacy: true }).map((c) => c.phase)).toEqual([
+      'propose-1',
+      'propose-2',
+      'select',
+    ]);
+  });
+
+  it('finds both defects that sank the first published run set', () => {
+    const checks = harnessChecks({ trace: legacyTrace(), phases: [], legacy: true });
+
+    expect(checks.filter((c) => !c.ok).map((c) => [c.id, c.detail])).toEqual([
+      [HARNESS_CHECK.harnessTools, 'select (select#3): StructuredOutput was offered, then denied'],
+      [HARNESS_CHECK.mcpConnected, 'propose-2 (propose-2#2): airline failed'],
     ]);
   });
 });

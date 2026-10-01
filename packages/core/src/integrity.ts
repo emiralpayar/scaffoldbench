@@ -96,15 +96,40 @@ export interface TracedCall {
   deniedTools: string[];
 }
 
+export interface TracedCallOptions {
+  /**
+   * Read a trace written before events carried a `callId`, such as the first
+   * published run set's. A phase's events then belong to the call its latest
+   * `phase_start` opened, which tells concurrent calls apart because they
+   * always had distinct phase names. Off by default: in a current trace, an
+   * event without a `callId` was not written by a call.
+   */
+  legacy?: boolean;
+}
+
 /** Group a run's trace into its calls, in start order. Events with no `callId` are ignored. */
-export function tracedCalls(trace: readonly TraceEvent[]): TracedCall[] {
+export function tracedCalls(
+  trace: readonly TraceEvent[],
+  options: TracedCallOptions = {},
+): TracedCall[] {
   const calls = new Map<string, TracedCall>();
+  const openByPhase = new Map<string, string>();
+  const idOf = (event: TraceEvent): string | undefined => {
+    if (event.callId !== undefined || !options.legacy) return event.callId;
+    if (event.kind === 'phase_start') {
+      const id = `${event.phase}#${calls.size + 1}`;
+      openByPhase.set(event.phase, id);
+      return id;
+    }
+    return openByPhase.get(event.phase);
+  };
   const callFor = (event: TraceEvent): TracedCall | undefined => {
-    if (event.callId === undefined) return undefined;
-    let call = calls.get(event.callId);
+    const callId = idOf(event);
+    if (callId === undefined) return undefined;
+    let call = calls.get(callId);
     if (!call) {
-      call = { callId: event.callId, phase: event.phase, deniedTools: [] };
-      calls.set(event.callId, call);
+      call = { callId, phase: event.phase, deniedTools: [] };
+      calls.set(callId, call);
     }
     return call;
   };
@@ -143,7 +168,7 @@ export function tracedCalls(trace: readonly TraceEvent[]): TracedCall[] {
   return [...calls.values()];
 }
 
-export interface HarnessCheckInput {
+export interface HarnessCheckInput extends TracedCallOptions {
   trace: readonly TraceEvent[];
   phases: readonly PhaseRecord[];
   /** Why the run did not complete: the environment, the strategy or grading threw. */
@@ -154,7 +179,7 @@ export interface HarnessCheckInput {
 
 /** The runner's own checks on one run. See `HARNESS_CHECK` for what each verifies. */
 export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
-  const calls = tracedCalls(input.trace);
+  const calls = tracedCalls(input.trace, { legacy: input.legacy === true });
   const checks: IntegrityCheck[] = [];
   const add = (id: string, failures: readonly string[]) => {
     checks.push(failures.length === 0 ? { id, ok: true } : { id, ok: false, detail: summarize(failures) });
@@ -196,8 +221,14 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
   );
 
   const connection = calls.flatMap((call) => {
+    if (!call.init) return [];
     const expected = call.end?.mcpServersExpected;
-    if (!call.init || expected === undefined) return [];
+    if (expected === undefined) {
+      // A trace from before calls recorded the servers they were given: which
+      // servers belonged is unknown, but none should ever have failed.
+      const failed = call.init.mcpServers.filter((server) => server.status === 'failed');
+      return [{ call, notConnected: failed.map((server) => `${server.name} failed`), unexpected: [] }];
+    }
     const reported = new Map(call.init.mcpServers.map((s) => [s.name, s.status]));
     return [
       {
