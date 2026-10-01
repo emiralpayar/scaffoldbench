@@ -9,6 +9,12 @@ and latency with bootstrap confidence intervals. The tasks are held constant so 
 in the leaderboard is a difference in the *architecture* — not in the model, the prompt, the
 toolset or how carefully somebody measured.
 
+The first real run set is in. Its headline is not a winner but a ceiling: on Claude Sonnet 5 the
+nine sandbox tasks are too easy to separate the five architectures, every pairwise comparison comes
+back `inconclusive`, and the cheapest architecture does the same work at a fifth the price. That
+is reported as it stands, in [Results](#results) and [Limitations](#limitations), rather than
+dressed up as a ranking — a benchmark that cannot admit a null result is not measuring anything.
+
 ---
 
 ## What makes the measurement trustworthy
@@ -276,22 +282,79 @@ writing anything to `results/`.
 
 ## Results
 
-_No numbers are published here yet._ This table is filled in from a real run set by
-`arena report --markdown`, which writes `results/<runSetId>/REPORT.md`; the weekly benchmark
-workflow appends the same report to its job summary and commits the run set. Until a benchmark has
-actually been run against a given model, every cell stays empty — publishing invented or
-extrapolated numbers would defeat the entire point of the project.
+First real run set: **`2026-07-25T20-18-35Z-3fs5`** — five architectures over the nine sandbox
+tasks, two repeats, Claude Sonnet 5 at `effort: high`, replay fixtures. 90 of 90 runs completed in
+23 minutes for $9.11, with zero harness errors and zero sandbox-guard violations. Regenerate or
+extend it with `arena report --markdown`, which writes `results/<runSetId>/REPORT.md`.
 
-| Strategy | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
-| --- | --- | --- | --- | --- | --- |
-| `single` | — | — | — | — | — |
-| `plan-execute` | — | — | — | — | — |
-| `orchestrator-workers` | — | — | — | — | — |
-| `plan-execute-verify` | — | — | — | — | — |
-| `debate-select` | — | — | — | — | — |
+| Strategy | n | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
+| --- | --- | --- | --- | --- | --- | --- |
+| `debate-select` | 18 | 1.000 [1.000, 1.000] | 100% | $0.187 | 1m10s | 5.3 |
+| `single` | 18 | 0.990 [0.970, 1.000] | 94% | $0.050 | 22s | **19.7** |
+| `plan-execute` | 18 | 0.990 [0.970, 1.000] | 94% | $0.070 | 33s | 14.1 |
+| `plan-execute-verify` | 18 | 0.990 [0.970, 1.000] | 94% | $0.109 | 52s | 9.1 |
+| `orchestrator-workers` | 18 | 0.980 [0.950, 1.000] | 89% | $0.089 | 44s | 11.0 |
+
+**All ten pairwise comparisons come back `inconclusive`, and that is the correct answer.** The
+task set saturates: eight of the nine tasks score 1.00 for every architecture. The only cell with
+any spread is `ecommerce-hard` — whether returned units get restocked while cancelled ones do —
+and there the miss moves *within* a strategy between repeats rather than between strategies
+(`single` gets it on repeat 1 and misses on repeat 2; `plan-execute` does the reverse). That is
+noise, not an architectural difference.
+
+Read honestly: **on this task set and this model, none of the extra architectural layers earns its
+cost back.** `single` does the same work at a fifth the price of `debate-select` and in a third of
+the wall-clock time. That is a real finding, and it is simultaneously a limit of the task set
+rather than a verdict on the architectures — see [Limitations](#limitations). The remedy is harder
+tasks, not a ranking.
 
 The report also emits the per-cell matrix, the failure-mode breakdown, the pairwise verdicts
 (including every `inconclusive` one) and the score/cost Pareto frontier.
+
+---
+
+## What running it actually surfaced
+
+A benchmark harness is itself software, and six defects in this one survived a green test suite,
+a clean typecheck and a passing MCP wiring canary. None was findable without a live model. They
+are listed here because they are the most transferable thing in the repository — anyone building
+an agent harness will meet some of them.
+
+1. **The tool surface leaked, and varied by host.** `settingSources: []` was not sufficient.
+   Reading an `init` message showed the session also loading its own agent tools — `Task`, `Skill`,
+   `Workflow`, `ToolSearch`, the scheduling tools — into every run. The permission mode kept them
+   uncallable, so no result was *wrong*, but they occupied the prompt and their exact set depends
+   on the machine, so two runs of the same task were not comparable. Fixed by pinning `tools`
+   alongside `allowedTools`.
+
+2. **Exact-key replay was unusable.** A recording answers only the wording that produced it, and
+   no two runs word a search the same way. Replaying a *freshly recorded* research task missed on
+   all sixteen of its searches and scored 0.08 — a number about fixture bookkeeping, not about the
+   architecture. Fixed with corpus near-matching; the same task then scored 1.00.
+
+3. **A truncated turn discarded the whole run.** Hitting the turn cap or the budget returned an
+   error result with no text, so a dozen genuine page fetches scored zero for want of a closing
+   message. The work is in the transcript, so `runQuery` now recovers the last assistant text. A
+   truncated run is a valid data point; a silently empty one is not.
+
+4. **Resolving the repo root broke under a bundler.** `import.meta.url` at module scope took the
+   entire web build down with `must be of type string or an instance of URL. Received an instance
+   of URL` — a bundler rewrites it so the `URL` reaching `fileURLToPath` comes from another realm.
+
+5. **The live demo could have billed the operator.** Spreading `process.env` and adding a
+   visitor's key lets the SDK fall through to the host's own credentials. Confirmed on a machine
+   that has an ambient Claude Code login: before the fix an invalid key silently succeeded on the
+   host's account; after it, the same key correctly fails with a 401.
+
+6. **The CLI rejected a working credential setup.** `arena run` exited without `ANTHROPIC_API_KEY`,
+   but the SDK resolves credentials in its own order and an interactive Claude Code login is a
+   perfectly good one. It now reports which account will be billed and lets the request decide.
+
+Two mechanisms earned their keep on the first live data. The citation audit caught a genuine
+fabrication — the agent cited an MDN page it had never opened, 7 of 8 citations verified, penalty
+applied. And the sandbox traces follow the intended solution path: read the reservation, read the
+rules, fetch the passenger tier with a second call because it is deliberately absent from the
+reservation, then make two coordinated mutations with the tier bonus applied correctly.
 
 ---
 
@@ -325,6 +388,17 @@ it illustrates something worth pointing at.
 
 This is an honest list. Read it before quoting anything from this repository.
 
+- **The current task set saturates — this is the biggest limitation, and it is measured, not
+  suspected.** On the first real run set, eight of the nine sandbox tasks scored 1.00 for every
+  architecture on Claude Sonnet 5, and all ten pairwise comparisons were `inconclusive`. A
+  benchmark whose tasks everything solves cannot separate anything. The nine tasks were designed to
+  need state discovery, a rule lookup and coordinated mutations, and they do — but a current
+  frontier model clears that bar comfortably. **Do not read the present leaderboard as a ranking of
+  architectures; read it as the task set running out of headroom.** The fixes, in order of value:
+  harder tasks with more rule interactions ([docs/ADDING-A-TASK.md](docs/ADDING-A-TASK.md)); the
+  research half, which showed real variance in single runs (1.00 / 0.86 / 0.49) and has not yet
+  been put through the full matrix; and tighter `--max-cost` and turn caps, which test the
+  architectures under resource pressure and need no new code.
 - **Results are model-specific and a snapshot in time.** Everything here measures *this
   architecture on this model at this moment*. A harness that wins on one model can lose on another
   — much of what a planning phase buys is compensation for weaknesses a stronger model may not

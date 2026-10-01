@@ -179,8 +179,11 @@ Tavan etkisini kırmak için üç yol:
 
 **B + C** en hızlı gerçek sinyali verir; **A** kalıcı çözüm.
 
-Ayrıca yapılmadı: README'nin "Limitations" bölümüne bu tavan etkisi henüz
-yazılmadı — ilk gerçek koşu bulgusu olarak eklenmeli.
+README artık bu bulguyu tam olarak taşıyor: açılış paragrafında null sonucun
+kabulü, `Results` bölümünde gerçek 90 koşuluk tablo ve dürüst okuması,
+`Limitations`'ın en başında ölçülmüş tavan etkisi, ve yeni bir
+`What running it actually surfaced` bölümünde canlı koşuların ortaya çıkardığı
+altı kusur.
 
 ---
 
