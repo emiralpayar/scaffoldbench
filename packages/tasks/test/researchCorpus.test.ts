@@ -2,11 +2,22 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { FIXTURES_DIR } from '@arena/core';
-import { Bm25Index, chunkDocument } from '../src/research/bm25';
-import { CORPUS_DIRNAME, Corpus, corpusUrlKey, documentFile, sha256, type CorpusSelection } from '../src/research/corpus';
-import { CORPUS_SOURCES, LICENSES } from '../src/research/sources';
-import { writeCorpus } from './researchHelpers';
+import { FIXTURES_DIR, type ToolCall } from '@arena/core';
+import {
+  Bm25Index,
+  CORPUS_DIRNAME,
+  CORPUS_SOURCES,
+  Corpus,
+  LICENSES,
+  chunkDocument,
+  corpusUrlKey,
+  createWebTools,
+  documentFile,
+  judgedResearchSpecs,
+  sha256,
+  type CorpusSelection,
+} from '../src/research/index';
+import { callTool, writeCorpus } from './researchHelpers';
 
 const scratch: string[] = [];
 afterAll(() => {
@@ -182,6 +193,109 @@ describe('chunkDocument', () => {
 });
 
 // ---------------------------------------------------------------------------
+// web tools
+// ---------------------------------------------------------------------------
+
+describe('search tool', () => {
+  const { view } = smallCorpus();
+  const tools = createWebTools({ corpus: view });
+
+  it('returns ranked pages with title, canonical URL and a snippet around the match', async () => {
+    const reply = await callTool(tools, [], 'search', { query: 'heuristically cacheable 308' });
+    expect(reply.isError).toBe(false);
+    const first = reply.text.split('\n').slice(1, 4).join('\n');
+    expect(first).toContain('RFC 9110: HTTP Semantics');
+    expect(first).toContain('https://specs.test.org/rfc9110.html');
+    expect(first).toContain('heuristically cacheable');
+  });
+
+  it('points at the offset of the best passage in a long page', async () => {
+    const reply = await callTool(tools, [], 'search', { query: 'Balloon hashing' });
+    const offset = Number(/best match at offset (\d+)/.exec(reply.text)?.[1]);
+    expect(offset).toBeGreaterThan(1_000);
+  });
+
+  it('answers a query with no matches with an empty result, not an error', async () => {
+    const reply = await callTool(tools, [], 'search', { query: 'zebra' });
+    expect(reply).toEqual({ text: 'No results found for "zebra".', isError: false });
+  });
+
+  it('honours the limit', async () => {
+    const reply = await callTool(tools, [], 'search', { query: 'redirect cache responses', limit: 1 });
+    expect(reply.text).toMatch(/\(1 of \d+\)/);
+  });
+});
+
+describe('fetch_page tool', () => {
+  const { view } = smallCorpus();
+  const spec = view.resolve('https://specs.test.org/rfc9110.html');
+  if (!spec) throw new Error('fixture missing');
+  const tools = createWebTools({ corpus: view, pageChars: 2_000 });
+
+  it('serves exactly the requested document, under its canonical URL', async () => {
+    const reply = await callTool(tools, [], 'fetch_page', { url: 'https://specs.test.org/rfc9110.txt' });
+    expect(reply.isError).toBe(false);
+    expect(reply.text).toMatch(/^URL: https:\/\/specs\.test\.org\/rfc9110\.html\nTitle: RFC 9110: HTTP Semantics/);
+  });
+
+  it('pages through a long document without gaps or overlaps', async () => {
+    let offset = 0;
+    let read = '';
+    for (let guard = 0; guard < 50; guard++) {
+      const reply = await callTool(tools, [], 'fetch_page', { url: spec.url, offset });
+      const body = reply.text.split('\n\n').slice(1).join('\n\n').replace(/\n\n\[The page continues[\s\S]*$/, '');
+      const range = /Characters ([\d,]+)–([\d,]+) of/.exec(reply.text);
+      expect(range).not.toBeNull();
+      const end = Number(range?.[2]?.replace(/,/g, ''));
+      read += spec.text.slice(offset, end);
+      expect(spec.text.slice(offset, end).trim()).toBe(body.trim());
+      const next = /offset=(\d+)/.exec(reply.text)?.[1];
+      if (!next) break;
+      expect(Number(next)).toBe(end);
+      offset = end;
+    }
+    expect(read).toBe(spec.text);
+  });
+
+  it('returns a short page whole', async () => {
+    const reply = await callTool(tools, [], 'fetch_page', { url: 'https://specs.test.org/rfc9111.html' });
+    expect(reply.text).toContain('Full page, ');
+    expect(reply.text).not.toContain('offset=');
+  });
+
+  it('finds a phrase and points at an offset that shows it', async () => {
+    const found = await callTool(tools, [], 'fetch_page', { url: spec.url, find: 'BALLOON   hashing' });
+    const offset = Number(/offset (\d+):/.exec(found.text)?.[1]);
+    expect(spec.text.slice(offset, offset + 15)).toBe('Balloon hashing');
+    const page = await callTool(tools, [], 'fetch_page', { url: spec.url, offset });
+    expect(page.text).toContain('Balloon hashing');
+    const none = await callTool(tools, [], 'fetch_page', { url: spec.url, find: 'argon2' });
+    expect(none).toMatchObject({ isError: false });
+    expect(none.text).toContain('No occurrences of "argon2"');
+  });
+
+  it('answers an unknown URL with a 404 and a bad offset with an error', async () => {
+    const journal: ToolCall[] = [];
+    const missing = await callTool(tools, journal, 'fetch_page', { url: 'https://specs.test.org/rfc9112.html' });
+    expect(missing).toEqual({ text: 'HTTP 404 Not Found: https://specs.test.org/rfc9112.html', isError: true });
+    expect(journal[0]?.ok).toBe(false);
+    const past = await callTool(tools, journal, 'fetch_page', { url: spec.url, offset: spec.text.length });
+    expect(past.isError).toBe(true);
+    const bad = await callTool(tools, journal, 'fetch_page', { url: 'mailto:x@test.org' });
+    expect(bad.isError).toBe(true);
+  });
+
+  it('never tells the agent it is running against a fixture', async () => {
+    const replies = [
+      await callTool(tools, [], 'fetch_page', { url: 'https://nowhere.test.org/' }),
+      await callTool(tools, [], 'search', { query: 'zebra' }),
+      await callTool(tools, [], 'search', { query: '' }),
+    ];
+    for (const reply of replies) expect(reply.text).not.toMatch(/replay|record|fixture|corpus|benchmark|offline/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // the shipped corpus
 // ---------------------------------------------------------------------------
 
@@ -238,6 +352,43 @@ describe('shipped corpus integrity', () => {
       expect(notice).toContain(`### \`${document.id}\``);
       expect(notice).toContain(document.url);
       expect(notice).toContain(license?.name ?? '');
+    }
+  });
+});
+
+describe('shipped corpus sufficiency', () => {
+  const corpus = Corpus.load(path.join(FIXTURES_DIR, CORPUS_DIRNAME));
+
+  for (const spec of judgedResearchSpecs) {
+    it(`${spec.id}: every rubric claim is quotable from the task's own web`, () => {
+      const view = corpus.forTask(spec.corpus);
+      for (const item of spec.rubric) {
+        expect(item.support.length, item.id).toBeGreaterThan(0);
+        for (const support of item.support) {
+          const document = view.documents.find((candidate) => candidate.id === support.doc);
+          expect(document, `${item.id}: ${support.doc} is in the task corpus`).toBeDefined();
+          if (!document) continue;
+          expect(view.locate(document, support.quote), `${item.id}: ${support.quote}`).not.toEqual([]);
+        }
+      }
+    });
+  }
+
+  // Ranking is purely lexical — no authority or recency prior — so an obsolete
+  // RFC can outrank the current one, as it can on the real web. What has to
+  // hold is that the authoritative page is among the five results an agent
+  // sees by default.
+  it('answers natural queries with the authoritative page among the default results', () => {
+    const queries: Array<[CorpusSelection, string, string]> = [
+      [judgedResearchSpecs[0]!.corpus, '308 Permanent Redirect status code', 'rfc9110'],
+      [judgedResearchSpecs[0]!.corpus, 'heuristically cacheable redirect', 'rfc9110'],
+      [judgedResearchSpecs[1]!.corpus, 'async defer script element HTML standard', 'whatwg-html-scripting'],
+      [judgedResearchSpecs[2]!.corpus, 'OWASP password storage Argon2id', 'owasp-password-storage'],
+      [judgedResearchSpecs[2]!.corpus, 'NIST 800-63B password hashing scheme salt', 'nist-sp800-63b-4'],
+    ];
+    for (const [selection, query, expected] of queries) {
+      const top = corpus.forTask(selection).search(query).slice(0, 5).map((hit) => hit.document.id);
+      expect(top, query).toContain(expected);
     }
   });
 });

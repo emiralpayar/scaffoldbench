@@ -147,6 +147,13 @@ export interface ScoringDeps {
   judgeSamples: number;
 }
 
+/** A known way to get a task wrong, and the part of the scorer that catches it. */
+export interface TaskTrap {
+  id: string;
+  description: string;
+  caughtBy: string;
+}
+
 export interface Task {
   id: string;
   category: TaskCategory;
@@ -161,6 +168,10 @@ export interface Task {
   maxTurns: number;
   difficulty: 'easy' | 'medium' | 'hard';
   tags: string[];
+  /** Pre-registered prediction of which architecture should do best here, and why. */
+  hypothesis?: string;
+  /** Known ways to get this task wrong, each with the check that catches it. */
+  traps?: TaskTrap[];
   createEnvironment(opts: EnvironmentOptions): Promise<TaskEnvironment> | TaskEnvironment;
   score(input: ScoreInput): Promise<TaskScore>;
 }
