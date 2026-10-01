@@ -33,19 +33,26 @@ function gaussian(rng: () => number): () => number {
 
 const settings: InferenceSettings = { iterations: 1_000, seed: 0xa11ce, alpha: 0.05, minClusters: 5 };
 
-function verdictOf(diffs: number[], margin: number, binaryRepeats?: number): string {
-  const test = pairedTest(diffs, margin, settings, binaryRepeats ? { binaryRepeats: diffs.map(() => binaryRepeats) } : {});
+/** Verdict of one paired contrast given its cell differences, task by task. */
+function verdictOf(cells: number[][], margin: number, binary = false): string {
+  const diffs = cells.map((c) => c.reduce((a, d) => a + d, 0) / c.length);
+  const test = pairedTest(diffs, margin, settings, { cellDiffs: cells, binary });
   return (resolveVerdicts([test], 0.05, true)[0] as { verdict: string }).verdict;
 }
 
-/** Score-like paired differences: task effect ~ N(delta, 0.05²), run noise sd 0.15. */
-function scoreDiffs(normal: () => number, tasks: number, repeats: number, delta: number): number[] {
+/** Score-like paired cell differences: task effect ~ N(delta, 0.05²), run noise sd 0.15. */
+function scoreCells(normal: () => number, tasks: number, repeats: number, delta: number): number[][] {
   return Array.from({ length: tasks }, () => {
     const effect = delta + 0.05 * normal();
-    let total = 0;
-    for (let r = 0; r < repeats; r++) total += effect + 0.15 * normal();
-    return total / repeats;
+    return Array.from({ length: repeats }, () => effect + 0.15 * normal());
   });
+}
+
+/** Lumpy differences at the margin: A always scores 1, B loses `penalty` with probability 0.05 / penalty. */
+function lumpyCells(rng: () => number, tasks: number, repeats: number, penalty: number): number[][] {
+  return Array.from({ length: tasks }, () =>
+    Array.from({ length: repeats }, () => (rng() < 0.05 / penalty ? penalty : 0)),
+  );
 }
 
 describe('interval coverage', () => {
@@ -111,7 +118,7 @@ describe('error rates of the four-way verdict', () => {
     let falsePositives = 0;
     const trials = 300;
     for (let s = 0; s < trials; s++) {
-      const v = verdictOf(scoreDiffs(normal, 20, 3, 0), 0.05);
+      const v = verdictOf(scoreCells(normal, 20, 3, 0), 0.05);
       if (v === 'better' || v === 'worse') falsePositives += 1;
     }
     expect(falsePositives / trials).toBeLessThan(0.08);
@@ -122,31 +129,36 @@ describe('error rates of the four-way verdict', () => {
     let falseEquivalence = 0;
     const trials = 300;
     for (let s = 0; s < trials; s++) {
-      if (verdictOf(scoreDiffs(normal, 20, 3, 0.05), 0.05) === 'equivalent') falseEquivalence += 1;
+      if (verdictOf(scoreCells(normal, 20, 3, 0.05), 0.05) === 'equivalent') falseEquivalence += 1;
     }
     expect(falseEquivalence / trials).toBeLessThan(0.08);
   });
 
-  it('holds that line for pass/fail data with rare failures, thanks to the variance floor', () => {
-    // A always passes; B fails 5% of runs: the true gap is exactly the margin.
+  it('holds that line when differences are rare and lumpy', () => {
+    // The true gap equals the margin, but it arrives as rare large jumps — the
+    // case where a bootstrap sees too little spread. Pass/fail (penalty 1, with
+    // the binary floor) at 60 tasks, and partial-credit score penalties of
+    // 0.5 at 30 tasks and 0.25 at 9 x 2 (the published run set's shape).
     const rng = makeRng(606);
-    const trial = () =>
-      Array.from({ length: 40 }, () => {
-        let fails = 0;
-        for (let r = 0; r < 3; r++) if (rng() < 0.05) fails += 1;
-        return fails / 3;
-      });
-    let floored = 0;
     const trials = 300;
-    for (let s = 0; s < trials; s++) if (verdictOf(trial(), 0.05, 3) === 'equivalent') floored += 1;
-    expect(floored / trials).toBeLessThan(0.08);
+    for (const [penalty, tasks, repeats] of [
+      [1, 60, 3],
+      [0.5, 30, 3],
+      [0.25, 9, 2],
+    ] as const) {
+      let falseEquivalence = 0;
+      for (let s = 0; s < trials; s++) {
+        if (verdictOf(lumpyCells(rng, tasks, repeats, penalty), 0.05, penalty === 1) === 'equivalent') falseEquivalence += 1;
+      }
+      expect(falseEquivalence / trials).toBeLessThan(0.08);
+    }
   });
 
   it('detects a 10-point effect on 20 tasks most of the time', () => {
     const normal = gaussian(makeRng(707));
     let detected = 0;
     const trials = 100;
-    for (let s = 0; s < trials; s++) if (verdictOf(scoreDiffs(normal, 20, 3, 0.1), 0.05) === 'better') detected += 1;
+    for (let s = 0; s < trials; s++) if (verdictOf(scoreCells(normal, 20, 3, 0.1), 0.05) === 'better') detected += 1;
     expect(detected / trials).toBeGreaterThan(0.8);
   });
 });

@@ -206,25 +206,41 @@ describe('pairedTest', () => {
     expect(test.pEquivalence).toBeLessThan(0.01);
   });
 
+  it('needs enough tasks that differed at all before it calls equivalence', () => {
+    // Nine tasks, one of which differed (the published run set's score
+    // contrasts look like this). Its spread comes from one value.
+    const cellDiffs = Array.from({ length: 9 }, (_, i) => (i === 0 ? [0.18, 0] : [0, 0]));
+    const diffs = cellDiffs.map((c) => (c[0]! + c[1]!) / 2);
+    const test = pairedTest(diffs, 0.05, settings, { cellDiffs });
+    expect(test.caveat).toBe('few-informative-tasks');
+    expect(test.pEquivalence).toBe(1);
+    // A task whose repeats cancel out still counts as having differed.
+    const cancelling = Array.from({ length: 6 }, () => [0.1, -0.1]);
+    const counted = pairedTest([0, 0, 0, 0, 0, 0.01], 0.05, settings, { cellDiffs: [...cancelling.slice(0, 5), [0.02, 0]] });
+    expect(counted.caveat).toBeUndefined();
+  });
+
   it('holds a pass/fail equivalence test to the binary variance floor', () => {
-    // 25 tasks x 3 repeats with a single discordant run. The bootstrap reads
-    // that as equivalence within 5 points, but if the true gap were 5 points
-    // the floor says SE >= sqrt(0.05 * 0.95 / 3 / 25) = 0.0252, and
-    // (0.0133 - 0.05) / 0.0252 = -1.46 is not far enough below the margin.
-    const diffs = Array.from({ length: 25 }, (_, i) => (i === 0 ? 1 / 3 : 0));
-    const free = pairedTest(diffs, 0.05, settings);
-    const floored = pairedTest(diffs, 0.05, settings, { binaryRepeats: diffs.map(() => 3) });
+    // 60 tasks x 3 repeats, five discordant runs. The bootstrap reads that as
+    // equivalence within 5 points; but a true 5-point gap would give
+    // SE >= sqrt(0.05 * 0.95 / 3 / 60) = 0.0162, and
+    // (0.0278 - 0.05) / 0.0162 = -1.37 is not far enough below the margin.
+    const cellDiffs = Array.from({ length: 60 }, (_, i) => (i < 5 ? [1, 0, 0] : [0, 0, 0]));
+    const diffs = cellDiffs.map((c) => (c[0]! + c[1]! + c[2]!) / 3);
+    const free = pairedTest(diffs, 0.05, settings, { cellDiffs });
+    const floored = pairedTest(diffs, 0.05, settings, { cellDiffs, binary: true });
     expect(free.pEquivalence).toBeLessThan(0.05);
     expect(floored.pEquivalence).toBeGreaterThan(0.05);
-    expect(floored.pEquivalence).toBeCloseTo(0.0787, 3);
+    expect(floored.pEquivalence).toBeCloseTo(0.0883, 3);
     expect(floored.pDifference).toBe(free.pDifference);
   });
 
   it('lets a pass/fail equivalence through when the floor is cleared', () => {
-    // 40 tasks x 3: a true 5-point gap would show at least 6 discordant runs
-    // on average; one is evidence of equivalence, floor or not.
-    const diffs = Array.from({ length: 40 }, (_, i) => (i === 0 ? 1 / 3 : 0));
-    const floored = pairedTest(diffs, 0.05, settings, { binaryRepeats: diffs.map(() => 3) });
+    // 100 tasks x 3: a true 5-point gap would show about 15 discordant runs;
+    // five is evidence of equivalence, floor or not.
+    const cellDiffs = Array.from({ length: 100 }, (_, i) => (i < 5 ? [1, 0, 0] : [0, 0, 0]));
+    const diffs = cellDiffs.map((c) => (c[0]! + c[1]! + c[2]!) / 3);
+    const floored = pairedTest(diffs, 0.05, settings, { cellDiffs, binary: true });
     expect(floored.pEquivalence).toBeLessThan(0.05);
   });
 

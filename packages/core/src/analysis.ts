@@ -456,7 +456,7 @@ class PairedTestCache {
     const margin = this.settings.margins[metric];
     const onScale = metricScale(metric) === 'ratio' ? Math.log(margin) : margin;
     // Pass/fail differences get the binary variance floor on their equivalence test.
-    const options = metric === 'pass' ? { binaryRepeats: diffs.cellDiffs.map((c) => c.length) } : {};
+    const options = { cellDiffs: diffs.cellDiffs, binary: metric === 'pass' };
     return { test: pairedTest(diffs.taskDiffs, onScale, this.inf, options), cells: diffs.cells };
   }
 }

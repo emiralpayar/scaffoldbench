@@ -31,8 +31,12 @@ export interface InferenceSettings {
 
 export type ContrastVerdict = 'better' | 'worse' | 'equivalent' | 'inconclusive';
 
-/** Why a contrast was not tested, when it was not. */
-export type ContrastCaveat = 'too-few-tasks' | 'no-variation';
+/**
+ * Why a contrast could not reach a verdict, when the data decided that:
+ * fewer tasks than the minimum; every task moved by the same amount; or
+ * fewer tasks than the minimum on which the two arms differed at all.
+ */
+export type ContrastCaveat = 'too-few-tasks' | 'no-variation' | 'few-informative-tasks';
 
 /** A point estimate with its interval and how the interval was obtained. */
 export interface Estimate {
@@ -349,15 +353,21 @@ export interface PairedTest {
 
 export interface PairedTestOptions {
   /**
-   * Set for a pass/fail metric: the paired repeats behind each task's
-   * difference. A run-level difference of two pass/fail outcomes lies in
-   * {−1, 0, 1}, so if the true mean difference were ±m its variance would be
-   * at least m(1 − m), and Var(estimate) ≥ m(1 − m)·mean(1/rₜ)/T. The
-   * equivalence test then also has to pass a t-test whose variance is held
-   * at that floor — which is what stops a run set that happened to see no
-   * failures from being read as proof that none would happen.
+   * The paired cell differences behind each task's difference, in the order
+   * of `taskDiffs`. Used to count tasks where any repeat differed, and the
+   * repeats per task for the binary floor. Without them a task counts as
+   * informative when its mean difference is non-zero.
    */
-  binaryRepeats?: readonly number[];
+  cellDiffs?: readonly (readonly number[])[];
+  /**
+   * The metric is pass/fail. A run-level difference of two pass/fail outcomes
+   * lies in {−1, 0, 1}, so if the true mean difference were ±m its variance
+   * would be at least m(1 − m), and Var(estimate) ≥ m(1 − m)·mean(1/rₜ)/T.
+   * The equivalence test then also has to pass a t-test whose variance is
+   * held at that floor — which stops a run set that happened to see almost no
+   * failures from being read as proof that failures are rare.
+   */
+  binary?: boolean;
 }
 
 /**
@@ -369,6 +379,13 @@ export interface PairedTestOptions {
  * under exchangeability; requiring it as well guards the bootstrap where it
  * is weakest — few tasks, most of them tied. Taking the larger of valid
  * p-values keeps the test valid; it only costs power.
+ *
+ * Equivalence also needs `minClusters` informative tasks (tasks where the
+ * arms differed in some repeat). The spread of the difference is learned
+ * only from those; from a handful of lumpy differences the bootstrap
+ * understates it and calls equivalence too readily. The difference test
+ * needs no such rule: with k informative tasks the sign-flip p is at least
+ * 2/2^k, so it cannot reject below six of them at α = 0.05.
  */
 export function pairedTest(
   taskDiffs: readonly number[],
@@ -406,19 +423,27 @@ export function pairedTest(
     return { tasks, estimate, ci, pDifference: 1, pEquivalence: 1, caveat: 'no-variation' };
   }
 
+  const cells = options.cellDiffs?.length === tasks ? options.cellDiffs : undefined;
+  const informative = cells
+    ? cells.filter((c) => c.some((d) => Math.abs(d) > tolerance)).length
+    : taskDiffs.filter((d) => Math.abs(d) > tolerance).length;
+
   const flips = signFlipTest(taskDiffs, margin, settings.iterations, settings.seed);
   const atZero = bootstrapPValues(replicates, 0, tasks, tolerance);
-  const atLower = bootstrapPValues(replicates, -margin, tasks, tolerance);
-  const atUpper = bootstrapPValues(replicates, margin, tasks, tolerance);
-
   const pBootstrapDiff = Math.min(1, 2 * Math.min(atZero.greater, atZero.less));
   const pDifference = Math.max(pBootstrapDiff, flips.twoSided);
+  if (informative < minClusters) {
+    return { tasks, estimate, ci, pDifference, pEquivalence: 1, caveat: 'few-informative-tasks' };
+  }
+
+  const atLower = bootstrapPValues(replicates, -margin, tasks, tolerance);
+  const atUpper = bootstrapPValues(replicates, margin, tasks, tolerance);
   let pAboveLower = Math.max(atLower.greater, flips.aboveLower);
   let pBelowUpper = Math.max(atUpper.less, flips.belowUpper);
 
-  if (options.binaryRepeats && options.binaryRepeats.length === tasks) {
-    const meanInverseRepeats =
-      options.binaryRepeats.reduce((acc, r) => acc + 1 / Math.max(1, r), 0) / tasks;
+  if (options.binary) {
+    const repeats = cells ? cells.map((c) => c.length) : taskDiffs.map(() => 1);
+    const meanInverseRepeats = repeats.reduce((acc, r) => acc + 1 / Math.max(1, r), 0) / tasks;
     const floor = (margin * (1 - margin) * meanInverseRepeats) / tasks;
     let ss = 0;
     for (const d of taskDiffs) ss += (d - estimate) ** 2;
