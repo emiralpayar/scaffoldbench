@@ -338,6 +338,18 @@ function stockRose(world: EcommerceOpsWorld, changes: Record<string, number>): b
 const lineStatus = (world: EcommerceOpsWorld, orderId: string, lineId: string) =>
   orderOrThrow(world, orderId).lines.find((entry) => entry.id === lineId)?.status;
 
+/**
+ * O-6112's monitor back on the shelf. The only other monitor a run can
+ * cancel is O-6106's, the withdrawn cancellation, which has a rule of its
+ * own: putting that one back too must not read as a mistake on this order.
+ */
+function monitorRestocked(world: EcommerceOpsWorld): boolean {
+  const seed = createInboxWorld();
+  const rose = (findProduct(world, 'P-MON')?.stock ?? 0) - (findProduct(seed, 'P-MON')?.stock ?? 0);
+  const withdrawn = lineStatus(world, 'O-6106', 'L2') === 'cancelled' ? 1 : 0;
+  return rose === 1 || rose === 1 + withdrawn;
+}
+
 const replied = (id: string): AssertionSpec<EcommerceOpsWorld> => ({
   id: `replied:${id}`,
   label: `${id} answered`,
@@ -574,7 +586,7 @@ export const ecommerceInboxSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
         lineStatus(world, 'O-6112', 'L2') === 'cancelled' &&
         lineStatus(world, 'O-6112', 'L1') === 'shipped' &&
         refundedCard(world, 'O-6112', ['L2']) &&
-        stockRose(world, { 'P-MON': 1 }),
+        monitorRestocked(world),
     },
     replied('M-809'),
     {

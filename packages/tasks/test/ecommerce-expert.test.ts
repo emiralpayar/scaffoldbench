@@ -787,6 +787,20 @@ describe('ecommerce-inbox-triage', () => {
     expect(firedTraps(ecommerceInboxTask, result)).toEqual(['withdrawn-cancellation']);
   });
 
+  it('trap withdrawn-cancellation: carrying the cancellation through in full fires that trap alone', async () => {
+    // Cancelling the monitor, refunding it and putting it back on the shelf is
+    // the whole naive path; the extra monitor in stock must not read as a
+    // mistake on Nadia's order, which also restocks one.
+    const d = drive(ecommerceInboxSpec);
+    await solve(d, { cancelMonitorFirst: true });
+    await d.call('refund_order', { orderId: 'O-6106', lineIds: ['L2'], amountCents: 32_900, method: 'card' });
+    await d.call('restock_item', { productId: 'P-MON', quantity: 1, orderId: 'O-6106' });
+    const result = await score(ecommerceInboxTask, d);
+    expect(penaltyIds(result)).toEqual(['withdrawn-cancellation']);
+    expect(missed(result)).toEqual(['kept:O-6106']);
+    expect(firedTraps(ecommerceInboxTask, result)).toEqual(['withdrawn-cancellation']);
+  });
+
   it('trap superseded-address: the uncorrected postcode is caught', async () => {
     const d = drive(ecommerceInboxSpec);
     await solve(d, { firstAddressOnly: true });
