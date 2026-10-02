@@ -56,6 +56,8 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
   // -- What to run ----------------------------------------------------------
   let args = input;
   let resumeNotes: string[] = [];
+  // What the run set had spent before this session, so the session's own spend can be told apart.
+  let earlierUsd = 0;
   if (input.resume !== undefined) {
     const id = input.resume;
     const records = await listJsonFiles(runsDir(id, resultsRoot));
@@ -79,6 +81,7 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
     }
     args = resumed.args;
     resumeNotes = resumed.notes;
+    if (manifest) earlierUsd = runSetSpend(manifest);
   } else if (args.runSetId !== undefined && args.persist) {
     const existing = await listJsonFiles(runsDir(args.runSetId, resultsRoot));
     if (existing.length > 0) {
@@ -242,13 +245,26 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
 
   // -- After ----------------------------------------------------------------
   const manifest = result.manifest;
-  const spent = manifest.totalCostUsd + manifest.totalJudgeCostUsd + (manifest.totalDiscardedCostUsd ?? 0);
+  const runSetUsd = runSetSpend(manifest);
+  const sessionUsd = Math.max(0, runSetUsd - earlierUsd);
+  const apiErrors = result.records.filter((record) => record.failureMode === 'api_error').length;
+  // Runs that lost a call to the API measured nothing: they are neither scores nor failures of an architecture.
+  const nothingMeasured = result.records.length > 0 && apiErrors === result.records.length;
+  const discardedUsd = manifest.totalDiscardedCostUsd ?? 0;
   err('');
   err(
-    `${manifest.status === 'complete' ? style.ok('Finished') : style.warn('Stopped')}: ` +
-      `${plural(result.records.length, 'run')} recorded in ${formatDuration(Date.now() - started)} this session · ` +
-      `run set ${manifest.completedRuns} of ${manifest.totalRuns} · spent ${formatUsd(spent)}` +
-      ((manifest.totalDiscardedCostUsd ?? 0) > 0 ? style.dim(` (${formatUsd(manifest.totalDiscardedCostUsd ?? 0)} on discarded attempts)`) : ''),
+    [
+      `${manifest.status === 'complete' ? style.ok('Finished') : style.warn('Stopped')}: ` +
+        `${plural(result.records.length, 'run')} recorded` +
+        (apiErrors > 0 ? style.bad(` (${apiErrors === result.records.length ? 'all' : apiErrors} hit an API error)`) : '') +
+        ` in ${formatDuration(Date.now() - started)} this session`,
+      `run set ${manifest.completedRuns} of ${manifest.totalRuns}`,
+      // A resumed run set has spent more than this session did: say which is which.
+      // (The discarded share is the run set's, so it is only this session's when nothing came before.)
+      `spent ${formatUsd(sessionUsd)} this session` +
+        (earlierUsd > 0 ? `, ${formatUsd(runSetUsd)} on the run set` : '') +
+        (earlierUsd === 0 && discardedUsd > 0 ? style.dim(` (${formatUsd(discardedUsd)} of it on discarded attempts)`) : ''),
+    ].join(' · '),
   );
 
   if (result.records.length > 0 || args.resume !== undefined) {
@@ -271,7 +287,25 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
     if (manifest.stoppedBy === 'signal' || manifest.stoppedBy === 'drain') return EXIT_INTERRUPTED;
     return EXIT_STOPPED_EARLY;
   }
+  if (nothingMeasured) {
+    err(style.bad('Nothing was measured: every run hit an API error. Check the model id and the credentials above.'));
+    if (args.persist) err(`Run them again with: arena run --resume ${runSetId}`);
+    return 1;
+  }
+  if (apiErrors > 0 && args.persist) {
+    err(
+      style.warn(
+        `${plural(apiErrors, 'run')} hit an API error and ${apiErrors === 1 ? 'was' : 'were'} not scored. ` +
+          `Run ${apiErrors === 1 ? 'it' : 'them'} again with: arena run --resume ${runSetId}`,
+      ),
+    );
+  }
   return result.records.length > 0 ? 0 : 1;
+}
+
+/** Everything a run set has spent, as its manifest adds it up. */
+function runSetSpend(manifest: RunSetManifest): number {
+  return manifest.totalCostUsd + manifest.totalJudgeCostUsd + (manifest.totalDiscardedCostUsd ?? 0);
 }
 
 /** The stored records of a run set, by cell key, for drawing what earlier sessions finished. */

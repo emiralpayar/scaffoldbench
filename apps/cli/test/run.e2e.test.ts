@@ -78,6 +78,7 @@ describe('arena run', () => {
     expect(log).toMatch(/Stopping: no new runs will start; 1 in flight will finish/);
     expect(log).toMatch(/\[1\/4\] [●◑✗] claude-haiku-4-5-20251001__single__airline-easy__r1/);
     expect(log).toMatch(/Resume with: arena run --resume e2e-1/);
+    expect(log).toMatch(/Stopped: 1 run recorded in \S+ this session · run set 1 of 4 · spent \$0\.010 this session/);
 
     const stopped = await readJson<RunSetManifest>(manifestPath('e2e-1', root));
     expect(stopped).toMatchObject({ status: 'interrupted', stoppedBy: 'drain', completedRuns: 1, totalRuns: 4 });
@@ -90,6 +91,8 @@ describe('arena run', () => {
     expect(resumed).toBe(0);
     expect(second.stderrText()).toMatch(/1 already recorded, 3 to run/);
     expect(second.stderrText()).not.toMatch(/\[\d\/4\] .*__airline-easy__r1 /);
+    // The second session says what it spent, apart from what the run set had spent before it.
+    expect(second.stderrText()).toMatch(/spent \$0\.030 this session, \$0\.040 on the run set/);
     const complete = await readJson<RunSetManifest>(manifestPath('e2e-1', root));
     expect(complete).toMatchObject({ status: 'complete', completedRuns: 4, totalRuns: 4 });
     expect(complete.previousSessions).toHaveLength(1);
@@ -140,6 +143,44 @@ describe('arena run', () => {
     expect(text).toMatch(/tried up to 3 times, each attempt with a cap of its own/);
     expect(text).toMatch(/Dry run: nothing was started\./);
     expect(await listJsonFiles(runsDir('anything', root))).toHaveLength(0);
+  });
+
+  it('exits 1 and says so when every run hit an API error, since nothing was measured', async () => {
+    // What a mistyped model id looks like: the API refuses every call, for free.
+    setScript(async function* () {
+      yield success({ isError: true, apiErrorStatus: 404, text: 'There is an issue with the selected model', costUsd: 0 });
+    });
+    const run = fakeContext();
+    const code = await runCommand(args(...MATRIX, '--run-set', 'e2e-api', '--plain'), run.ctx);
+
+    expect(code).toBe(1);
+    const log = run.stderrText();
+    expect(log).toMatch(/Finished: 4 runs recorded \(all hit an API error\)/);
+    expect(log).toMatch(/Nothing was measured: every run hit an API error/);
+    expect(log).toMatch(/Run them again with: arena run --resume e2e-api/);
+    // They are recorded, but a resume runs them again instead of keeping them.
+    const resumed = fakeContext();
+    expect(await runCommand(args('--resume', 'e2e-api', '--dry-run'), resumed.ctx)).toBe(0);
+    expect(resumed.stderrText()).toMatch(/= 4 runs\n/);
+    expect(resumed.stderrText()).not.toMatch(/already recorded/);
+  });
+
+  it('exits 0 but names the runs that hit an API error when only some did', async () => {
+    let calls = 0;
+    setScript(async function* () {
+      calls += 1;
+      if (calls === 1) {
+        yield success({ isError: true, apiErrorStatus: 404, text: 'There is an issue with the selected model', costUsd: 0 });
+      } else {
+        yield success({ text: 'done', costUsd: 0.01 });
+      }
+    });
+    const run = fakeContext();
+    const code = await runCommand(args(...MATRIX, '--run-set', 'e2e-some', '--plain'), run.ctx);
+
+    expect(code).toBe(0);
+    expect(run.stderrText()).toMatch(/Finished: 4 runs recorded \(1 hit an API error\)/);
+    expect(run.stderrText()).toMatch(/1 run hit an API error and was not scored\. Run it again with: arena run --resume e2e-some/);
   });
 
   it('draws the live grid on a terminal and gives the cursor back', async () => {

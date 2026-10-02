@@ -276,7 +276,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     ],
     notes: [
       'Ctrl-C once stops starting runs and lets the runs in flight finish and be recorded; Ctrl-C again aborts them. Either way the manifest says the run set was interrupted, and --resume picks it up.',
-      'Exit status: 0 every cell ran · 1 usage or setup error, or no run recorded · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "arena report --strict" is the gate for that.',
+      'Exit status: 0 every cell ran · 1 usage or setup error, no run recorded, or nothing measured (every run hit an API error) · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "arena report --strict" is the gate for that.',
     ],
   },
   {
