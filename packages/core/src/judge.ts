@@ -155,7 +155,12 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
 
     const value = report.structured ?? parseLooseJson(report.text);
     if (value === undefined || value === null) {
-      throw new JudgeError('judge returned no parsable structured output', { costUsd });
+      // A grader that ran out of room or refused gave no verdict either, but
+      // say which: it is not a malformed reply, and not an API failure.
+      const why = report.modelStop
+        ? `judge could not finish (${report.modelStop.reason}): ${report.modelStop.message}`
+        : 'judge returned no parsable structured output';
+      throw new JudgeError(why, { costUsd });
     }
     return { value: value as T, costUsd };
   };

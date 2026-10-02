@@ -116,6 +116,33 @@ describe('createJudge', () => {
     expect(error.costUsd).toBe(0.003);
   });
 
+  it('says when the grader refused rather than failing at the API', async () => {
+    const notice = "API Error: Haiku 4.5's safeguards flagged this message.";
+    setScript(async function* () {
+      yield {
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'invalid_request',
+        message: {
+          id: 'msg_refusal',
+          model: '<synthetic>',
+          content: [{ type: 'text', text: notice }],
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+          usage: {},
+        },
+      };
+      yield success({ text: notice, isError: true, costUsd: 0.001 });
+    });
+
+    const error = (await createJudge({ model: MODEL })(REQUEST).catch((e: unknown) => e)) as JudgeError;
+
+    expect(error).toBeInstanceOf(JudgeError);
+    expect(error.apiError).toBeUndefined();
+    expect(error.message).toMatch(/^judge could not finish \(refusal\): Haiku 4\.5's safeguards/);
+    expect(error.costUsd).toBe(0.001);
+  });
+
   it('distinguishes a reply it cannot parse from an outage', async () => {
     setScript(async function* () {
       yield success({ text: 'I think it is met.', costUsd: 0.004 });
