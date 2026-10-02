@@ -65,6 +65,8 @@ describe('support expert tier', () => {
   it('keeps the handbook free of record ids and of the runbook it defers to', () => {
     expect(SUPPORT_OPS_HANDBOOK).not.toMatch(/T-\d{4}|E-\d{3}|U-\d{3}|AR-\d+|KB-\d+|INC-\d+/);
     expect(SUPPORT_OPS_HANDBOOK).not.toMatch(/30 days|7 days|right now/i);
+    // It says separation of duties exists, never which systems it pairs.
+    expect(SUPPORT_OPS_HANDBOOK).not.toMatch(/payroll-prod|bank-payments/);
   });
 
   it('gives every task the full ops toolset, with reads marked read-only', async () => {
