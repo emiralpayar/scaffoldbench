@@ -295,7 +295,7 @@ export function renderPairwiseGrid(
 
   const cell = (text: string) => padEnd(text, columnWidth);
   const lines = [
-    `  ${' '.repeat(labelWidth)}  ${ids.map((id) => style.dim(cell(header(id)))).join('')}`.trimEnd(),
+    `  ${' '.repeat(labelWidth)}  ${ids.map((id) => cell(style.dim(header(id)))).join('')}`.trimEnd(),
   ];
   for (const row of ids) {
     const cells = ids.map((column) =>

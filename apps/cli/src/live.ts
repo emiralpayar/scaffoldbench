@@ -55,7 +55,11 @@ export interface LiveState {
   coordinates: Map<string, MatrixCell>;
   /** Cells this session runs. */
   total: number;
-  /** Of those, cells that have finished one way or another. */
+  /**
+   * Of those, cells that ended with a record, or with a runner error. Cells
+   * a stop cut off are in `discarded` instead: they have no record and run
+   * again on --resume, so they are not progress.
+   */
   finished: number;
   counts: Record<Outcome, number>;
   retries: number;
@@ -159,12 +163,14 @@ export function applyRunnerEvent(state: LiveState, event: RunnerEvent, now: numb
       }
       return;
     }
-    case 'run-interrupted':
+    case 'run-interrupted': {
       state.cells.set(event.runId, { kind: 'discarded' });
+      // The run is gone but what its finished calls spent is not.
+      state.settledUsd += state.inFlight.get(event.runId)?.costUsd ?? 0;
       state.inFlight.delete(event.runId);
-      state.finished += 1;
       state.discarded += 1;
       return;
+    }
     case 'run-error':
       state.cells.set(event.runId, { kind: 'error' });
       state.inFlight.delete(event.runId);

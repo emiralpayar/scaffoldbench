@@ -89,11 +89,24 @@ describe('live state', () => {
     finish(state, b, { integrity: { ok: false, checks: [{ id: 'harness.mcp-connected', ok: false }] } }, T0);
     applyRunnerEvent(state, { type: 'run-interrupted', runId: c }, T0);
 
-    expect(state).toMatchObject({ retries: 1, discarded: 1, finished: 3 });
+    expect(state).toMatchObject({ retries: 1, discarded: 1, finished: 2 });
     expect(state.counts).toMatchObject({ api_error: 1, integrity: 1 });
     expect(state.notices.join('\n')).toMatch(/attempt 1 failed at the API \(overloaded 529: busy\); retrying in 6\.0s/);
     expect(state.notices.join('\n')).toMatch(/integrity failed \(harness\.mcp-connected\)/);
     expect(state.notices).toHaveLength(3);
+  });
+
+  it('keeps what a discarded run had already spent, and does not call it progress', () => {
+    const state = setup();
+    const runId = id('single', 'airline-easy', 1);
+    applyRunnerEvent(state, { type: 'run-start', runId, index: 0, total: 8 }, T0);
+    applyTraceEvent(state, runId, { seq: 1, tMs: 0, phase: 'agent', depth: 0, kind: 'phase_start' });
+    applyTraceEvent(state, runId, { seq: 2, tMs: 1, phase: 'agent', depth: 0, kind: 'phase_end', costUsd: 0.026 });
+    applyRunnerEvent(state, { type: 'run-interrupted', runId }, T0 + 5_000);
+
+    expect(state).toMatchObject({ finished: 0, discarded: 1 });
+    expect(spentSoFar(state)).toBeCloseTo(0.026);
+    expect(state.inFlight.size).toBe(0);
   });
 
   it('counts runs that had a call end on a model stop, and shows the count only once there is one', () => {

@@ -195,6 +195,11 @@ describe('spend', () => {
     expect(ceilingText(input, plan)).toBe('$5.00  10 runs × $0.50 cap');
   });
 
+  it('says "1 run", not "1 runs"', () => {
+    const input = { runs: 1, gradedRuns: 1, maxCostUsd: 0.5, totalBudgetUsd: 0.5, concurrency: 4, judgeSamples: 3 };
+    expect(ceilingText(input, spendPlan(input))).toBe('$2.00  1 run × $0.50 cap + grading of up to 1 run in flight (3 × $0.50 each)');
+  });
+
   it('adds the grading of the runs still in flight once the budget binds', () => {
     const input = { runs: 180, gradedRuns: 36, maxCostUsd: 1, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3 };
     const plan = spendPlan(input);

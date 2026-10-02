@@ -186,3 +186,11 @@ describe('small pieces', () => {
     expect(abbreviationLegend(short)).toBe('S single · PE1 plan-execute · PE2 propose-execute · PEV plan-execute-verify');
   });
 });
+
+describe('trailing padding', () => {
+  it('leaves no spaces after the last column of a coloured pairwise grid', () => {
+    const style = createStyle(true);
+    const lines = renderPairwiseGrid(['a', 'bb'], [{ a: 'a', b: 'bb', verdict: 'better' }], { style });
+    for (const line of lines) expect(line, JSON.stringify(line)).not.toMatch(/ +(\u001b\[\d+m)*$/);
+  });
+});

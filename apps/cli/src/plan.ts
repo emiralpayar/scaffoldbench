@@ -10,7 +10,7 @@ import { cellKey, makeRunId } from '@arena/core';
 import type { CellCoordinates, EffortLevel, FixtureMode, RunSetManifest } from '@arena/core';
 
 import type { MeasurementSetting, RunArgs } from './args';
-import { formatBudget, formatDuration, formatUsd } from './format';
+import { formatBudget, formatDuration, plural } from './format';
 
 /** Most a single grading call may spend; passed to `createJudge` so the plan and the cap agree. */
 export const JUDGE_CALL_CAP_USD = 0.5;
@@ -199,17 +199,17 @@ export function spendPlan(input: SpendInput): SpendPlan {
 export function ceilingText(input: SpendInput, plan: SpendPlan): string {
   const parts: string[] = [];
   if (input.runs * input.maxCostUsd <= input.totalBudgetUsd) {
-    parts.push(`${input.runs} runs × ${formatBudget(input.maxCostUsd)} cap`);
+    parts.push(`${plural(input.runs, 'run')} × ${formatBudget(input.maxCostUsd)} cap`);
   } else {
     parts.push(`total budget ${formatBudget(input.totalBudgetUsd)}`);
   }
   if (plan.judgeCapPerRun > 0) {
     parts.push(
-      `grading of up to ${Math.min(plan.maxInFlight, input.gradedRuns)} runs in flight ` +
+      `grading of up to ${plural(Math.min(plan.maxInFlight, input.gradedRuns), 'run')} in flight ` +
         `(${input.judgeSamples} × ${formatBudget(JUDGE_CALL_CAP_USD)} each)`,
     );
   }
-  return `${formatUsd(plan.ceiling)}  ${parts.join(' + ')}`;
+  return `${formatBudget(plan.ceiling)}  ${parts.join(' + ')}`;
 }
 
 /** "4m00s per run" style summary of the per-run caps. */
