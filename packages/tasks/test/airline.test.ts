@@ -185,6 +185,14 @@ describe('airline tool error handling', () => {
     expect(cancelled).not.toMatch(/issue_refund|record_non_refundable|fare paid/i);
   });
 
+  it('says the service fee comes off what is returned rather than as a separate charge', async () => {
+    // A refund of the whole fare plus a cancellation_service_fee entry nets
+    // the same, but every scorer expects one entry for the net amount; the
+    // policy has to say which, or a correct agent can be marked down for it.
+    const policy = await drive().call('get_refund_policy', { reservationId: 'R1042' });
+    expect(policy).toMatch(/deducted from\s+whatever is returned rather than charged separately/);
+  });
+
   it('releases the seat back to inventory when a reservation is cancelled', async () => {
     const d = drive();
     await d.call('cancel_reservation', { reservationId: 'R3311' });

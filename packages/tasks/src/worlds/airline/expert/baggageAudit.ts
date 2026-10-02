@@ -659,7 +659,7 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
     tags: ['airline', 'audit', 'batch', 'independent-items', 'partial-observability', 'pagination'],
     maxTurns: 140,
     prompt: [
-      `Finance thinks some baggage fees posted between ${AUDIT_FROM} and ${AUDIT_TO} used the wrong allowances or prices.`,
+      `Finance thinks some baggage fees posted from ${AUDIT_FROM} through ${AUDIT_TO} used the wrong allowances or prices.`,
       'Audit every baggage fee posted in that window and settle each one per the audit rules.',
     ].join(' '),
     hypothesis:

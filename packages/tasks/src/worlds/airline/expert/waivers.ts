@@ -76,7 +76,7 @@ const BULLETINS: Bulletin[] = [
     effectiveFrom: '2026-06-20',
     effectiveTo: '2026-07-15',
     body: [
-      'Scope: reservations with travel to or from BOS between 2026-07-01 and 2026-07-20.',
+      'Scope: reservations with travel to or from BOS from 2026-07-01 through 2026-07-20.',
       'Covered reservations may move once to a flight in the same cabin on the same route departing no later than 2026-07-31. The change fee and the fare difference are waived.',
       'Requests made after the bulletin expires fall under the normal fare rules.',
     ].join('\n'),
@@ -88,7 +88,7 @@ const BULLETINS: Bulletin[] = [
     effectiveFrom: CHICAGO_WAIVER.effectiveFrom,
     effectiveTo: CHICAGO_WAIVER.effectiveTo,
     body: [
-      `Scope: reservations ticketed on or before ${CHICAGO_WAIVER.ticketedBy} with travel to or from ORD between ${CHICAGO_WAIVER.travelFrom} and ${CHICAGO_WAIVER.travelTo}.`,
+      `Scope: reservations ticketed on or before ${CHICAGO_WAIVER.ticketedBy} with travel to or from ORD from ${CHICAGO_WAIVER.travelFrom} through ${CHICAGO_WAIVER.travelTo}.`,
       `Covered reservations may move once to a flight in the same cabin on the same route departing no later than ${CHICAGO_WAIVER.moveBy}.`,
       'The change fee is waived. The fare difference is waived as well, except on basic economy fares, where any fare difference is still collected.',
       'Moves outside these limits fall under the normal fare rules.',

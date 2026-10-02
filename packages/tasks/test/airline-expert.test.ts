@@ -415,6 +415,16 @@ describe('airline-waiver-desk', () => {
     ]);
   });
 
+  it('states the Chicago travel window with both ends included, and covers its last day', () => {
+    const seed = createWaiverWorld();
+    const waiver = seed.bulletins.find((bulletin) => bulletin.id === 'PB-2026-14')!;
+    // "between" would leave the last day open to argument; R5211 travels on it.
+    expect(waiver.body).toContain('from 2026-08-02 through 2026-08-04');
+    expect(seed.reservations.find((entry) => entry.id === 'R5211')?.segments[0]?.date).toBe('2026-08-04');
+    const lastDay = WAIVER_REQUESTS.find((request) => request.reservationId === 'R5211')!;
+    expect(expectedFees(seed, lastDay)).toEqual({ change_fee: 0, fare_difference: 0 });
+  });
+
   async function solve(
     d: OpsDriver,
     fees: (reservationId: string) => { change_fee: number; fare_difference: number } = (id) =>
