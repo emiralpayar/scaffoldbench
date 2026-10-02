@@ -415,6 +415,39 @@ describe('API failures through the real call path', () => {
     expect(events.find((e) => e.type === 'stop')).toMatchObject({ reason: 'auth' });
     expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'auth' });
   });
+
+  it('stops the whole matrix, without retrying, when the account’s usage limit is spent', async () => {
+    const text = 'You\'ve hit your session limit · resets 6am (Europe/Istanbul)';
+    let sessionCount = 0;
+    setScript(async function* () {
+      sessionCount += 1;
+      yield {
+        type: 'rate_limit_event',
+        rate_limit_info: { status: 'rejected', resetsAt: 1790931600, rateLimitType: 'five_hour' },
+      };
+      yield assistant(text, { model: '<synthetic>', error: 'rate_limit', usage: {} });
+      yield success({ text, isError: true, apiErrorStatus: 429, costUsd: 0 });
+    });
+    const events: RunnerEvent[] = [];
+
+    const { records, manifest } = await runMatrix(
+      config({ repeats: 3, onEvent: (event) => events.push(event) }),
+    );
+
+    // One doomed call, not three attempts at each of three cells.
+    expect(sessionCount).toBe(1);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ failureMode: 'api_error', attempts: 1 });
+    expect(records[0]?.apiError).toMatchObject({
+      kind: 'rate_limit',
+      retryable: false,
+      status: 429,
+      resetsAt: '2026-10-02T09:00:00.000Z',
+    });
+    expect(events.find((e) => e.type === 'stop')).toMatchObject({ reason: 'usage_limit' });
+    expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'usage_limit' });
+    expect(manifest.notes).toMatch(/usage limit/);
+  });
 });
 
 describe('effort through the real call path', () => {

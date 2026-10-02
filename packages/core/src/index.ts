@@ -4,6 +4,7 @@ export * from './trace';
 export * from './guard';
 export * from './hermetic';
 export * from './apiErrors';
+export * from './usageLimit';
 export * from './pricing';
 export * from './meter';
 export * from './tools';

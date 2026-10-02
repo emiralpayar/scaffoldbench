@@ -401,5 +401,6 @@ function asApiError(value: unknown): ApiError | undefined {
     retryable: e.retryable === true,
     message: e.message,
     ...(typeof e.status === 'number' ? { status: e.status } : {}),
+    ...(typeof e.resetsAt === 'string' ? { resetsAt: e.resetsAt } : {}),
   };
 }

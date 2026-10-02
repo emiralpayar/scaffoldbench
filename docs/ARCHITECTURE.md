@@ -64,7 +64,10 @@ What lives at this level rather than inside a cell:
   three attempts by default (`retry`). The record keeps the attempt that counted, `attempts`, and
   what the discarded ones cost (`discardedCostUsd`), which never enters `costUsd`. A failure a
   retry cannot fix, or the last attempt's, is recorded as `api_error`. Rejected credentials stop the
-  session: every further run would fail the same way.
+  session: every further run would fail the same way. So does a spent usage limit — a 429 that
+  comes with the CLI's `rate_limit_event` saying `rejected`, or worded as a limit that resets at a
+  set time — which is not retried, since it lifts only hours later (`stoppedBy: 'usage_limit'`);
+  the run set is resumed once it has reset.
 - **Stopping.** `signal` is a hard stop: nothing new starts, the runs in flight are aborted and
   discarded, since a run cut off from outside is not a measurement. `drainSignal` is a soft one:
   nothing new starts and the runs in flight finish and are recorded.

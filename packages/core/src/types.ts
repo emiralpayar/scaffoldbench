@@ -394,11 +394,17 @@ export type ApiErrorKind =
 /** A call that failed at the API or in the infrastructure around it. See `apiErrors.ts`. */
 export interface ApiError {
   kind: ApiErrorKind;
-  /** True when the same call could succeed if made again later. */
+  /**
+   * True when the same call could succeed if made again after a short wait.
+   * A `rate_limit` that is not retryable is the account's usage limit, spent
+   * until `resetsAt` (see `usageLimit.ts`).
+   */
   retryable: boolean;
   message: string;
   /** HTTP status, when the SDK reported one. */
   status?: number;
+  /** When a spent usage limit lifts (ISO 8601), when the CLI said. */
+  resetsAt?: string;
 }
 
 /** One model's share of a call, as the SDK's `modelUsage` reports it. */
@@ -612,7 +618,12 @@ export type RunSetStopReason =
   /** The next run's cap no longer fit in the total budget. */
   | 'total_budget'
   /** The API rejected the credentials, so every further run would have failed. */
-  | 'auth';
+  | 'auth'
+  /**
+   * The account's usage limit was spent (a rate limit that lifts only at a
+   * set time, hours away), so every further run would have failed until then.
+   */
+  | 'usage_limit';
 
 /** Transient API failures are retried by re-running the whole cell. */
 export interface RetryPolicy {

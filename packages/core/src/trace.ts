@@ -1,6 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { apiErrorOfAssistant, modelStopOfAssistant, type ModelStop } from './apiErrors';
 import type { TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
+import { observeRateLimit } from './usageLimit';
 
 const MAX_TEXT = 8_000;
 
@@ -230,6 +231,22 @@ export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext):
               }
             : {}),
         },
+      });
+      break;
+    }
+
+    case 'rate_limit_event': {
+      // Every call on a subscription streams one; only a refusal for a spent
+      // limit is worth a line in the trace.
+      const seen = observeRateLimit({ rejected: false }, message);
+      if (!seen.rejected) break;
+      out.push({
+        ...base,
+        kind: 'note',
+        text:
+          `The account's ${seen.limitType ?? 'usage'} limit is spent` +
+          `${seen.resetsAt ? `; it resets at ${seen.resetsAt}` : ''}.`,
+        meta: { rateLimit: seen },
       });
       break;
     }

@@ -292,3 +292,27 @@ describe('normalizeSdkMessage', () => {
     expect(normalizeSdkMessage(asMessage({ type: 'assistant', message: {} }), ctx)).toEqual([]);
   });
 });
+
+describe('rate-limit events', () => {
+  it('notes a refusal for a spent usage limit, and nothing for the routine allowance report', () => {
+    const event = (status: string) =>
+      asMessage({
+        type: 'rate_limit_event',
+        rate_limit_info: { status, resetsAt: 1790931600, rateLimitType: 'five_hour' },
+      });
+
+    expect(normalizeSdkMessage(event('allowed'), ctx)).toEqual([]);
+    expect(normalizeSdkMessage(event('rejected'), ctx)).toEqual([
+      {
+        phase: 'main',
+        depth: 0,
+        agent: undefined,
+        kind: 'note',
+        text: "The account's five_hour limit is spent; it resets at 2026-10-02T09:00:00.000Z.",
+        meta: {
+          rateLimit: { rejected: true, resetsAt: '2026-10-02T09:00:00.000Z', limitType: 'five_hour' },
+        },
+      },
+    ]);
+  });
+});

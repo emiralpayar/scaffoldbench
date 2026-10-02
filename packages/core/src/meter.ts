@@ -12,6 +12,7 @@ import {
   type ModelStop,
 } from './apiErrors';
 import { emptyUsage } from './budget';
+import { asUsageLimit, observeRateLimit, type RateLimitState } from './usageLimit';
 import { estimateCostUsd, type PricedUsage } from './pricing';
 import { usageFrom } from './trace';
 import type { ApiError, McpServerStatus, ModelSpend, UsageTotals } from './types';
@@ -80,6 +81,7 @@ export class CallMeter {
   /** The CLI's model-stop notice, while it is the last thing the main thread said. */
   #modelStop: ModelStop | undefined;
   #mcpServers: McpServerStatus[] = [];
+  #rateLimit: RateLimitState = { rejected: false };
 
   constructor(defaultModel: string) {
     this.#defaultModel = defaultModel;
@@ -100,6 +102,9 @@ export class CallMeter {
         break;
       case 'result':
         this.#result = message;
+        break;
+      case 'rate_limit_event':
+        this.#rateLimit = observeRateLimit(this.#rateLimit, message);
         break;
       default:
         break;
@@ -137,6 +142,8 @@ export class CallMeter {
       if (apiError && apiError.status === undefined && fromResult?.status !== undefined) {
         apiError = { ...apiError, status: fromResult.status };
       }
+      // A spent usage limit will not lift within a retry's wait.
+      if (apiError) apiError = asUsageLimit(apiError, this.#rateLimit);
     }
 
     return {

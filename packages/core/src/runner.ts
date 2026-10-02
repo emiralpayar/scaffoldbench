@@ -14,6 +14,7 @@ import {
   tracedCalls,
 } from './integrity';
 import { JudgeError, judgeInfoOf } from './judge';
+import { isUsageLimit } from './usageLimit';
 import {
   RESULTS_DIR,
   assertValidRunSetId,
@@ -178,6 +179,7 @@ const STOP_NOTES: Record<RunSetStopReason, string> = {
   drain: 'Stopped on request once the runs in flight had finished.',
   total_budget: 'Stopped early: total budget reached.',
   auth: 'Stopped early: the API rejected the credentials.',
+  usage_limit: "Stopped early: the account's usage limit was reached. Resume the run set once it resets.",
 };
 
 /**
@@ -348,6 +350,13 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
             'auth',
             `The API rejected the credentials (${describeApiError(failure)}). No further runs were ` +
               'started; fix the credentials, then resume the run set.',
+          );
+        } else if (failure && isUsageLimit(failure)) {
+          stop(
+            'usage_limit',
+            `The account's usage limit was reached (${describeApiError(failure)})` +
+              `${failure.resetsAt ? `; it resets at ${failure.resetsAt}` : ''}. No further runs were ` +
+              'started; resume the run set once it has reset.',
           );
         }
         return;
