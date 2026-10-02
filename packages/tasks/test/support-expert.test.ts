@@ -505,6 +505,20 @@ describe('support-major-incident', () => {
     expect(firedTraps(supportIncidentTask, result)).toEqual(['lookalike-reports', 'missed-report']);
   });
 
+  it('penalises linking any report of a different problem, not only the two look-alikes', async () => {
+    // T-3110 is a slow CRM dashboard and T-3090 a cache problem closed last
+    // week; neither is this outage, however the agent reads the queue.
+    for (const extra of ['T-3110', 'T-3090']) {
+      const d = drive(supportIncidentSpec);
+      await solve(d);
+      await d.call('link_to_incident', { incidentId: 'INC-1', ticketIds: [extra] });
+      const result = await score(supportIncidentTask, d);
+      expect(penaltyIds(result), extra).toEqual(['lookalike-linked']);
+      expect(result.penalties[0]?.detail, extra).toBe(`Touched: ${extra}.`);
+      expect(firedTraps(supportIncidentTask, result), extra).toEqual(['lookalike-reports']);
+    }
+  });
+
   it('trap other-service-report: reports of the outage filed against other services are missed', async () => {
     const d = drive(supportIncidentSpec);
     await solve(d, { links: REPORTS.filter((id) => id !== 'T-3113' && id !== 'T-3114') });

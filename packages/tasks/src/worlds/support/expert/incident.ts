@@ -316,14 +316,22 @@ function deadlinesPulledIn(world: SupportOpsWorld): string[] {
     .map((entry) => entry.id);
 }
 
-/** Look-alike reports linked to the incident or re-graded as part of it. */
+/**
+ * Tickets that are not this outage but were treated as part of it: any of
+ * them linked to an incident (the two look-alikes, or anything else in the
+ * queue, open or closed), and a look-alike re-graded or re-dated. Postmortem
+ * tickets the run created are not in the seed, so linking them is fine.
+ */
 function lookalikesTouched(world: SupportOpsWorld): string[] {
   const seed = createIncidentWorld();
-  return LOOKALIKES.filter((id) => {
-    const linked = world.incidents.some((incident) => incident.ticketIds.includes(id));
+  const linked = new Set(world.incidents.flatMap((incident) => incident.ticketIds));
+  return [...SEED_TICKETS].filter((id) => {
+    if (OUTAGE_REPORTS.includes(id)) return false;
+    if (linked.has(id)) return true;
+    if (!LOOKALIKES.includes(id)) return false;
     const before = ticketOrThrow(seed, id);
     const after = ticketOrThrow(world, id);
-    return linked || after.severity !== before.severity || after.slaDueAt !== before.slaDueAt;
+    return after.severity !== before.severity || after.slaDueAt !== before.slaDueAt;
   });
 }
 
@@ -370,7 +378,8 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     },
     {
       id: 'lookalike-reports',
-      description: 'Links a known flaky test or a local build problem to the outage.',
+      description:
+        'Links a report of a different problem to the outage: a known flaky test, a local build problem, or anything else in the queue.',
       caughtBy: ['lookalike-linked'],
     },
     {
