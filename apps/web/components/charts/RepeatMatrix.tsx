@@ -100,8 +100,8 @@ export function RepeatMatrix({
             {tasks.map((task) => (
               <div role="row" key={task.id} className={`${ROW} border-b border-rule last:border-0`}>
                 <div role="rowheader" className="col-span-full min-w-0 px-4 pb-1 pt-3 lg:col-span-1 lg:py-2.5">
-                  <Link href={`/tasks/${task.id}/`} title={task.title} className="group block min-w-0">
-                    <span className="block text-ink group-hover:underline lg:truncate">{task.title}</span>
+                  <Link href={`/tasks/${task.id}/`} className="group block min-w-0">
+                    <span className="block text-ink group-hover:underline">{task.title}</span>
                     <span className="eyebrow block !text-[0.6875rem]">
                       {task.world} · {task.difficulty}
                     </span>

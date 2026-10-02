@@ -49,7 +49,7 @@ export function TaskDeltaGrid({ models }: { models: readonly ModelDeltas[] }) {
           role="rowgroup"
           className="sticky top-0 z-10 rounded-t-[13px] border-b border-rule bg-surface/95 backdrop-blur sm:static sm:bg-surface sm:backdrop-blur-none"
         >
-          <div role="row" className="grid grid-cols-1 lg:grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)]">
+          <div role="row" className="grid grid-cols-1 lg:grid-cols-[minmax(14rem,28rem)_minmax(0,1fr)]">
             <div role="columnheader" className="hidden px-4 py-3 lg:block">
               <span className="eyebrow">Task</span>
             </div>
@@ -67,10 +67,10 @@ export function TaskDeltaGrid({ models }: { models: readonly ModelDeltas[] }) {
             <div
               role="row"
               key={task.taskId}
-              className="grid grid-cols-1 border-b border-rule last:border-0 lg:grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)]"
+              className="grid grid-cols-1 border-b border-rule last:border-0 lg:grid-cols-[minmax(14rem,28rem)_minmax(0,1fr)]"
             >
               <div role="rowheader" className="min-w-0 px-4 pb-1 pt-3 lg:py-2.5">
-                <Link href={`/tasks/${task.taskId}/`} className="block min-w-0 text-ink hover:underline lg:truncate" title={task.title}>
+                <Link href={`/tasks/${task.taskId}/`} className="block min-w-0 text-ink hover:underline">
                   {task.title}
                 </Link>
                 <span className="eyebrow block !text-[0.6875rem]">{task.difficulty}</span>
