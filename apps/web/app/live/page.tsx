@@ -6,6 +6,7 @@ import { ALL_TASKS } from '@arena/tasks';
 
 import { ArchitectureGlyph } from '../../components/ArchitectureGlyph';
 import { LiveRunner, type LiveOption } from '../../components/LiveRunner';
+import { ScrollRegion } from '../../components/ScrollRegion';
 import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { ReplayGallery } from '../../components/timeline/ReplayGallery';
 import { architectureName, compareArchitectures } from '../../lib/architectures';
@@ -119,14 +120,11 @@ export default async function LivePage() {
                   <span className="num text-muted">{String(index + 1).padStart(2, '0')}</span>
                   {step.label}
                 </p>
-                <pre
-                  role="region"
-                  aria-label={`Command: ${step.label}`}
-                  tabIndex={0}
-                  className="scroll-x bg-sunken px-4 py-3 font-mono text-[0.8125rem] leading-relaxed text-ink"
-                >
-                  <code>{step.command}</code>
-                </pre>
+                <ScrollRegion label={`Command: ${step.label}`}>
+                  <pre className="w-max min-w-full bg-sunken px-4 py-3 font-mono text-[0.8125rem] leading-relaxed text-ink">
+                    <code>{step.command}</code>
+                  </pre>
+                </ScrollRegion>
               </li>
             ))}
           </ol>
