@@ -10,13 +10,9 @@
  *     added without touching the runner.
  */
 
-import type {
-  AgentDefinition,
-  EffortLevel,
-  McpServerConfig,
-} from '@anthropic-ai/claude-agent-sdk';
+import type { EffortLevel, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
-export type { AgentDefinition, EffortLevel, McpServerConfig };
+export type { EffortLevel, McpServerConfig };
 
 // ---------------------------------------------------------------------------
 // Tasks
