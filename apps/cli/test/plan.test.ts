@@ -10,7 +10,7 @@ import type { Judge, RunSetManifest, Strategy, Task } from '@arena/core';
 import { parseArgs } from '../src/args';
 import type { RunArgs } from '../src/args';
 import { addToHistory, emptyHistory, expectedCost } from '../src/history';
-import { ceilingText, matrixCells, resolveResume, spendPlan } from '../src/plan';
+import { MAX_ATTEMPTS, ceilingText, matrixCells, resolveResume, spendPlan } from '../src/plan';
 import { makeRecord } from './support';
 
 function run(argv: string[]): RunArgs {
@@ -189,26 +189,41 @@ describe('cells to resume', () => {
 
 describe('spend', () => {
   it('bounds a matrix by its caps when they are below the budget', () => {
-    const input = { runs: 10, gradedRuns: 0, maxCostUsd: 0.5, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3 };
+    const input = { runs: 10, gradedRuns: 0, maxCostUsd: 0.5, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3, attempts: 1 };
     const plan = spendPlan(input);
     expect(plan).toMatchObject({ maxInFlight: 4, agentCeiling: 5, judgeOverBudget: 0, ceiling: 5 });
     expect(ceilingText(input, plan)).toBe('$5.00  10 runs × $0.50 cap');
   });
 
   it('says "1 run", not "1 runs"', () => {
-    const input = { runs: 1, gradedRuns: 1, maxCostUsd: 0.5, totalBudgetUsd: 0.5, concurrency: 4, judgeSamples: 3 };
+    const input = { runs: 1, gradedRuns: 1, maxCostUsd: 0.5, totalBudgetUsd: 0.5, concurrency: 4, judgeSamples: 3, attempts: 1 };
     expect(ceilingText(input, spendPlan(input))).toBe('$2.00  1 run × $0.50 cap + grading of up to 1 run in flight (3 × $0.50 each)');
   });
 
   it('adds the grading of the runs still in flight once the budget binds', () => {
-    const input = { runs: 180, gradedRuns: 36, maxCostUsd: 1, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3 };
+    const input = { runs: 180, gradedRuns: 36, maxCostUsd: 1, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3, attempts: 1 };
     const plan = spendPlan(input);
     expect(plan).toMatchObject({ maxInFlight: 4, judgeCapPerRun: 1.5, agentCeiling: 25, judgeOverBudget: 6, ceiling: 31 });
     expect(ceilingText(input, plan)).toMatch(/total budget \$25\.00 \+ grading of up to 4 runs in flight/);
   });
 
+  it('counts every attempt the runner may make, because each one reserves the cap again', () => {
+    // The runner retries a run hit by a transient API error, up to MAX_ATTEMPTS
+    // times; a failed attempt has been billed, so the cap can be spent each time.
+    expect(MAX_ATTEMPTS).toBe(3);
+    const input = { runs: 2, gradedRuns: 1, maxCostUsd: 0.5, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 2, attempts: 3 };
+    const plan = spendPlan(input);
+    // 3 attempts x (2 runs x $0.50 + 1 graded run x 2 x $0.50)
+    expect(plan.ceiling).toBe(6);
+    expect(ceilingText(input, plan)).toBe('$6.00  2 runs × $0.50 cap × 3 attempts + grading of up to 1 run in flight (2 × $0.50 each)');
+
+    // Once the budget binds, attempts draw on it like anything else.
+    const large = spendPlan({ ...input, runs: 180, gradedRuns: 0 });
+    expect(large.ceiling).toBe(25);
+  });
+
   it('knows a small budget holds fewer runs in flight than --concurrency', () => {
-    const plan = spendPlan({ runs: 20, gradedRuns: 0, maxCostUsd: 0.5, totalBudgetUsd: 1, concurrency: 8, judgeSamples: 1 });
+    const plan = spendPlan({ runs: 20, gradedRuns: 0, maxCostUsd: 0.5, totalBudgetUsd: 1, concurrency: 8, judgeSamples: 1, attempts: 1 });
     expect(plan.maxInFlight).toBe(2);
   });
 });

@@ -6,7 +6,7 @@
  * Pure: the command reads the disk and hands the results in.
  */
 
-import { cellKey, makeRunId } from '@arena/core';
+import { DEFAULT_RETRY_POLICY, cellKey, makeRunId } from '@arena/core';
 import type { CellCoordinates, EffortLevel, FixtureMode, RunSetManifest } from '@arena/core';
 
 import type { MeasurementSetting, RunArgs } from './args';
@@ -14,6 +14,13 @@ import { formatBudget, formatDuration, plural } from './format';
 
 /** Most a single grading call may spend; passed to `createJudge` so the plan and the cap agree. */
 export const JUDGE_CALL_CAP_USD = 0.5;
+
+/**
+ * Attempts the runner gives a run: a transient API failure is retried, and
+ * every attempt reserves the run's cap afresh, so a run can spend its cap
+ * more than once. `arena run` does not override the runner's retry policy.
+ */
+export const MAX_ATTEMPTS = DEFAULT_RETRY_POLICY.maxAttempts;
 
 export interface MatrixCell extends CellCoordinates {
   runId: string;
@@ -163,6 +170,8 @@ export interface SpendInput {
   totalBudgetUsd: number;
   concurrency: number;
   judgeSamples: number;
+  /** Attempts a run may take; see `MAX_ATTEMPTS`. */
+  attempts: number;
 }
 
 export interface SpendPlan {
@@ -170,7 +179,7 @@ export interface SpendPlan {
   maxInFlight: number;
   /** The most graded runs can spend on grading, per run. */
   judgeCapPerRun: number;
-  /** Agent spend, at most: every run at its cap, or the total budget. */
+  /** Agent spend, at most: every attempt of every run at its cap, or the total budget. */
   agentCeiling: number;
   /**
    * Grading is billed when a run settles but not reserved before it starts,
@@ -188,8 +197,10 @@ export function spendPlan(input: SpendInput): SpendPlan {
     Math.min(input.concurrency, input.runs, Math.floor(input.totalBudgetUsd / input.maxCostUsd + 1e-9)),
   );
   const judgeCapPerRun = input.gradedRuns > 0 ? input.judgeSamples * JUDGE_CALL_CAP_USD : 0;
-  const uncapped = input.runs * input.maxCostUsd + input.gradedRuns * judgeCapPerRun;
-  const agentCeiling = Math.min(input.runs * input.maxCostUsd, input.totalBudgetUsd);
+  // A run retried after an API failure is graded again if the judge was the
+  // failure, so grading repeats with the attempts like the agent does.
+  const uncapped = input.attempts * (input.runs * input.maxCostUsd + input.gradedRuns * judgeCapPerRun);
+  const agentCeiling = Math.min(input.attempts * input.runs * input.maxCostUsd, input.totalBudgetUsd);
   const judgeOverBudget = Math.min(maxInFlight, input.gradedRuns) * judgeCapPerRun;
   const ceiling = Math.min(uncapped, input.totalBudgetUsd + judgeOverBudget);
   return { maxInFlight, judgeCapPerRun, agentCeiling, judgeOverBudget, ceiling };
@@ -198,8 +209,11 @@ export function spendPlan(input: SpendInput): SpendPlan {
 /** The plan's "Ceiling" line, saying where the number comes from. */
 export function ceilingText(input: SpendInput, plan: SpendPlan): string {
   const parts: string[] = [];
-  if (input.runs * input.maxCostUsd <= input.totalBudgetUsd) {
-    parts.push(`${plural(input.runs, 'run')} × ${formatBudget(input.maxCostUsd)} cap`);
+  if (input.attempts * input.runs * input.maxCostUsd <= input.totalBudgetUsd) {
+    parts.push(
+      `${plural(input.runs, 'run')} × ${formatBudget(input.maxCostUsd)} cap` +
+        (input.attempts > 1 ? ` × ${input.attempts} attempts` : ''),
+    );
   } else {
     parts.push(`total budget ${formatBudget(input.totalBudgetUsd)}`);
   }

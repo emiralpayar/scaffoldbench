@@ -135,7 +135,9 @@ describe('arena run', () => {
     expect(await runCommand(args(...MATRIX, '--dry-run'), dry.ctx)).toBe(0);
     const text = dry.stderrText();
     expect(text).toMatch(/Matrix\s+1 model × 1 strategy × 2 tasks × 2 repeats = 4 runs/);
-    expect(text).toMatch(/Ceiling\s+\$2\.00 {2}4 runs × \$0\.50 cap/);
+    // 4 runs x $0.50 x 3 attempts is $6.00, above the $5.00 session budget, which binds.
+    expect(text).toMatch(/Ceiling\s+\$5\.00 {2}total budget \$5\.00/);
+    expect(text).toMatch(/tried up to 3 times, each attempt with a cap of its own/);
     expect(text).toMatch(/Dry run: nothing was started\./);
     expect(await listJsonFiles(runsDir('anything', root))).toHaveLength(0);
   });

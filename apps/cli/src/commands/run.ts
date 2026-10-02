@@ -33,7 +33,7 @@ import { credentialText, describeCredential } from '../env';
 import { displayPath, formatDuration, formatUsd, plural } from '../format';
 import { emptyHistory, expectedCost, loadCostHistory } from '../history';
 import { createLiveState } from '../live';
-import { JUDGE_CALL_CAP_USD, capsText, ceilingText, matrixCells, resolveResume, spendPlan } from '../plan';
+import { JUDGE_CALL_CAP_USD, MAX_ATTEMPTS, capsText, ceilingText, matrixCells, resolveResume, spendPlan } from '../plan';
 import { formatReport } from '../report';
 import { listRunSets, loadRunSet } from '../runSet';
 import type { LoadedRunSet } from '../runSet';
@@ -124,6 +124,7 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
     totalBudgetUsd: args.totalBudgetUsd,
     concurrency: args.concurrency,
     judgeSamples: args.judgeSamples,
+    attempts: MAX_ATTEMPTS,
   };
   const spend = spendPlan(spendInput);
   const history = await loadCostHistory(resultsRoot).catch(() => emptyHistory());
@@ -162,6 +163,12 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
   );
   for (const note of resumeNotes) err(style.dim(`  ${note}`));
   err(style.dim('  Caps are checked between model turns: a run can pass its cap by one turn of each call in flight.'));
+  err(
+    style.dim(
+      `  A run hit by a transient API error is tried up to ${MAX_ATTEMPTS} times, each attempt with a cap of its own; ` +
+        'the ceiling counts them.',
+    ),
+  );
   err('');
 
   if (args.dryRun) {
