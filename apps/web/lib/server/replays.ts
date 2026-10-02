@@ -7,9 +7,12 @@
  * traces, callers get `null` and say so, or draw the schematic instead.
  */
 
-import { compareArchitectures } from '../architectures';
+import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
+import { architectureColor, architectureName, compareArchitectures } from '../architectures';
 import { defaultModel } from '../derive';
 import type { Difficulty, RunRecord, TraceEvent } from '../records';
+import { timelineFromTrace } from '../timeline';
+import { buildViewGroups, trimGroups } from '../traceView';
 import type { RunSetData } from './runSet';
 import { hasTrace, loadPostmortemRunSet, loadRunSet, loadTrace } from './runSet';
 
@@ -105,4 +108,18 @@ export async function loadHeroRace(): Promise<RaceGroup | null> {
 export async function loadEvidenceRace(): Promise<RaceGroup | null> {
   const evidence = await loadPostmortemRunSet();
   return evidence ? findRace(evidence) : null;
+}
+
+/** A race as the replay gallery wants it: one entry per architecture. */
+export function toReplayEntries(race: Pick<RaceGroup, 'runs'>): ReplayEntry[] {
+  return race.runs.map(({ record, trace }) => ({
+    runId: record.runId,
+    strategyId: record.strategyId,
+    name: architectureName(record.strategyId),
+    color: architectureColor(record.strategyId),
+    timeline: timelineFromTrace(trace, record.phases),
+    groups: trimGroups(buildViewGroups(trace)),
+    score: record.score,
+    passed: record.passed,
+  }));
 }

@@ -8,7 +8,7 @@ import { ArchitectureGlyph } from '../../components/ArchitectureGlyph';
 import { LiveRunner, type LiveOption } from '../../components/LiveRunner';
 import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { ReplayGallery } from '../../components/timeline/ReplayGallery';
-import { architectureColor, architectureName, compareArchitectures } from '../../lib/architectures';
+import { architectureName, compareArchitectures } from '../../lib/architectures';
 import { modelShortName, formatModelPrice } from '../../lib/models';
 import {
   LIVE_DEFAULT_MODEL,
@@ -16,10 +16,8 @@ import {
   LIVE_MAX_WALL_CLOCK_MS,
   LIVE_MODELS,
 } from '../../lib/server/live';
-import { loadReplays } from '../../lib/server/replays';
+import { loadReplays, toReplayEntries } from '../../lib/server/replays';
 import { LIVE_ENABLED } from '../../lib/site';
-import { timelineFromTrace } from '../../lib/timeline';
-import { buildViewGroups, trimGroups } from '../../lib/traceView';
 
 export const metadata: Metadata = {
   title: 'Replay a run',
@@ -38,16 +36,7 @@ const STEPS = [
 
 export default async function LivePage() {
   const race = await loadReplays();
-  const entries: ReplayEntry[] = (race?.runs ?? []).map(({ record, trace }) => ({
-    runId: record.runId,
-    strategyId: record.strategyId,
-    name: architectureName(record.strategyId),
-    color: architectureColor(record.strategyId),
-    timeline: timelineFromTrace(trace, record.phases),
-    groups: trimGroups(buildViewGroups(trace)),
-    score: record.score,
-    passed: record.passed,
-  }));
+  const entries: ReplayEntry[] = race ? toReplayEntries(race) : [];
   // Open on the design with the most going on: the one that fans out.
   const initial =
     entries.find((entry) => entry.strategyId === 'propose-select') ??
