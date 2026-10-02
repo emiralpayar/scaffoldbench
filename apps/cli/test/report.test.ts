@@ -399,6 +399,14 @@ describe('publication gate', () => {
     ]);
   });
 
+  it('does not take a complete manifest at its word when records are missing', () => {
+    const records = overlappingRecords();
+    expect(publicationProblems(buildReportView(runSetOf(records, { manifest: manifest({ totalRuns: 12 }) })))).toEqual([]);
+    expect(publicationProblems(buildReportView(runSetOf(records.slice(1), { manifest: manifest({ totalRuns: 12 }) })))).toEqual([
+      'the manifest plans 12 runs, but 11 records are on disk',
+    ]);
+  });
+
   it('never publishes synthetic data or a run set without a manifest', () => {
     expect(publicationProblems(buildReportView(runSetOf(overlappingRecords())))).toContain('the run set has no manifest');
     expect(

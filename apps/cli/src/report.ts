@@ -588,6 +588,11 @@ export function publicationProblems(view: ReportView): string[] {
     );
   }
   const health = view.health;
+  // A run set that calls itself complete must hold every run it planned: a
+  // copy that lost files on the way (an artifact, a partial checkout) is not it.
+  if (manifest?.status === 'complete' && health.runs !== manifest.totalRuns) {
+    problems.push(`the manifest plans ${manifest.totalRuns} runs, but ${health.runs} records are on disk`);
+  }
   if (health.integrityFailed > 0) problems.push(`${plural(health.integrityFailed, 'run')} failed integrity checks`);
   if (health.apiErrors > 0) problems.push(`${plural(health.apiErrors, 'run')} hit API errors`);
   if (health.unverified + health.audited > 0) {
