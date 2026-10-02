@@ -10,6 +10,9 @@
  * overlap is printed as inconclusive rather than as a winner.
  */
 
+import { MODEL_STOP_LABELS } from '@arena/core';
+import type { ModelStop } from '@arena/core';
+
 import { formatBudget, formatDelta, formatDuration, formatScore, formatUsd, plural, shortModel } from './format';
 import {
   abbreviationLegend,
@@ -85,6 +88,17 @@ export function headerLines(view: ReportView): [string, string][] {
       models.length === 1 ? 'Model' : 'Models',
       `${models.join(', ')} · effort ${manifest.effort} · ${plural(manifest.repeats, 'repeat')} · fixtures ${manifest.fixtureMode}`,
     ]);
+    // The effort a model ran at can differ from the one asked for: a model
+    // without effort support is sent none, whatever the flag says.
+    const ranAt = Object.entries(manifest.effectiveEffort ?? {});
+    if (ranAt.some(([, level]) => level !== manifest.effort)) {
+      lines.push([
+        'Effort',
+        `${manifest.effort} requested; ran at ${ranAt
+          .map(([model, level]) => `${shortModel(model)} ${level ?? 'none (no effort parameter sent)'}`)
+          .join(', ')}`,
+      ]);
+    }
     const status = manifest.status
       ? ` · ${manifest.status}${manifest.stoppedBy ? ` (${stopReasonText(manifest.stoppedBy)})` : ''}`
       : '';
@@ -139,6 +153,8 @@ function stopReasonText(reason: string): string {
       return 'total budget reached';
     case 'auth':
       return 'credentials rejected';
+    case 'usage_limit':
+      return 'usage limit spent';
     default:
       return reason;
   }
@@ -189,6 +205,21 @@ export function healthSummary(health: HealthView): { level: 'ok' | 'warn' | 'bad
     });
   } else {
     lines.push({ level: 'ok', text: 'No tool call was denied.' });
+  }
+  if (health.modelStops.runs > 0) {
+    const { byReason, byCategory, calls, runs } = health.modelStops;
+    const reasons = [...byReason]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([reason, count]) => `${MODEL_STOP_LABELS[reason as ModelStop['reason']] ?? reason} ×${count}`)
+      .join(', ');
+    const categories = [...byCategory].map(([category, count]) => `${category} ×${count}`).join(', ');
+    lines.push({
+      level: 'warn',
+      text:
+        `${plural(runs, 'run')} had ${plural(calls, 'call')} end because the model could not finish the turn (${reasons}` +
+        `${categories ? `; refusal categories: ${categories}` : ''}). ` +
+        "That is the run's own limit, like running out of turns: these runs stay ranked, and count against the architecture when they fail.",
+    });
   }
   if (health.retried > 0) {
     lines.push({

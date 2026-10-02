@@ -91,6 +91,12 @@ export interface HealthView {
   phaseIssues: PhaseIssue[];
   /** Runs that needed more than one attempt because of transient API failures. */
   retried: number;
+  /**
+   * Calls that ended because the model could not finish the turn (out of
+   * room, a refusal). The run's own limit, not a harness fault: these runs
+   * stay ranked, so this is where they are counted.
+   */
+  modelStops: { runs: number; calls: number; byReason: Map<string, number>; byCategory: Map<string, number> };
 }
 
 export interface ReportView {
@@ -273,6 +279,21 @@ function healthView(runSet: Pick<LoadedRunSet, 'records' | 'audits' | 'deniedToo
     }
   }
 
+  const stopsByReason = new Map<string, number>();
+  const stopsByCategory = new Map<string, number>();
+  let stopRuns = 0;
+  let stopCalls = 0;
+  for (const record of records) {
+    const stops = record.modelStops ?? [];
+    if (stops.length === 0) continue;
+    stopRuns += 1;
+    stopCalls += stops.length;
+    for (const stop of stops) {
+      stopsByReason.set(stop.reason, (stopsByReason.get(stop.reason) ?? 0) + 1);
+      if (stop.category) stopsByCategory.set(stop.category, (stopsByCategory.get(stop.category) ?? 0) + 1);
+    }
+  }
+
   const deniedByStrategy = new Map<string, number>();
   const deniedByTool = new Map<string, number>();
   let deniedTotal = 0;
@@ -298,6 +319,7 @@ function healthView(runSet: Pick<LoadedRunSet, 'records' | 'audits' | 'deniedToo
     denied: { total: deniedTotal, byStrategy: deniedByStrategy, byTool: deniedByTool },
     phaseIssues: phaseIssues(records),
     retried: records.filter((record) => (record.attempts ?? 1) > 1).length,
+    modelStops: { runs: stopRuns, calls: stopCalls, byReason: stopsByReason, byCategory: stopsByCategory },
   };
 }
 

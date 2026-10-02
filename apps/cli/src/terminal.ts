@@ -3,6 +3,7 @@
  * one line per run anywhere else (CI logs, pipes, `--plain`).
  */
 
+import { MODEL_STOP_LABELS } from '@arena/core';
 import type { RunnerEvent, TraceEvent } from '@arena/core';
 
 import { formatDuration, formatScore, formatUsd } from './format';
@@ -142,6 +143,10 @@ export class PlainReporter implements Reporter {
         const outcome = outcomeOf(record);
         const glyph = cellGlyph({ kind: 'done', outcome }, 0, style);
         let why = record.failureMode === 'none' ? '' : record.failureMode;
+        if (record.failureMode === 'model_stop') {
+          const reasons = [...new Set((record.modelStops ?? []).map((stop) => MODEL_STOP_LABELS[stop.reason]))];
+          why = `model_stop${reasons.length > 0 ? `: ${reasons.join(', ')}` : ''}`;
+        }
         if (outcome === 'integrity') {
           const failed = record.integrity?.checks.filter((check) => !check.ok).map((check) => check.id) ?? [];
           why = `${record.failureMode}; integrity failed: ${failed.join(', ')}`;

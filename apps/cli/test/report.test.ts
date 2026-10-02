@@ -18,6 +18,7 @@ import {
 import { auditLegacy } from '../src/runSet';
 import { createStyle, visibleWidth } from '../src/style';
 import { buildReportView, exclusionOf, orderModels } from '../src/view';
+import type { ModelView } from '../src/view';
 import { makeRecord, overlappingRecords, plain, runSetOf } from './support';
 
 const manifest = (overrides: Partial<RunSetManifest> = {}): RunSetManifest => ({
@@ -307,6 +308,68 @@ describe('terminal report', () => {
     expect(text).toMatch(/⚠ 2 tool calls denied/);
     expect(text).toMatch(/harness\.harness-tools\s+1\s+alpha 1/);
     expect(text).toMatch(/StructuredOutput was offered, then denied/);
+  });
+});
+
+describe('model stops', () => {
+  const stopped = (repeat: number, reason: 'refusal' | 'output_limit', passed: boolean, category?: string) =>
+    makeRecord({
+      strategyId: 'alpha',
+      taskId: 'airline-easy',
+      repeat,
+      passed,
+      score: passed ? 1 : 0,
+      failureMode: passed ? 'none' : 'model_stop',
+      modelStops: [{ phase: 'agent', callId: `c${repeat}`, reason, ...(category ? { category } : {}) }],
+    });
+
+  it('counts them under health without leaving the run out of the ranking', () => {
+    const records = [stopped(1, 'refusal', false, 'cyber'), stopped(2, 'refusal', true, 'cyber'), stopped(3, 'output_limit', false)];
+    const view = buildReportView(runSetOf(records));
+    expect(view.health.modelStops).toMatchObject({ runs: 3, calls: 3 });
+    expect(view.health).toMatchObject({ ranked: 3, excluded: 0 });
+    expect(view.models[0]?.arms[0]?.runs).toBe(3);
+
+    const text = formatHealth(view.health).replace(/\s+/g, ' ');
+    expect(text).toMatch(/⚠ 3 runs had 3 calls end because the model could not finish the turn \(refused ×2, output limit ×1; refusal categories: cyber ×2\)/);
+    expect(text).toMatch(/these runs stay ranked/);
+    // The failure-mode table names the mode like any other.
+    expect(formatFailureModes(view.models[0] as ModelView)).toMatch(/model_stop/);
+  });
+
+  it('says nothing when no call stopped', () => {
+    const view = buildReportView(runSetOf(overlappingRecords()));
+    expect(view.health.modelStops.runs).toBe(0);
+    expect(formatHealth(view.health)).not.toMatch(/could not finish the turn/);
+  });
+});
+
+describe('what the effort was', () => {
+  it('says so when a model ran at something other than the effort asked for', () => {
+    const view = buildReportView(
+      runSetOf(overlappingRecords(), {
+        manifest: manifest({
+          models: ['claude-haiku-4-5-20251001', 'claude-sonnet-5-5'],
+          effectiveEffort: { 'claude-haiku-4-5-20251001': null, 'claude-sonnet-5-5': 'high' },
+        }),
+      }),
+    );
+    expect(formatReport(view)).toMatch(/Effort\s+high requested; ran at haiku-4-5 none \(no effort parameter sent\), sonnet-5-5 high/);
+  });
+
+  it('stays quiet when every model ran at the effort asked for', () => {
+    const view = buildReportView(
+      runSetOf(overlappingRecords(), { manifest: manifest({ effectiveEffort: { 'claude-haiku-4-5-20251001': 'high' } }) }),
+    );
+    expect(formatReport(view)).not.toMatch(/requested; ran at/);
+  });
+
+  it('names a spent usage limit as the reason a run set stopped', () => {
+    const view = buildReportView(
+      runSetOf(overlappingRecords(), { manifest: manifest({ status: 'interrupted', stoppedBy: 'usage_limit' }) }),
+    );
+    expect(formatReport(view)).toMatch(/interrupted \(usage limit spent\)/);
+    expect(publicationProblems(view)[0]).toMatch(/usage limit spent/);
   });
 });
 

@@ -60,6 +60,8 @@ export interface LiveState {
   counts: Record<Outcome, number>;
   retries: number;
   denied: number;
+  /** Finished runs that had a call end because the model could not finish the turn. */
+  modelStops: number;
   discarded: number;
   /** Settled spend: finished runs, their grading and their discarded attempts. */
   settledUsd: number;
@@ -105,6 +107,7 @@ export function createLiveState(setup: LiveSetup): LiveState {
     counts: { pass: 0, partial: 0, fail: 0, api_error: 0, integrity: 0 },
     retries: 0,
     denied: 0,
+    modelStops: 0,
     discarded: 0,
     settledUsd: 0,
     inFlight: new Map(),
@@ -146,6 +149,7 @@ export function applyRunnerEvent(state: LiveState, event: RunnerEvent, now: numb
       state.inFlight.delete(record.runId);
       state.finished += 1;
       state.counts[outcome] += 1;
+      if ((record.modelStops?.length ?? 0) > 0) state.modelStops += 1;
       state.settledUsd += record.costUsd + record.judgeCostUsd + (record.discardedCostUsd ?? 0);
       if (outcome === 'api_error') {
         notice(state, `${GLYPH.apiError} ${describeRun(state, record.runId)}: ${firstLine(record.error ?? 'API error')}`);
@@ -441,6 +445,7 @@ export function renderLiveFrame(state: LiveState, options: FrameOptions): string
         tally(counts.integrity, `${GLYPH.integrity} ${counts.integrity} integrity`, style.bad, style),
         tally(state.retries, `${GLYPH.retry} ${plural(state.retries, 'retry', 'retries')}`, style.warn, style),
         tally(state.denied, `${state.denied} denied`, style.warn, style),
+        ...(state.modelStops > 0 ? [style.warn(`${plural(state.modelStops, 'model stop')}`)] : []),
         ...(state.discarded > 0 ? [style.dim(`${GLYPH.discarded} ${state.discarded} discarded`)] : []),
       ].join('   '),
   );

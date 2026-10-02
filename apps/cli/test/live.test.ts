@@ -96,6 +96,23 @@ describe('live state', () => {
     expect(state.notices).toHaveLength(3);
   });
 
+  it('counts runs that had a call end on a model stop, and shows the count only once there is one', () => {
+    const state = setup();
+    const a = id('single', 'airline-easy', 1);
+    applyRunnerEvent(state, { type: 'run-start', runId: a, index: 0, total: 8 }, T0);
+    const frame = () => renderLiveFrame(state, { width: 110, height: 30, now: T0 + 1_000 }).map(plain).join('\n');
+    expect(frame()).not.toMatch(/model stop/);
+
+    finish(
+      state,
+      a,
+      { failureMode: 'model_stop', modelStops: [{ phase: 'agent', callId: 'c1', reason: 'refusal' }] },
+      T0 + 2_000,
+    );
+    expect(state.modelStops).toBe(1);
+    expect(frame()).toMatch(/0 denied {3}1 model stop\b/);
+  });
+
   it('draws cells an earlier session finished as they ended', () => {
     const recorded = new Map([
       [`${MODEL}|single|airline-easy|1`, makeRecord({ strategyId: 'single', taskId: 'airline-easy', score: 1, passed: true, failureMode: 'none' })],
