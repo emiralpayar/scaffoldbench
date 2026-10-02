@@ -282,11 +282,13 @@ export default async function MethodologyPage() {
           <Section id="reproduce" title="Reproduce it">
             <p>
               Everything on this site is read from <code className="code-inline">results/</code> at build time, and the
-              records are plain JSON. To run a cell yourself, from the repository root:
+              records are plain JSON. To run a cell yourself, from the repository root (it spends tokens on whatever
+              Claude account your shell is signed in to; <code className="code-inline">--update-latest</code> is what makes the
+              site show the new run set):
             </p>
             <ScrollRegion label="Commands to run a cell yourself" className="rounded-[12px] border border-rule bg-sunken">
               <pre className="w-max p-4 font-mono text-[0.75rem] leading-relaxed text-ink-2">{`npm ci
-npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1
+npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest
 npm run dev:web`}</pre>
             </ScrollRegion>
             <p>

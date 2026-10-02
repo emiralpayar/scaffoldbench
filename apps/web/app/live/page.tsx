@@ -32,7 +32,7 @@ const STEPS = [
   { label: 'Install', command: 'npm ci' },
   {
     label: 'Run two architectures on one task, once each',
-    command: 'npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1',
+    command: 'npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest',
   },
   { label: 'Open the site on your results', command: 'npm run dev:web' },
 ];
@@ -114,8 +114,9 @@ export default async function LivePage() {
             Run it yourself
           </h2>
           <p className="prose-serif mt-3 max-w-2xl">
-            Runs use whatever Claude credentials your shell has. Results land in{' '}
-            <code className="code-inline">results/</code> and the site renders them.
+            Runs use whatever Claude credentials your shell has, so they spend tokens on that account.
+            Results land in <code className="code-inline">results/</code>, and{' '}
+            <code className="code-inline">--update-latest</code> makes the site render them.
           </p>
           <ol className="mt-6 space-y-4">
             {STEPS.map((step, index) => (
