@@ -230,7 +230,7 @@ const DOCTOR_FLAGS: FlagSpec[] = [
   {
     name: 'wiring',
     kind: 'boolean',
-    help: 'Also start the wiring canary: 4 SDK sessions, stopped at start-up (free)',
+    help: 'Also start the wiring canary: 4 SDK sessions that cannot reach the API (free)',
   },
   {
     name: 'wiring-live',

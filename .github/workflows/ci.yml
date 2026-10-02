@@ -81,11 +81,12 @@ jobs:
       - name: Plan a matrix without running it
         run: npm run --silent arena -- run --tasks airline --strategies single,plan-execute --dry-run
 
-      # Starts four real SDK sessions and stops each at start-up, before any
-      # request is made: catches an SDK or CLI upgrade that breaks tool
-      # registration, structured output or per-call MCP servers. (`arena
-      # doctor` would also report that no credential is configured here, which
-      # is true and, for this job, beside the point.)
+      # Starts four real SDK sessions against an address nothing listens on, so
+      # no request can leave the runner whatever credential it holds: catches
+      # an SDK or CLI upgrade that breaks tool registration, structured output
+      # or per-call MCP servers. (`arena doctor` would also report that no
+      # credential is configured here, which is true and, for this job, beside
+      # the point.)
       - name: Wiring canary
         run: npm run --silent check:wiring -- --init-only
 

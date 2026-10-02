@@ -17,17 +17,22 @@
  * claude.ai connectors leaking into a run fail the check.
  *
  *   npm run check:wiring                    # real model calls, a few cents
- *   npm run check:wiring -- --init-only     # free: stops each session at start-up
+ *   npm run check:wiring -- --init-only     # free: offline, stops each session at start-up
  *   npm run check:wiring -- --model claude-sonnet-5-5 --max-cost 0.5
  *
  * `--init-only` needs no credentials, because a session reports its servers
- * and tools before it authenticates. Exits non-zero with a description of
- * what was wrong.
+ * and tools before it authenticates. It is free because it is offline: a
+ * session sends its first request right after that report, and the script
+ * only stops the sessions once the last of them has reported, so on a machine
+ * with a login or a key the others would already have called the model. The
+ * sessions therefore run with no credential variable and against a port
+ * nothing listens on. Exits non-zero with a description of what was wrong.
  */
 
 import { z } from 'zod';
 import {
   BudgetTracker,
+  CREDENTIAL_ENV_VARS,
   STRUCTURED_OUTPUT_TOOL,
   TraceCollector,
   createJournaledToolServer,
@@ -38,6 +43,8 @@ import type { QueryOutcome, QuerySpec, RunContext, Task, ToolCall, TraceEvent } 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_MAX_COST_USD = 0.4;
 const TIMEOUT_MS = 120_000;
+/** Where `--init-only` sessions are pointed: the discard port, on which nothing listens. */
+const OFFLINE_ENDPOINT = 'http://127.0.0.1:9';
 const SERVER = 'wiringcheck';
 const READ_TOOL = `mcp__${SERVER}__read_thing`;
 const WRITE_TOOL = `mcp__${SERVER}__write_thing`;
@@ -61,6 +68,19 @@ function parseArgs(argv: readonly string[]): Args {
     throw new Error('--max-cost must be a positive number of USD');
   }
   return args;
+}
+
+/**
+ * This process's environment with every credential source removed and the API
+ * endpoint unreachable. A session on it still starts, connects its MCP servers
+ * and reports its tools, but cannot send a request anywhere, whatever Claude
+ * Code login the machine has.
+ */
+function offlineEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...base };
+  for (const name of CREDENTIAL_ENV_VARS) delete env[name];
+  env.ANTHROPIC_BASE_URL = OFFLINE_ENDPOINT;
+  return env;
 }
 
 async function main(): Promise<number> {
@@ -148,6 +168,7 @@ async function main(): Promise<number> {
     budget,
     trace,
     systemPrompt: 'You are a wiring canary. Do exactly what the user asks and nothing else.',
+    ...(args.initOnly ? { subprocessEnv: offlineEnv() } : {}),
   };
 
   // Equal shares, as `runAll` hands out to concurrent phases.
