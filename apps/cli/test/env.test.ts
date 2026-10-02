@@ -1,12 +1,32 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { REPO_ROOT } from '@arena/core';
+
 import { credentialText, describeCredential, loadDotEnv, maskEmail, maskSecret } from '../src/env';
 
 const KEY = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCD-wxyz';
+
+describe('.env.example', () => {
+  // Copying the template must not change what a run bills or spends: a
+  // placeholder key left active is exactly how a run ends up refused, and a
+  // model left active is how a sweep ends up on the expensive tier.
+  it('sets nothing until someone edits it', async () => {
+    const text = await readFile(path.join(REPO_ROOT, '.env.example'), 'utf8');
+    const active = text.split('\n').filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
+    expect(active).toEqual([]);
+  });
+
+  it('documents each variable the CLI reads', async () => {
+    const text = await readFile(path.join(REPO_ROOT, '.env.example'), 'utf8');
+    for (const name of ['ANTHROPIC_API_KEY', 'ARENA_MODEL', 'ARENA_JUDGE_MODEL', 'ARENA_MAX_COST_USD', 'ARENA_RESULTS_DIR']) {
+      expect(text).toContain(`# ${name}=`);
+    }
+  });
+});
 
 describe('loadDotEnv', () => {
   const names = ['ARENA_CLI_TEST_FROM_FILE', 'ARENA_CLI_TEST_SHELL_WINS', 'ARENA_CLI_TEST_EMPTY'];
