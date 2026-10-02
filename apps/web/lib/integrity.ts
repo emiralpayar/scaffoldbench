@@ -5,13 +5,14 @@
  * The `harness.*` ids are the runner's own checks (`packages/core/src/
  * integrity.ts`); the descriptions here paraphrase the comments there. Every
  * other id belongs to an architecture's own fidelity checks, which the
- * strategies declare; those are shown by a readable form of their id until
- * the site is given their descriptions too.
+ * strategies declare; `lib/designs.ts` describes those, and an id nobody
+ * has described is shown by a readable form of itself.
  *
  * Pure: no filesystem, safe anywhere.
  */
 
 import { architectureName, isKnownArchitecture } from './architectures';
+import { fidelityCheckInfo } from './designs';
 import type { RunRecord } from './records';
 
 export interface CheckWords {
@@ -65,8 +66,8 @@ export function isHarnessCheck(id: string): boolean {
 
 /** A check's title: the runner's own words, or a readable form of the id. */
 export function checkWords(id: string): CheckWords {
-  const known = HARNESS_CHECKS[id];
-  if (known) return known;
+  const known = HARNESS_CHECKS[id] ?? fidelityCheckInfo(id);
+  if (known) return { title: known.title, means: known.means };
   const [owner, ...rest] = id.split('.');
   const subject = (rest.length > 0 ? rest.join(' ') : id).replace(/[-_]/g, ' ');
   const title = subject.charAt(0).toUpperCase() + subject.slice(1);

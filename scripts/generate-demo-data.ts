@@ -205,17 +205,28 @@ const TASKS: DemoTask[] = [
 ];
 
 /**
- * The fidelity invariants each architecture is checked against (contract 4).
- * The ids follow core's convention (`<strategy>.<what>`); the strategies
- * stream declares the real ones, so these are placeholders in that shape.
+ * The fidelity invariants each architecture is checked against (contract 4),
+ * by the ids `packages/strategies` declares them under. Every architecture
+ * also has a tool-surface check; only the ones in `DEGRADED_REASON` are ever
+ * made to fail here, because each failure has to leave its mark on a phase.
  */
 const FIDELITY_CHECKS: Record<string, string[]> = {
-  single: [],
-  'plan-execute': ['plan-execute.plan'],
-  'orchestrator-workers': ['orchestrator-workers.decomposition', 'orchestrator-workers.fan-out'],
-  'plan-execute-verify': ['plan-execute-verify.plan', 'plan-execute-verify.verdict'],
-  'propose-select': ['propose-select.proposers-grounded', 'propose-select.selection'],
-  'gated-execute': ['gated-execute.gate'],
+  single: ['single.tools'],
+  'plan-execute': ['plan-execute.plan', 'plan-execute.tools'],
+  'orchestrator-workers': [
+    'orchestrator-workers.decomposition',
+    'orchestrator-workers.fan-out',
+    'orchestrator-workers.synthesis',
+    'orchestrator-workers.tools',
+  ],
+  'plan-execute-verify': [
+    'plan-execute-verify.plan',
+    'plan-execute-verify.verdicts',
+    'plan-execute-verify.loop',
+    'plan-execute-verify.tools',
+  ],
+  'propose-select': ['propose-select.proposals', 'propose-select.selection', 'propose-select.tools'],
+  'gated-execute': ['gated-execute.reviewed', 'gated-execute.decisions', 'gated-execute.tools'],
 };
 
 /** The runner's own checks, by the ids `packages/core/src/integrity.ts` uses. */
@@ -235,10 +246,10 @@ const DEGRADED_REASON: Record<string, { phase: string; degraded: string; detail:
   'orchestrator-workers.decomposition': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] the decomposition did not parse; fell back to one worker' },
   'orchestrator-workers.fan-out': { phase: 'decompose', degraded: 'single-worker-fallback', detail: '[synthetic] only one subtask was produced' },
   'plan-execute-verify.plan': { phase: 'plan', degraded: 'empty-plan', detail: '[synthetic] the planner returned no steps; the executor ran without a plan' },
-  'plan-execute-verify.verdict': { phase: 'verify', degraded: 'verdict-unreadable', detail: '[synthetic] the verifier gave no readable verdict' },
-  'propose-select.proposers-grounded': { phase: 'propose-2', degraded: 'proposer-without-tools', detail: '[synthetic] proposer 2 started without its tool server and made no tool call' },
+  'plan-execute-verify.verdicts': { phase: 'verify-1', degraded: 'verdict-unreadable', detail: '[synthetic] verify-1: the verifier gave no readable verdict' },
+  'propose-select.tools': { phase: 'propose-2', degraded: 'proposer-without-tools', detail: '[synthetic] the proposer (propose-2) was not shown get_reservation, get_flight and 4 more' },
   'propose-select.selection': { phase: 'select', degraded: 'default-winner', detail: '[synthetic] the selection did not parse; proposal 1 was used by default' },
-  'gated-execute.gate': { phase: 'act', degraded: 'ungated-action', detail: '[synthetic] a mutating call ran without a review' },
+  'gated-execute.reviewed': { phase: 'execute', degraded: 'ungated-action', detail: '[synthetic] issue_refund ran 1 time, 0 allowed by a review' },
   'harness.mcp-connected': { phase: 'main', degraded: 'mcp-failed', detail: '[synthetic] a call started without its tool server' },
 };
 
@@ -477,7 +488,7 @@ function buildRecord({ rng, repeat, task, tier, model, arch, startMs }: RecordIn
 }
 
 function pickCheck(archId: string, rng: () => number): string {
-  const fidelity = FIDELITY_CHECKS[archId] ?? [];
+  const fidelity = (FIDELITY_CHECKS[archId] ?? []).filter((id) => id in DEGRADED_REASON);
   // Most fidelity failures are the architecture's own invariants; a few are
   // harness health (an MCP server that did not connect for one phase).
   if (fidelity.length === 0 || rng() < 0.2) return 'harness.mcp-connected';
@@ -598,7 +609,7 @@ function buildPhases(
       add('plan', 'Plan', 0, L * 0.12, 0.08, 0);
       const revise = context.imperfect && rng() < 0.35;
       add('execute', 'Execute', L * 0.12, L * (revise ? 0.4 : 0.55), 0.45, tools(4, 5));
-      add('verify', 'Verify', L * (revise ? 0.52 : 0.67), L * (revise ? 0.16 : 0.33), 0.22, tools(2, 3));
+      add('verify-1', 'Verify', L * (revise ? 0.52 : 0.67), L * (revise ? 0.16 : 0.33), 0.22, tools(2, 3));
       if (revise) {
         add('revise-1', 'Revise', L * 0.68, L * 0.18, 0.15, tools(1, 3));
         add('verify-2', 'Verify again', L * 0.86, L * 0.14, 0.1, tools(1, 2));
@@ -614,7 +625,7 @@ function buildPhases(
       break;
     }
     case 'gated-execute': {
-      add('act', 'Act', 0, L, 0.7, tools(4, 5));
+      add('execute', 'Execute', 0, L, 0.7, tools(4, 5));
       const reviews = 1 + Math.floor(rng() * 3);
       for (let i = 0; i < reviews; i++) {
         add(`review-${i + 1}`, `Review ${i + 1}`, L * (0.3 + 0.2 * i), L * 0.08, 0.3 / reviews, tools(1, 2));

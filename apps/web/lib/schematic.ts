@@ -52,7 +52,7 @@ const STEPS: Record<ArchitectureId, Step[]> = {
     { phase: 'execute', label: 'Execute', start: 20, end: 36, tools: [22, 26, 30, 34] },
   ],
   'gated-execute': [
-    { phase: 'act', label: 'Act', start: 0, end: 33, tools: [3, 6, 9, 14, 19, 24, 29] },
+    { phase: 'execute', label: 'Execute', start: 0, end: 33, tools: [3, 6, 9, 14, 19, 24, 29] },
     { phase: 'review-1', label: 'Review 1', depth: 1, start: 9, end: 12, tools: [10] },
     { phase: 'review-2', label: 'Review 2', depth: 1, start: 19, end: 22, tools: [20] },
     { phase: 'review-3', label: 'Review 3', depth: 1, start: 29, end: 32, tools: [30] },
