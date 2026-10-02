@@ -68,6 +68,12 @@ export interface Credential {
   provider?: string;
   /** Set when the value cannot be a working credential, e.g. the placeholder from .env.example. */
   problem?: string;
+  /**
+   * The host requests go to when `ANTHROPIC_BASE_URL` points somewhere other
+   * than the API: a gateway or proxy, which bills and logs by its own rules.
+   * Only the host, never a userinfo or a path that could carry a secret.
+   */
+  endpoint?: string;
 }
 
 const isSet = (value: string | undefined): value is string => value !== undefined && value.trim() !== '';
@@ -84,6 +90,22 @@ export function describeCredential(
   env: NodeJS.ProcessEnv,
   fromDotEnv: ReadonlySet<string> = new Set(),
 ): Credential {
+  const endpoint = endpointOf(env.ANTHROPIC_BASE_URL);
+  const credential = credentialFrom(env, fromDotEnv);
+  return endpoint !== undefined && credential.kind !== 'platform' ? { ...credential, endpoint } : credential;
+}
+
+/** The host of a base URL, `(unreadable URL)` when it is not one, or undefined when none is set. */
+function endpointOf(baseUrl: string | undefined): string | undefined {
+  if (!isSet(baseUrl)) return undefined;
+  try {
+    return new URL(baseUrl.trim()).host || '(unreadable URL)';
+  } catch {
+    return '(unreadable URL)';
+  }
+}
+
+function credentialFrom(env: NodeJS.ProcessEnv, fromDotEnv: ReadonlySet<string>): Credential {
   const source = (name: string) => (fromDotEnv.has(name) ? '.env' : 'environment');
   for (const [variable, provider] of PLATFORMS) {
     const value = env[variable]?.trim().toLowerCase();
@@ -128,6 +150,11 @@ export function describeCredential(
 
 /** One line for the run plan, e.g. `ANTHROPIC_API_KEY sk-ant-…a1b2 (from .env)`. */
 export function credentialText(credential: Credential): string {
+  const text = credentialKindText(credential);
+  return credential.endpoint !== undefined ? `${text}, sent to ${credential.endpoint} (ANTHROPIC_BASE_URL)` : text;
+}
+
+function credentialKindText(credential: Credential): string {
   switch (credential.kind) {
     case 'platform':
       return `${credential.provider} (${credential.variable} is set${credential.source === '.env' ? ' in .env' : ''})`;

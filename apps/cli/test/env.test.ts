@@ -104,6 +104,28 @@ describe('credentials', () => {
     expect(describeCredential({ CLAUDE_CODE_USE_BEDROCK: '0', ANTHROPIC_API_KEY: KEY }).kind).toBe('api-key');
   });
 
+  it('says where requests go when a base URL sends them elsewhere, host only', () => {
+    const viaGateway = describeCredential({
+      ANTHROPIC_API_KEY: KEY,
+      ANTHROPIC_BASE_URL: 'https://user:hunter2@gateway.example.com:8443/v1/secret-path?token=abc',
+    });
+    expect(viaGateway.endpoint).toBe('gateway.example.com:8443');
+    const text = credentialText(viaGateway);
+    expect(text).toBe(
+      'ANTHROPIC_API_KEY sk-ant-…wxyz (from the environment), sent to gateway.example.com:8443 (ANTHROPIC_BASE_URL)',
+    );
+    expect(text).not.toMatch(/hunter2|secret-path|token=abc/);
+
+    // A login goes through it too; an unset or blank variable says nothing; nonsense is reported as such.
+    expect(credentialText(describeCredential({ ANTHROPIC_BASE_URL: 'http://localhost:9' }))).toBe(
+      "this machine's Claude Code login (no key in the environment), sent to localhost:9 (ANTHROPIC_BASE_URL)",
+    );
+    expect(describeCredential({ ANTHROPIC_API_KEY: KEY, ANTHROPIC_BASE_URL: '  ' }).endpoint).toBeUndefined();
+    expect(describeCredential({ ANTHROPIC_BASE_URL: 'not a url' }).endpoint).toBe('(unreadable URL)');
+    // A cloud provider switch routes elsewhere altogether; the base URL is not what is billed.
+    expect(describeCredential({ CLAUDE_CODE_USE_BEDROCK: '1', ANTHROPIC_BASE_URL: 'http://localhost:9' }).endpoint).toBeUndefined();
+  });
+
   it('never prints more of a secret than the mask', () => {
     const text = credentialText(describeCredential({ ANTHROPIC_API_KEY: KEY }));
     expect(text).not.toContain(KEY.slice(7, -4));
