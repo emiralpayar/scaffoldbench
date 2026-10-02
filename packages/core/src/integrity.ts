@@ -10,12 +10,14 @@
  *
  * The checks look for the harness failing the architecture, not for the
  * architecture failing the task. A phase that runs out of turns, budget or
- * time has failed on its own terms; the run is a valid, losing data point,
- * and excluding it would flatter exactly the architectures that fail that
- * way. A phase that crashed, lost its tool server, had a harness tool denied
- * or never got its structured reply has not been measured at all.
+ * time, or whose model could not finish its turn (a model stop: out of room,
+ * or a refusal), has failed on its own terms; the run is a valid, losing data
+ * point, and excluding it would flatter exactly the architectures that fail
+ * that way. A phase that crashed, lost its tool server, had a harness tool
+ * denied or never got its structured reply has not been measured at all.
  */
 
+import { MODEL_STOP_LABELS, type ModelStop } from './apiErrors';
 import { matchesToolList } from './guard';
 import { STRUCTURED_OUTPUT_TOOL } from './hermetic';
 import type {
@@ -33,7 +35,10 @@ export const HARNESS_CHECK = {
   runCompleted: 'harness.run-completed',
   /** No model call failed at the API. */
   api: 'harness.api',
-  /** Every call ended with a result, or was stopped by the run's own limits. */
+  /**
+   * Every call ended with a result, was stopped by the run's own limits, or
+   * ended on a model stop, whatever result subtype the CLI gave that.
+   */
   callsEnded: 'harness.calls-ended',
   /** The guard never denied a harness tool, nor a tool the session itself offered. */
   harnessTools: 'harness.harness-tools',
@@ -97,6 +102,8 @@ export interface TracedCall {
   end?: {
     subtype: string | undefined;
     apiError?: ApiError;
+    /** Set when the turn ended because the model could not finish it; see `QueryOutcome.modelStop`. */
+    modelStop?: Pick<ModelStop, 'reason' | 'category'>;
     structuredMissing: boolean;
     /** The MCP servers the harness gave the call. Absent in traces older than per-call servers. */
     mcpServersExpected?: string[];
@@ -162,9 +169,11 @@ export function tracedCalls(
         break;
       case 'phase_end': {
         const apiError = asApiError(meta.apiError);
+        const modelStop = asModelStop(meta.modelStop);
         call.end = {
           subtype: typeof meta.subtype === 'string' ? meta.subtype : undefined,
           ...(apiError ? { apiError } : {}),
+          ...(modelStop ? { modelStop } : {}),
           structuredMissing: meta.structuredMissing === true,
           ...(Array.isArray(meta.mcpServersExpected)
             ? { mcpServersExpected: stringArray(meta.mcpServersExpected) }
@@ -219,7 +228,9 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
     HARNESS_CHECK.callsEnded,
     calls.flatMap((call) => {
       if (!call.end) return [`${where(call)} never finished`];
-      if (call.end.apiError) return [];
+      // The API check's business; and a model stop is the model's own ending,
+      // which the CLI reports as an error result as often as a successful one.
+      if (call.end.apiError || call.end.modelStop) return [];
       const subtype = call.end.subtype ?? 'unknown';
       return CLEAN_ENDINGS.has(subtype) ? [] : [`${where(call)} ended ${subtype}`];
     }),
@@ -298,7 +309,10 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
       if (!end?.structuredMissing || end.apiError) return [];
       if (end.subtype !== undefined && CUT_SHORT.has(end.subtype)) return [];
       if (retried.has(call.callId)) return [];
-      return [`${where(call)} returned no structured output (${end.subtype ?? 'no result'})`];
+      // A model stop does not excuse the miss: the architecture still lacks
+      // the reply it is built on. It does say better than the subtype why.
+      const why = end.modelStop ? MODEL_STOP_LABELS[end.modelStop.reason] : (end.subtype ?? 'no result');
+      return [`${where(call)} returned no structured output (${why})`];
     }),
   );
 
@@ -390,6 +404,16 @@ function serverStatuses(value: unknown): McpServerStatus[] {
     const { name, status } = item as { name?: unknown; status?: unknown };
     return typeof name === 'string' ? [{ name, status: typeof status === 'string' ? status : 'unknown' }] : [];
   });
+}
+
+function asModelStop(value: unknown): Pick<ModelStop, 'reason' | 'category'> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { reason, category } = value as { reason?: unknown; category?: unknown };
+  if (typeof reason !== 'string' || !Object.hasOwn(MODEL_STOP_LABELS, reason)) return undefined;
+  return {
+    reason: reason as ModelStop['reason'],
+    ...(typeof category === 'string' ? { category } : {}),
+  };
 }
 
 function asApiError(value: unknown): ApiError | undefined {

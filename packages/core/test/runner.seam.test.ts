@@ -359,6 +359,24 @@ describe('failure modes through the real call path', () => {
     expect(record.integrity?.ok).toBe(true);
   });
 
+  it('does not call a turn the model could not finish a harness failure, whatever the result says', async () => {
+    // The CLI can end a turn it gave up on with an execution-error result.
+    const notice = "The model's tool call could not be parsed (retry also failed).";
+    setScript(async function* () {
+      yield assistant('Let me refund it.');
+      yield assistant(notice, { model: '<synthetic>', usage: {} });
+      yield errorResult('error_during_execution', {
+        errors: [notice],
+        terminalReason: 'malformed_tool_use_exhausted',
+      });
+    });
+
+    const record = await onlyRecord();
+
+    expect(record.failureMode).toBe('wrong_answer');
+    expect(record.integrity?.ok).toBe(true);
+  });
+
   it('times out a run that would not finish, and charges what it streamed', async () => {
     setScript(async function* (session) {
       yield assistant('Looking into it.', { usage: { input_tokens: 50_000, output_tokens: 5_000 } });

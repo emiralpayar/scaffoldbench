@@ -226,6 +226,14 @@ export interface ModelStop {
   category?: string;
 }
 
+/** How a model stop is named in errors and integrity details: `refused: …`. */
+export const MODEL_STOP_LABELS: Readonly<Record<ModelStop['reason'], string>> = {
+  output_limit: 'output limit',
+  context_limit: 'context limit',
+  malformed_tool_use: 'malformed tool call',
+  refusal: 'refused',
+};
+
 /** The CLI's own wording for a context that no longer fits, and for a tool call it gave up parsing. */
 const CONTEXT_LIMIT_NOTICE = /^(?:Prompt is too long|The model has reached its context window limit)/;
 const MALFORMED_TOOL_USE_NOTICE = /^The model's tool call could not be parsed/;

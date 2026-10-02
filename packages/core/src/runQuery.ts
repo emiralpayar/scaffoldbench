@@ -1,6 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { assistantText, isSyntheticAssistant, type ModelStop } from './apiErrors';
+import { MODEL_STOP_LABELS, assistantText, isSyntheticAssistant, type ModelStop } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
 import type { ToolCallReviewer } from './guard';
@@ -17,14 +17,6 @@ import type {
   TraceSink,
   UsageTotals,
 } from './types';
-
-/** How `QueryOutcome.error` names a model stop. */
-const MODEL_STOP_LABEL: Record<ModelStop['reason'], string> = {
-  output_limit: 'output limit',
-  context_limit: 'context limit',
-  malformed_tool_use: 'malformed tool call',
-  refusal: 'refused',
-};
 
 /** Smallest budget worth attempting a call with. */
 const MIN_CALL_BUDGET_USD = 0.02;
@@ -358,7 +350,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     : aborted
       ? `aborted: ${stoppedBy ? `run ${stoppedBy} limit reached` : 'run aborted'}`
       : report.modelStop !== undefined
-        ? `${MODEL_STOP_LABEL[report.modelStop.reason]}: ${report.modelStop.message}`
+        ? `${MODEL_STOP_LABELS[report.modelStop.reason]}: ${report.modelStop.message}`
         : report.subtype !== undefined && report.subtype !== 'success'
           ? report.errors.join('; ') || report.subtype
           : undefined;

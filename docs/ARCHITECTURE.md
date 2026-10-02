@@ -370,7 +370,7 @@ designed, and every sign of it was in the traces. So every record now carries
 `integrity: { ok, checks[] }`, and a run with `ok: false` must not be ranked.
 
 The runner's own checks (`harness.*`) read the trace call by call: no call failed at the API or
-ended without a result; the guard never denied `StructuredOutput` or any tool the session itself
+ended without a result (a model stop is an ending, whatever result subtype the CLI gave it); the guard never denied `StructuredOutput` or any tool the session itself
 offered; every MCP server a call was given reported `connected`, and no other server loaded; no
 call was offered one of Claude Code's own tools, only its task's and the structured-output tool; every
 schema call that ran to the end got its structured output; no phase was marked `degraded` by its
@@ -398,12 +398,13 @@ review with no readable decision — it records that on the phase as `degraded`,
 verdict is never approval, and an action no reviewer could decide on is denied.
 
 Running out of budget or time is not an integrity failure, and neither is an acting phase running
-out of turns. Such a run is a valid, losing data point; excluding it would flatter exactly the
+out of turns or ending on a model stop (out of output tokens or context, a tool call it could not
+form, a refusal). Such a run is a valid, losing data point; excluding it would flatter exactly the
 architectures that fail that way. A phase the run's limits cut short is therefore never marked
 degraded, and a fidelity check about a phase that was cut short, or never started because the run
 had stopped, passes. (A run stopped by an API failure passes them too, but fails `harness.api` and
-is never ranked.) A planner, decomposer, selector, verifier or reviewer that uses up its turns
-without giving its structured reply is different: it ran to the end of what it was given and the
+is never ranked.) A planner, decomposer, selector, verifier or reviewer that uses up its turns, or
+stops on a model stop, without giving its structured reply is different: it ran to the end of what it was given and the
 architecture still did not get the plan, split, choice or verdict it is built on, so that run
 fails `harness.structured-output` and the strategy's own check.
 

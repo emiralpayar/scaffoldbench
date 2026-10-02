@@ -34,6 +34,7 @@ interface CallShape {
   denied?: string[];
   structuredMissing?: boolean;
   apiError?: ApiError;
+  modelStop?: { reason: string; category?: string };
   noInit?: boolean;
   noEnd?: boolean;
 }
@@ -65,6 +66,7 @@ function call(shape: CallShape = {}): TraceEvent[] {
           ...(expected !== null ? { mcpServersExpected: expected } : {}),
           ...(shape.structuredMissing ? { structuredMissing: true } : {}),
           ...(shape.apiError ? { apiError: shape.apiError } : {}),
+          ...(shape.modelStop ? { modelStop: shape.modelStop } : {}),
         },
       }),
     );
@@ -249,6 +251,29 @@ describe('harnessChecks', () => {
     expect(result).toMatchObject({ ok: false, detail });
   });
 
+  it('takes a model stop for the call’s own ending, whatever subtype the CLI gave it', () => {
+    for (const subtype of ['success', 'error_during_execution']) {
+      const trace = call({ subtype, modelStop: { reason: 'malformed_tool_use' } });
+      const checks = harnessChecks({ trace, phases: [] });
+      expect(integrityOf(checks).ok).toBe(true);
+    }
+  });
+
+  it('still fails a schema call a model stop left without its reply, and says why', () => {
+    const trace = call({
+      phase: 'plan',
+      structuredMissing: true,
+      modelStop: { reason: 'refusal', category: 'cyber' },
+    });
+    const checks = harnessChecks({ trace, phases: [] });
+
+    expect(check(checks, HARNESS_CHECK.callsEnded).ok).toBe(true);
+    expect(check(checks, HARNESS_CHECK.structuredOutput)).toMatchObject({
+      ok: false,
+      detail: 'plan (call-1) returned no structured output (refused)',
+    });
+  });
+
   it('fails a call that never recorded its end', () => {
     const result = check(harnessChecks({ trace: call({ noEnd: true }), phases: [] }), HARNESS_CHECK.callsEnded);
     expect(result).toMatchObject({ ok: false, detail: 'main (call-1) never finished' });
@@ -318,6 +343,17 @@ describe('tracedCalls', () => {
     expect(calls.map((c) => [c.callId, c.phase, c.end?.subtype, c.deniedTools])).toEqual([
       ['call-1', 'propose-1', 'success', []],
       ['call-2', 'propose-2', 'success', ['Bash']],
+    ]);
+  });
+
+  it('reads how a call’s model stopped, ignoring reasons it does not know', () => {
+    const trace = [
+      ...call({ callId: 'call-1', modelStop: { reason: 'refusal', category: 'cyber' } }),
+      ...call({ callId: 'call-2', modelStop: { reason: 'tired' } }),
+    ];
+    expect(tracedCalls(trace).map((c) => c.end?.modelStop)).toEqual([
+      { reason: 'refusal', category: 'cyber' },
+      undefined,
     ]);
   });
 
