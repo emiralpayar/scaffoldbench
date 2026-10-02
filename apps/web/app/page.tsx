@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import { ActOne } from '../components/landing/ActOne';
 import { ActTwo } from '../components/landing/ActTwo';
@@ -10,6 +10,7 @@ import { analyzeForSite } from '../lib/analysis';
 import { ARCHITECTURES, architectureColor, architectureInfo, architectureName } from '../lib/architectures';
 import { formatInt } from '../lib/format';
 import { modelShortName } from '../lib/models';
+import { DARK } from '../lib/palette';
 import { derivePostmortem } from '../lib/postmortem';
 import { isRankable } from '../lib/records';
 import { loadHeroRace } from '../lib/server/replays';
@@ -21,6 +22,9 @@ import { timelineFromTrace } from '../lib/timeline';
 
 // Title, description and social card come from the root layout.
 export const metadata: Metadata = { alternates: { canonical: absoluteUrl('/') } };
+
+// The page opens on the dark hero in both themes, so the browser's own bar should match it.
+export const viewport: Viewport = { themeColor: DARK.plane };
 
 export default async function HomePage() {
   const [published, evidence, recorded] = await Promise.all([
