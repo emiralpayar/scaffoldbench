@@ -73,3 +73,12 @@ long-lived Node host, not a serverless function. The rules that keep it safe
 - `app/globals.css` holds the colour, type, space and motion tokens for both
   themes; `test/tokens.test.ts` checks their contrast and the architecture
   palette's separation.
+- `lib/pageMetadata.ts` builds a page's title, Open Graph and Twitter
+  blocks and canonical link from one title, description and route. Every
+  page uses it: set only a `title` and Next drops the layout's blocks, so the
+  page would unfurl as the home page. The post-mortem has a social card of its
+  own (`app/postmortem/og.png`); the rest share `app/og.png`.
+- `components/Link.tsx` is `next/link` with prefetching off. A production build
+  otherwise fetches every page a link scrolls past: opening the matrix
+  fetched some 8 MB of pages (uncompressed) that nobody opened. Import it, not
+  `next/link`.
