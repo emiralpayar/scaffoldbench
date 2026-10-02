@@ -344,6 +344,26 @@ describe('API errors', () => {
     expect(outcome.text).toBe(answer);
   });
 
+  it('does not blame the API for a turn the CLI carried on past a failed request', async () => {
+    // A response cut off mid-stream is reported, then the CLI asks the model
+    // to carry on and the turn goes on to end for a reason of its own.
+    setScript(async function* () {
+      yield assistant('API Error: Server error mid-response. The response above may be incomplete.', {
+        model: '<synthetic>',
+        error: 'server_error',
+        usage: {},
+      });
+      yield assistant('Picking up where I left off.');
+      yield errorResult('error_max_turns', { errors: ['Reached maximum number of turns (6)'] });
+    });
+
+    const outcome = await runQuery(makeCtx(), { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.subtype).toBe('error_max_turns');
+    expect(outcome.text).toBe('Picking up where I left off.');
+  });
+
   it('counts a model that ran out of room against the run, never as an API failure', async () => {
     // What the CLI streams once its own attempts to let the model carry on
     // have failed: the cut-off text, then its notice dressed as an API error,

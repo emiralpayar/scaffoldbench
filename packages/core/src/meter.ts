@@ -4,6 +4,7 @@ import {
   apiErrorOfAssistant,
   classifyFailureText,
   isApiErrorText,
+  isSyntheticAssistant,
   kindFromStatus,
   makeApiError,
   modelStopOfAssistant,
@@ -162,7 +163,14 @@ export class CallMeter {
 
   #observeAssistant(message: Extract<SDKMessage, { type: 'assistant' }>): void {
     const apiError = apiErrorOfAssistant(message);
-    if (apiError) this.#assistantError = apiError;
+    if (apiError) {
+      this.#assistantError = apiError;
+    } else if (message.parent_tool_use_id == null && !isSyntheticAssistant(message)) {
+      // The model spoke after the failure: the CLI carried the turn on past
+      // it (it asks the model to resume a response cut off mid-stream), so
+      // the failure is not what ended the turn.
+      this.#assistantError = undefined;
+    }
     if (message.parent_tool_use_id == null) this.#modelStop = modelStopOfAssistant(message);
 
     const body = message.message as { id?: unknown; model?: unknown; usage?: unknown } | undefined;
