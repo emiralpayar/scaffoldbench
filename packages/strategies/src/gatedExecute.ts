@@ -120,10 +120,15 @@ export function reviewPrompt(
             ),
           ),
         ),
+    // A call is shown only the tools it may use, so the reviewer never sees
+    // the mutating tool it is judging. Told nothing, a reviewer took that
+    // tool for one that does not exist and denied every action on that
+    // ground (Haiku 4.5 at low effort, airline-easy).
     'You are the action reviewer. An agent working on the task above is about to make the call ' +
-      'shown, and it would change state. You hold the read-only tools and the domain policy: ' +
-      'check the current state and the rules this action touches, and decide whether it should ' +
-      'run.',
+      'shown, and it would change state. The tool is the agent\'s: it is not among yours, and ' +
+      'it does not need to be, because the agent makes the call and you decide whether it ' +
+      'should. You hold the read-only tools and the domain policy: check the current state and ' +
+      'the rules this action touches, and decide whether it should run.',
     'Allow it when it is correct, needed for the task and within the rules. Deny it when it is ' +
       'wrong, premature or against a rule, and give a reason the agent can act on: what is wrong, ' +
       'and what would be right. Judge the action itself — you will not see the agent\'s reasoning, ' +
