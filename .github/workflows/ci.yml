@@ -1,9 +1,13 @@
 name: CI
 
+# Pushes to main, pull requests and the merge queue. A branch with an open
+# pull request is checked once, as the pull request; listing every push as
+# well ran the same commit twice.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
+  merge_group:
 
 # A superseded commit's checks are worthless; cancel them rather than queue them.
 concurrency:
@@ -14,28 +18,76 @@ permissions:
   contents: read
 
 jobs:
-  # No ANTHROPIC_API_KEY is available here, and none is needed: every test
-  # injects a fake judge and a fake runQuery, and nothing touches the network.
-  # A check that started requiring a key would be a regression in the test
-  # suite, not a reason to add one.
+  # No ANTHROPIC_API_KEY is available here, and none is needed: the tests
+  # drive the real harness against a scripted SDK, and nothing touches the
+  # network. A check that started requiring a key would be a regression in
+  # the test suite, not a reason to add one.
   check:
-    name: Typecheck and tests
+    name: Typecheck and tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # engines says >=22: test the oldest supported line and the newest LTS.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      # Covers packages/*, the CLI and its tests, scripts/ and vitest.config.ts.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test
+
+  cli:
+    name: CLI smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
 
       - run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      # Every command here is free: none of them makes a model call.
+      - name: Version and help
+        run: |
+          npm run --silent arena -- --version
+          npm run --silent arena -- help run > /dev/null
 
-      - name: Tests
-        run: npm run test
+      - name: Catalogs
+        run: |
+          npm run --silent arena -- tasks
+          npm run --silent arena -- strategies
+
+      - name: Report the committed run sets
+        # Whatever state a committed run set is in (the first predates the
+        # integrity checks and renders with a health warning), it must render.
+        run: |
+          npm run --silent arena -- report
+          npm run --silent arena -- report demo-synthetic > /dev/null
+
+      - name: Plan a matrix without running it
+        run: npm run --silent arena -- run --tasks airline --strategies single,plan-execute --dry-run
+
+      # Starts four real SDK sessions and stops each at start-up, before any
+      # request is made: catches an SDK or CLI upgrade that breaks tool
+      # registration, structured output or per-call MCP servers. (`arena
+      # doctor` would also report that no credential is configured here, which
+      # is true and, for this job, beside the point.)
+      - name: Wiring canary
+        run: npm run --silent check:wiring -- --init-only
 
   web:
     name: Build site (${{ matrix.results }} results)
@@ -48,9 +100,9 @@ jobs:
         # the state the project ships in until a real benchmark has been run.
         results: [committed, empty]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
