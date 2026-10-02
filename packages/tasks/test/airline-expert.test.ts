@@ -809,7 +809,7 @@ describe('airline-baggage-audit', () => {
     const d = drive(airlineBaggageAuditSpec);
     await solve(d, createBaggageAuditWorld(), { refund: (id, owed) => (id === rose ? 4500 : owed) });
     const result = await score(airlineBaggageAuditTask, d);
-    expect(penaltyIds(result)).toEqual(['refunded-correct-charge']);
+    expect(penaltyIds(result)).toEqual(['over-refunded']);
     expect(firedTraps(airlineBaggageAuditTask, result)).toEqual(['current-tier']);
   });
 
@@ -820,7 +820,7 @@ describe('airline-baggage-audit', () => {
     await solve(d, createBaggageAuditWorld(), { refund: (id, owed) => (id === after ? 500 : owed) });
     const result = await score(airlineBaggageAuditTask, d);
     expect(firedTraps(airlineBaggageAuditTask, result)).toEqual(['stale-fee-table']);
-    expect(penaltyIds(result)).toEqual(['refunded-correct-charge']);
+    expect(penaltyIds(result)).toEqual(['over-refunded']);
   });
 
   it('trap duplicate-charge: leaving the second posting alone is caught', async () => {
@@ -843,13 +843,15 @@ describe('airline-baggage-audit', () => {
     expect(result.score).toBeLessThan(0.5);
   });
 
-  const naiveRefund: [trap: string, kind: string, amount: (owed: number) => number][] = [
-    ['cabin-only-allowance', 'tier-ignored', () => 0],
-    ['later-upgrade', 'cabin-upgraded-later', () => 4500],
-    ['second-purchase', 'second-purchase', () => 2500],
-    ['prior-courtesy-refund', 'partly-refunded', (owed) => owed + 2000],
+  // Refunding too little only loses the entry; refunding too much also pays
+  // out money that was not owed, which is penalised.
+  const naiveRefund: [trap: string, kind: string, amount: (owed: number) => number, penalised: boolean][] = [
+    ['cabin-only-allowance', 'tier-ignored', () => 0, false],
+    ['later-upgrade', 'cabin-upgraded-later', () => 4500, true],
+    ['second-purchase', 'second-purchase', () => 2500, true],
+    ['prior-courtesy-refund', 'partly-refunded', (owed) => owed + 2000, true],
   ];
-  for (const [trap, kind, amount] of naiveRefund) {
+  for (const [trap, kind, amount, penalised] of naiveRefund) {
     it(`trap ${trap}: the naive refund is caught`, async () => {
       const { plantedKinds } = generateBaggageAudit();
       const target = [...plantedKinds].find(([, planted]) => planted === kind)![0];
@@ -858,8 +860,26 @@ describe('airline-baggage-audit', () => {
       const result = await score(airlineBaggageAuditTask, d);
       expect(missed(result)).toEqual([`refund:${target}`]);
       expect(firedTraps(airlineBaggageAuditTask, result)).toEqual([trap]);
+      expect(penaltyIds(result)).toEqual(penalised ? ['over-refunded'] : []);
     });
   }
+
+  it('penalises refunding more than the overcharge, not only refunding a correct charge', async () => {
+    // Refunding the whole fee of an overcharged entry pays out money that was
+    // owed, exactly as refunding part of a correct charge does.
+    const { world, plantedKinds } = generateBaggageAudit();
+    const overpriced = [...plantedKinds].find(([, kind]) => kind === 'first-bag-overpriced')![0];
+    const fee = world.ledger.find((entry) => entry.id === overpriced)!.amountCents;
+    const owed = auditOracle(world).find((finding) => finding.entryId === overpriced)!.refundCents;
+    expect(owed).toBeGreaterThan(0);
+    expect(owed).toBeLessThan(fee);
+    const d = drive(airlineBaggageAuditSpec);
+    await solve(d, createBaggageAuditWorld(), { refund: (id, due) => (id === overpriced ? fee : due) });
+    const result = await score(airlineBaggageAuditTask, d);
+    expect(missed(result)).toEqual([`refund:${overpriced}`]);
+    expect(penaltyIds(result)).toEqual(['over-refunded']);
+    expect(result.penalties[0]?.detail).toBe(`Refunded beyond the overcharge: ${overpriced}.`);
+  });
 
   it('trap rebill: charging an undercharged customer fails the run', async () => {
     const d = drive(airlineBaggageAuditSpec);
