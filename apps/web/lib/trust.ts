@@ -29,7 +29,7 @@ export const TRUST_CLAIMS: readonly TrustClaim[] = [
   },
   {
     title: 'Scored by state, not by vibes',
-    body: 'Tool-use tasks are graded by checking the final state of the world and the journal of tool calls. No language model decides who won.',
+    body: 'Tool-use tasks are graded by checking the final state of the world and the journal of tool calls: no language model decides who won. Research tasks are graded by a judge model against a rubric, and say so.',
     source: 'packages/tasks/src/defineToolUseTask.ts',
     icon: 'grid',
   },
