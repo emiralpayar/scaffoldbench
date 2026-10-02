@@ -206,6 +206,8 @@ export interface SpendPlan {
    * grading on top of it.
    */
   judgeOverBudget: number;
+  /** What every attempt of every run could spend at its cap, with all the grading, if no budget cut it short. */
+  uncapped: number;
   /** The most this session can spend, give or take one model turn per call in flight. */
   ceiling: number;
 }
@@ -222,7 +224,7 @@ export function spendPlan(input: SpendInput): SpendPlan {
   const agentCeiling = Math.min(input.attempts * input.runs * input.maxCostUsd, input.totalBudgetUsd);
   const judgeOverBudget = Math.min(maxInFlight, input.gradedRuns) * judgeCapPerRun;
   const ceiling = Math.min(uncapped, input.totalBudgetUsd + judgeOverBudget);
-  return { maxInFlight, judgeCapPerRun, agentCeiling, judgeOverBudget, ceiling };
+  return { maxInFlight, judgeCapPerRun, agentCeiling, judgeOverBudget, uncapped, ceiling };
 }
 
 /**
@@ -240,22 +242,26 @@ export function needsConfirmation(input: {
   return input.interactive && !input.yes && !input.budgetGiven && input.ceilingUsd > CONFIRM_ABOVE_USD;
 }
 
-/** The plan's "Ceiling" line, saying where the number comes from. */
+/**
+ * The plan's "Ceiling" line: the number, and the terms that add up to it.
+ * Either nothing binds, and the terms are every attempt of every run plus all
+ * the grading, or the session's budget does, and the terms are the budget
+ * plus the grading of the runs still in flight when it is reached.
+ */
 export function ceilingText(input: SpendInput, plan: SpendPlan): string {
   const parts: string[] = [];
-  if (input.attempts * input.runs * input.maxCostUsd <= input.totalBudgetUsd) {
-    parts.push(
-      `${plural(input.runs, 'run')} × ${formatBudget(input.maxCostUsd)} cap` +
-        (input.attempts > 1 ? ` × ${input.attempts} attempts` : ''),
-    );
+  const attempts = input.attempts > 1 ? ` × ${input.attempts} attempts` : '';
+  const grading = `${input.judgeSamples} × ${formatBudget(JUDGE_CALL_CAP_USD)} each`;
+  if (plan.uncapped <= input.totalBudgetUsd + plan.judgeOverBudget + 1e-9) {
+    parts.push(`${plural(input.runs, 'run')} × ${formatBudget(input.maxCostUsd)} cap${attempts}`);
+    if (plan.judgeCapPerRun > 0) parts.push(`grading of ${plural(input.gradedRuns, 'run')} (${grading}${attempts})`);
   } else {
     parts.push(`total budget ${formatBudget(input.totalBudgetUsd)}`);
-  }
-  if (plan.judgeCapPerRun > 0) {
-    parts.push(
-      `grading of up to ${plural(Math.min(plan.maxInFlight, input.gradedRuns), 'run')} in flight ` +
-        `(${input.judgeSamples} × ${formatBudget(JUDGE_CALL_CAP_USD)} each)`,
-    );
+    if (plan.judgeOverBudget > 0) {
+      parts.push(
+        `grading of up to ${plural(Math.min(plan.maxInFlight, input.gradedRuns), 'run')} in flight (${grading})`,
+      );
+    }
   }
   return `${formatBudget(plan.ceiling)}  ${parts.join(' + ')}`;
 }

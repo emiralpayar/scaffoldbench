@@ -207,7 +207,7 @@ describe('spend', () => {
 
   it('says "1 run", not "1 runs"', () => {
     const input = { runs: 1, gradedRuns: 1, maxCostUsd: 0.5, totalBudgetUsd: 0.5, concurrency: 4, judgeSamples: 3, attempts: 1 };
-    expect(ceilingText(input, spendPlan(input))).toBe('$2.00  1 run × $0.50 cap + grading of up to 1 run in flight (3 × $0.50 each)');
+    expect(ceilingText(input, spendPlan(input))).toBe('$2.00  1 run × $0.50 cap + grading of 1 run (3 × $0.50 each)');
   });
 
   it('adds the grading of the runs still in flight once the budget binds', () => {
@@ -225,11 +225,28 @@ describe('spend', () => {
     const plan = spendPlan(input);
     // 3 attempts x (2 runs x $0.50 + 1 graded run x 2 x $0.50)
     expect(plan.ceiling).toBe(6);
-    expect(ceilingText(input, plan)).toBe('$6.00  2 runs × $0.50 cap × 3 attempts + grading of up to 1 run in flight (2 × $0.50 each)');
+    expect(ceilingText(input, plan)).toBe('$6.00  2 runs × $0.50 cap × 3 attempts + grading of 1 run (2 × $0.50 each × 3 attempts)');
 
     // Once the budget binds, attempts draw on it like anything else.
     const large = spendPlan({ ...input, runs: 180, gradedRuns: 0 });
     expect(large.ceiling).toBe(25);
+  });
+
+  it('always shows terms that add up to the number: all of them, or the budget and the grading in flight', () => {
+    const terms = (text: string) => text.split('  ')[1] ?? '';
+    // Agent part under the budget, but the grading pushes the whole past it: the budget binds.
+    const input = { runs: 10, gradedRuns: 10, maxCostUsd: 0.5, totalBudgetUsd: 25, concurrency: 4, judgeSamples: 3, attempts: 3 };
+    const plan = spendPlan(input);
+    expect(plan.ceiling).toBe(31);
+    expect(ceilingText(input, plan)).toBe('$31.00  total budget $25.00 + grading of up to 4 runs in flight (3 × $0.50 each)');
+
+    // Nothing binds: 3 x (10 runs x $0.50 + 2 graded x 1.5) = $24 < $25.
+    const small = { ...input, gradedRuns: 2 };
+    const open = spendPlan(small);
+    expect(open.ceiling).toBe(24);
+    expect(terms(ceilingText(small, open))).toBe(
+      '10 runs × $0.50 cap × 3 attempts + grading of 2 runs (3 × $0.50 each × 3 attempts)',
+    );
   });
 
   it('knows a small budget holds fewer runs in flight than --concurrency', () => {
