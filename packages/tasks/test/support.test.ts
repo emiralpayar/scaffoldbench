@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ScoreInput, Task, TaskScore, ToolCall } from '@arena/core';
+import type { Task, TaskScore, ToolCall } from '@arena/core';
 import {
   createSupportTools,
   createSupportWorld,
@@ -9,6 +9,7 @@ import {
   supportTasks,
   type SupportWorld,
 } from '../src/worlds/support';
+import { createDriver, scoreInput } from './harness';
 
 // Expected answers are written out literally here rather than imported from the
 // world definition: the test is the specification, so it must fail if the world
@@ -25,42 +26,18 @@ interface Harness {
   score(task: Task): Promise<TaskScore>;
 }
 
-/**
- * Drive the real tool handlers and record a journal the same way
- * `createJournaledToolServer` would, without pulling in the Agent SDK.
- */
+/** The shared harness, with the `{ text, isError }` reply shape these tests were written against. */
 function harness(world = createSupportWorld()): Harness {
-  const journal: ToolCall[] = [];
-  const byName = new Map(createSupportTools(world).map((spec) => [spec.name, spec]));
-
+  const driver = createDriver(world, createSupportTools(world));
   return {
     world,
-    journal,
+    journal: driver.journal,
     async call(name, args = {}) {
-      const spec = byName.get(name);
-      if (!spec) throw new Error(`no such tool: ${name}`);
-      const reply = await spec.handler(args);
-      const text = typeof reply === 'string' ? reply : reply.text;
-      const isError = typeof reply === 'string' ? false : reply.isError === true;
-      journal.push({ name, args, tMs: journal.length, ok: !isError, result: text });
-      return { text, isError };
+      const { text, ok } = await driver.attempt(name, args);
+      return { text, isError: !ok };
     },
     score(task) {
-      return task.score(scoreInput(world, journal));
-    },
-  };
-}
-
-function scoreInput(world: SupportWorld, journal: ToolCall[]): ScoreInput {
-  return {
-    env: { createMcpServers: () => ({}), allowedTools: [], readOnlyTools: [], state: world, journal },
-    outcome: { finalText: '', subagentCount: 0, phases: [] },
-    trace: [],
-    deps: {
-      judge: async () => {
-        throw new Error('tool-use tasks must not call the judge');
-      },
-      judgeSamples: 1,
+      return task.score(scoreInput(driver));
     },
   };
 }
@@ -142,7 +119,6 @@ describe('support tools', () => {
       ['get_ticket', { id: 'T-9999' }],
       ['get_user', { id: 'U-999' }],
       ['get_oncall', { rotation: 'no-such-rotation' }],
-      ['get_escalation_matrix', { service: 'teleportation' }],
       ['assign_ticket', { ticketId: 'T-9999', engineerId: 'E-101' }],
       ['assign_ticket', { ticketId: 'T-1041', engineerId: 'E-999' }],
       ['set_severity', { ticketId: 'T-9999', severity: 'sev1' }],
@@ -163,6 +139,13 @@ describe('support tools', () => {
     expect(h.world.auditLog).toHaveLength(0);
   });
 
+  it('rejects a service outside the enum at the schema, before the handler runs', async () => {
+    const h = harness();
+    await expect(h.call('get_escalation_matrix', { service: 'teleportation' })).rejects.toThrow(
+      /invalid arguments/,
+    );
+  });
+
   it('resolves on-call against the requested instant, not the current shift', async () => {
     const h = harness();
     const now = await h.call('get_oncall', { rotation: 'incident-command' });
@@ -180,15 +163,15 @@ describe('support tools', () => {
     ).toBe(true);
   });
 
-  it('refuses to move an existing SLA deadline earlier', async () => {
+  it('lets a deadline move in either direction and leaves the policy question to the scorer', async () => {
     const h = harness();
     const shorten = await h.call('extend_sla', {
       ticketId: 'T-1070',
       dueAt: '2026-03-17T11:00:00Z',
       reason: 'urgent',
     });
-    expect(shorten.isError).toBe(true);
-    expect(ticket(h.world, 'T-1070').slaDueAt).toBe(HARD_DUE);
+    expect(shorten.isError).toBe(false);
+    expect(ticket(h.world, 'T-1070').slaDueAt).toBe('2026-03-17T11:00:00Z');
 
     const extend = await h.call('extend_sla', {
       ticketId: 'T-1070',
@@ -323,6 +306,18 @@ describe('support-easy', () => {
     expect(score.penalties).toEqual([]);
     expect(score.score).toBeGreaterThan(0);
     expect(score.score).toBeLessThan(1);
+  });
+
+  it('hard-fails when another ticket is changed along the way', async () => {
+    const h = harness();
+    await goldenPath(h);
+    await h.call('close_ticket', { ticketId: 'T-1055', resolution: 'tidying up' });
+    await h.call('set_severity', { ticketId: 'T-1052', severity: 'sev1' });
+    const score = await h.score(supportEasyTask);
+    expect(score.penalties.map((p) => p.id)).toEqual(['out-of-scope-change']);
+    expect(score.penalties[0]?.detail).toContain('tickets[T-1055].status');
+    expect(score.penalties[0]?.detail).toContain('tickets[T-1052].severity');
+    expect(score.score).toBe(0);
   });
 
   it('scores 0 on an untouched world', async () => {
@@ -491,18 +486,48 @@ describe('support-hard', () => {
     expect(score.penalties).toEqual([]);
   });
 
-  it('does not reward escalating to the right engineer while shortening the deadline', async () => {
+  it('halves the score when the committed deadline is pulled forward to the sev1 target', async () => {
     const h = harness();
     await h.call('get_escalation_matrix', { service: 'payroll' });
     await h.call('set_severity', { ticketId: 'T-1070', severity: 'sev1' });
     await h.call('escalate_ticket', { ticketId: 'T-1070', engineerId: 'E-402', reason: 'sev1' });
-    // The tool refuses to shorten a committed deadline, so the state stays correct
-    // and the assertion holds; this pins that behaviour to the scorer.
+    await h.call('post_comment', { ticketId: 'T-1070', body: 'Blocked by T-1071, still open.' });
     await h.call('extend_sla', { ticketId: 'T-1070', dueAt: '2026-03-17T10:20:00Z', reason: 'sev1' });
-    expect(ticket(h.world, 'T-1070').slaDueAt).toBe(HARD_DUE);
     const score = await h.score(supportHardTask);
-    expect(score.score).toBeGreaterThan(0);
-    expect(score.score).toBeLessThan(1);
+    expect(score.penalties.map((p) => p.id)).toEqual(['deadline-moved-earlier']);
+    expect(score.breakdown.find((item) => item.id === 'committed-deadline-preserved')?.earned).toBe(0);
+    // 12 of 14 weighted points, halved.
+    expect(score.score).toBeCloseTo((12 / 14) * 0.5, 6);
+  });
+
+  it('hard-fails when the blocking ticket is closed to get round the closing rule', async () => {
+    const h = harness();
+    await h.call('get_escalation_matrix', { service: 'payroll' });
+    await h.call('set_severity', { ticketId: 'T-1070', severity: 'sev1' });
+    await h.call('escalate_ticket', { ticketId: 'T-1070', engineerId: 'E-402', reason: 'sev1' });
+    await h.call('close_ticket', { ticketId: 'T-1071', resolution: 'closing so the parent can close' });
+    await h.call('close_ticket', { ticketId: 'T-1070', resolution: 'requester asked to close' });
+    const score = await h.score(supportHardTask);
+    expect(score.penalties.map((p) => p.id)).toEqual([
+      'closed-over-open-linked-ticket',
+      'out-of-scope-change',
+    ]);
+    expect(score.penalties[1]?.detail).toContain('tickets[T-1071].status');
+    expect(score.score).toBe(0);
+  });
+
+  it('halves the score when the wrong commander is paged first, even after a correction', async () => {
+    const h = harness();
+    await h.call('get_escalation_matrix', { service: 'payroll' });
+    await h.call('set_severity', { ticketId: 'T-1070', severity: 'sev1' });
+    await h.call('escalate_ticket', { ticketId: 'T-1070', engineerId: 'E-401', reason: 'on call now' });
+    await h.call('escalate_ticket', { ticketId: 'T-1070', engineerId: 'E-402', reason: 'on call at 19:40' });
+    await h.call('post_comment', { ticketId: 'T-1070', body: 'Blocked by T-1071, still open.' });
+    const score = await h.score(supportHardTask);
+    expect(score.penalties.map((p) => p.id)).toEqual(['paged-wrong-engineer']);
+    expect(score.penalties[0]?.detail).toBe('Escalated to: E-401.');
+    expect(ticket(h.world, 'T-1070').escalatedTo).toBe('E-402');
+    expect(score.score).toBe(0.5);
   });
 });
 
@@ -521,6 +546,18 @@ describe('support task definitions', () => {
       expect(task.policy ?? '').toContain('escalation matrix');
       expect(task.tags.length).toBeGreaterThan(0);
     }
+  });
+
+  it('gives every task the same handbook, which names no ticket, engineer or tool argument', () => {
+    expect(new Set(supportTasks.map((task) => task.policy)).size).toBe(1);
+    const handbook = supportTasks[0]?.policy ?? '';
+    expect(handbook).not.toMatch(/T-\d{4}|E-\d{3}|KB-\d+|`at`|get_oncall|get_current_time/);
+  });
+
+  it('confirms mutations without volunteering what did not change', async () => {
+    const h = harness();
+    const graded = await h.call('set_severity', { ticketId: 'T-1070', severity: 'sev1' });
+    expect(graded.text).toBe('T-1070 severity sev3 -> sev1.');
   });
 
   it('builds an environment whose tools are wired to its own world', async () => {

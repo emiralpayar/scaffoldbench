@@ -39,17 +39,17 @@ export const httpRedirectsSpec: ResearchTaskSpec = {
       description:
         "MDN's 308 page says a 301 'requires the request method and the body to remain unchanged'; " +
         'RFC 9110 says a user agent MAY change POST to GET. Repeating MDN contradicts the primary source.',
-      caughtBy: 'rubric:method-change-301',
+      caughtBy: ['rubric:method-change-301'],
     },
     {
       id: 'rfc7231-cacheable-list',
       description: "RFC 7231's list of cacheable-by-default codes predates 308; an answer built on it gets 308 wrong.",
-      caughtBy: 'rubric:cacheable',
+      caughtBy: ['rubric:cacheable'],
     },
     {
       id: 'rfc7538-current',
       description: 'Citing RFC 7538 as the current definition of 308; RFC 9110 obsoletes it.',
-      caughtBy: 'rubric:specifications',
+      caughtBy: ['rubric:specifications'],
     },
   ],
   rubric: [
@@ -148,12 +148,12 @@ export const scriptLoadingSpec: ResearchTaskSpec = {
       description:
         "MDN's DOMContentLoaded page says the event fires 'before the execution of scripts with async'; " +
         'the HTML Standard says an async script runs as soon as it is available, possibly before parsing completes.',
-      caughtBy: 'rubric:async-timing',
+      caughtBy: ['rubric:async-timing'],
     },
     {
       id: 'module-defer',
       description: 'Claiming defer changes a module script; the HTML Standard says it has no effect on module scripts.',
-      caughtBy: 'rubric:modules',
+      caughtBy: ['rubric:modules'],
     },
   ],
   rubric: [
@@ -268,18 +268,18 @@ export const passwordHashingSpec: ResearchTaskSpec = {
       description:
         "Reporting revision 3's 'PBKDF2 and Balloon ... a memory-hard function SHOULD be used' as what NIST " +
         'currently requires. Revision 3 is in the corpus and says it is superseded.',
-      caughtBy: 'rubric:nist-current',
+      caughtBy: ['rubric:nist-current'],
     },
     {
       id: 'false-conflict',
       description:
         'Presenting OWASP and NIST as irreconcilable. OWASP itself prescribes PBKDF2 when FIPS-140 compliance is required.',
-      caughtBy: 'rubric:reconciliation',
+      caughtBy: ['rubric:reconciliation'],
     },
     {
       id: 'strict-ranking',
       description: "Reading OWASP's alternatives as a strict ranking rather than conditions (unavailable / legacy / FIPS).",
-      caughtBy: 'rubric:owasp-conditions',
+      caughtBy: ['rubric:owasp-conditions'],
     },
   ],
   rubric: [

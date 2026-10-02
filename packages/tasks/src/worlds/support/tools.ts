@@ -145,6 +145,9 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
         `department: ${user.department}`,
         `seniority: ${user.seniority}`,
         `role: ${user.role}`,
+        ...(user.employment ? [`employment: ${user.employment}`] : []),
+        ...(user.contractEndsOn ? [`contract ends: ${user.contractEndsOn}`] : []),
+        ...(user.managerId ? [`manager: ${userLabel(world, user.managerId)}`] : []),
         `rotations: ${rotations.length ? rotations.join(', ') : '-'}`,
       ].join('\n');
     },
@@ -153,7 +156,7 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
   const getOncall: JournaledToolSpec = {
     name: 'get_oncall',
     description:
-      'Who is on call for a rotation at a given instant. `at` defaults to the current time; pass it explicitly when you care about a future deadline rather than right now.',
+      'Who is on call for a rotation at a given instant. `at` defaults to the current time.',
     schema: {
       rotation: z.string().describe('Rotation name, e.g. network-primary or incident-command'),
       at: z.string().optional().describe('ISO-8601 UTC instant, e.g. 2026-03-17T19:40:00Z'),
@@ -214,6 +217,9 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
           [
             `${entry.article.id} - ${entry.article.title}`,
             `tags: ${entry.article.tags.join(', ')}`,
+            ...(entry.article.supersededBy
+              ? [`status: superseded by ${entry.article.supersededBy}`]
+              : []),
             entry.article.body,
           ].join('\n'),
         )
@@ -326,7 +332,7 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
       found.severity = args.severity;
       appendAudit(world, 'set_severity', found.id, { from: previous, to: args.severity });
 
-      return `${found.id} severity ${previous} -> ${args.severity}. The SLA deadline is unchanged (${found.slaDueAt ?? 'not set'}).`;
+      return `${found.id} severity ${previous} -> ${args.severity}.`;
     },
   };
 
@@ -443,7 +449,6 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
         `Merged ${[...mergedIds].join(', ')} into ${survivor.id}.`,
         `${survivor.id}: impact=${survivor.impact}, severity=${survivor.severity}, sla_due_at=${survivor.slaDueAt} (was ${previousDue ?? 'not set'})`,
         `linked_tickets: ${survivor.linkedTickets.length ? survivor.linkedTickets.join(', ') : '-'}`,
-        'Severity was not changed by the merge.',
       ].join('\n');
     },
   };
@@ -506,8 +511,7 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
 
   const extendSla: JournaledToolSpec = {
     name: 'extend_sla',
-    description:
-      'Set the SLA deadline. A ticket without a deadline gets its first one; a deadline already committed to a requester may only be moved later, never earlier.',
+    description: 'Set or change the SLA deadline of a ticket.',
     schema: {
       ticketId: z.string(),
       dueAt: z.string().describe('ISO-8601 instant, e.g. 2026-03-17T17:20:00Z'),
@@ -523,13 +527,8 @@ export function createSupportTools(world: SupportWorld): JournaledToolSpec[] {
         return fail('Changing an SLA deadline needs a reason.');
       }
 
-      const currentMs = parseIso(found.slaDueAt);
-      if (currentMs !== null && dueMs < currentMs) {
-        return fail(
-          `${found.id} is already committed to ${found.slaDueAt}. An SLA deadline is never moved earlier; ${canonicalIso(dueMs)} was rejected.`,
-        );
-      }
-
+      // Moving a deadline earlier is a policy question, not an API one: the
+      // tool records it and the scorer decides whether it was allowed.
       const previous = found.slaDueAt;
       found.slaDueAt = canonicalIso(dueMs);
       appendAudit(world, 'extend_sla', found.id, {

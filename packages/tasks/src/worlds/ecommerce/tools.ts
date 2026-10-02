@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { JournaledToolSpec, ToolReply } from '@arena/core';
 import {
-  daysSinceShipped,
   findCustomer,
   findLine,
   findOrder,
@@ -19,9 +18,8 @@ import {
 
 export const ECOMMERCE_INSTRUCTIONS = [
   'Back-office order management for an online store.',
-  'All money is in integer cents. Ids are exact and case-sensitive.',
-  'Nothing cascades: cancelling a line does not restock it, and refunding store credit does not',
-  'add it to the customer balance. Each step is its own call.',
+  'All money is in integer cents. Dates are YYYY-MM-DD. Ids are exact and case-sensitive.',
+  'Reads never change anything; every mutating tool reports exactly what it changed.',
 ].join(' ');
 
 /**
@@ -53,7 +51,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     {
       name: 'list_orders',
       description:
-        'List orders, optionally filtered by customerId and/or status (pending, partially_shipped, shipped, returned, cancelled). Use it to find which of a customer orders is still open.',
+        'List orders, optionally filtered by customerId and/or status (pending, partially_shipped, shipped, returned, cancelled).',
       schema: { customerId: z.string().optional(), status: z.string().optional() },
       readOnly: true,
       handler: (args: { customerId?: unknown; status?: unknown }) => {
@@ -124,6 +122,11 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
           `A return requested more than ${policy.returnWindowDays} days after the line shipped must be paid out as ${policy.outOfWindowMethod}, never back to the original payment method.`,
           'A line that never shipped is a cancellation, not a return: it is refunded to the original payment method (method=card) whatever the age of the order.',
           'A refund for a line may never exceed the amount actually paid for that line.',
+          ...(policy.restockingFeePercent
+            ? [
+                `A return made because the customer changed their mind is refunded less a restocking fee of ${policy.restockingFeePercent}% of what was paid for the returned units, rounded down to the cent. Returns of defective goods, or of goods damaged in transit, carry no fee.`,
+              ]
+            : []),
           policy.restockOnReceiptOnly
             ? 'Returned goods re-enter stock only once the warehouse receives them. Cancelled goods never left, so they are restocked immediately.'
             : 'Returned goods re-enter stock as soon as the refund is issued.',
@@ -149,7 +152,10 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
         );
         return [
           'stock:',
-          ...products.map((product) => `  ${product.id} name="${product.name}" stock=${product.stock}`),
+          ...products.map(
+            (product) =>
+              `  ${product.id} name="${product.name}" stock=${product.stock}${product.damagedStock !== undefined ? ` damagedStock=${product.damagedStock}` : ''}`,
+          ),
           `movements (${movements.length}):`,
           ...movements.map(
             (movement) =>
@@ -204,11 +210,13 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
               `order ${order.id} has lines that already shipped (${dispatched.map((line) => line.id).join(', ')}). Shipped goods cannot be cancelled, only returned. Name the lines that have not shipped in lineIds.`,
             );
           }
-          targets = order.lines.filter((line) => line.status === 'pending');
+          targets = order.lines.filter(
+            (line) => line.status === 'pending' || line.status === 'backordered',
+          );
         }
 
         for (const line of targets) {
-          if (line.status !== 'pending') {
+          if (line.status !== 'pending' && line.status !== 'backordered') {
             return fail(
               `line ${line.id} on order ${order.id} has status ${line.status} and cannot be cancelled. Shipped goods can only be returned.`,
             );
@@ -219,28 +227,18 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
         for (const line of targets) line.status = 'cancelled';
         order.status = recomputeOrderStatus(order);
 
-        const released = new Map<string, number>();
-        for (const line of targets) {
-          released.set(line.productId, (released.get(line.productId) ?? 0) + line.quantity);
-        }
-        const paid = targets.reduce((acc, line) => acc + line.paidCents, 0);
-
         return [
           `cancelled ${targets.length} line(s) on order ${order.id}${readString(args.reason) ? ` (reason: ${readString(args.reason)})` : ''}`,
-          ...targets.map(
-            (line) =>
-              `  ${line.id} product=${line.productId} qty=${line.quantity} paidCents=${line.paidCents}`,
-          ),
+          ...targets.map((line) => `  ${line.id} product=${line.productId} qty=${line.quantity}`),
           `order ${order.id} status is now ${order.status}`,
-          `released, awaiting restock: ${[...released].map(([productId, qty]) => `${productId} x${qty}`).join(', ')} — call restock_item for each`,
-          `no money moved: use refund_order for the amount actually paid for these lines (${paid} cents in total)`,
+          'No refund was issued and no stock was moved.',
         ].join('\n');
       },
     },
     {
       name: 'refund_order',
       description:
-        'Refund named lines of an order. amountCents is the total for those lines and is split across them in proportion to what each one paid. method=card returns the money to the original payment method, method=store_credit only records the ledger entry — apply_store_credit still has to add it to the balance. A line must be cancelled or shipped before it can be refunded.',
+        'Refund named lines of an order. amountCents is the total for those lines and is split across them in proportion to what each one paid. method=card returns the money to the original payment method; method=store_credit records the refund against the order but does not change the customer store-credit balance. A line must be cancelled or shipped before it can be refunded.',
       schema: {
         orderId: z.string(),
         lineIds: z.array(z.string()).min(1),
@@ -278,9 +276,9 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
         for (const lineId of lineIds) {
           const line = findLine(order, lineId);
           if (!line) return fail(unknownLine(order, lineId));
-          if (line.status === 'pending') {
+          if (line.status === 'pending' || line.status === 'backordered') {
             return fail(
-              `line ${line.id} on order ${order.id} is still pending. Cancel it with cancel_order before refunding it.`,
+              `line ${line.id} on order ${order.id} is still ${line.status}. Cancel it with cancel_order before refunding it.`,
             );
           }
           if (line.refundedCents > 0) {
@@ -324,17 +322,14 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
           `order ${order.id} refunded ${refundedTotal(world, order.id)} of ${order.paidCents} cents paid, status is now ${order.status}`,
         ];
         if (method === 'store_credit') {
-          lines.push(
-            `store credit is recorded in the ledger only — customer ${order.customerId} balance is unchanged. Call apply_store_credit for ${amountCents} cents to complete it.`,
-          );
+          lines.push(`customer ${order.customerId} store-credit balance is unchanged`);
         }
         return lines.join('\n');
       },
     },
     {
       name: 'restock_item',
-      description:
-        'Put units of a product back into stock and record an inventory movement. Use it for goods that never left the warehouse, or for a return the warehouse has actually received.',
+      description: 'Put units of a product back into stock and record an inventory movement.',
       schema: {
         productId: z.string(),
         quantity: z.number().int().positive(),
@@ -376,8 +371,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     },
     {
       name: 'update_shipping_address',
-      description:
-        'Overwrite the shipping address of an order. The reply states the order status so you can tell whether the parcel has already left.',
+      description: 'Overwrite the shipping address of an order.',
       schema: { orderId: z.string(), address: z.string() },
       handler: (args: { orderId?: unknown; address?: unknown }) => {
         const orderId = readString(args.orderId);
@@ -440,8 +434,7 @@ export function createEcommerceTools(world: EcommerceWorld): JournaledToolSpec[]
     },
     {
       name: 'apply_store_credit',
-      description:
-        'Add store credit to a customer balance. This is the step that actually gives the customer the money after a store-credit refund has been recorded with refund_order.',
+      description: "Add store credit to a customer's balance.",
       schema: {
         customerId: z.string(),
         amountCents: z.number().int().positive(),
@@ -477,7 +470,7 @@ const ORDER_STATUSES = ['pending', 'partially_shipped', 'shipped', 'returned', '
  * paid. With a correct total this reproduces the per-line amounts exactly; the
  * last line absorbs the rounding remainder so the parts always sum to the whole.
  */
-function allocateRefund(lines: OrderLine[], amountCents: number, method: RefundMethod): void {
+export function allocateRefund(lines: OrderLine[], amountCents: number, method: RefundMethod): void {
   const basis = lines.reduce((acc, line) => acc + line.paidCents, 0);
   let allocated = 0;
   lines.forEach((line, index) => {
@@ -497,13 +490,13 @@ function allocateRefund(lines: OrderLine[], amountCents: number, method: RefundM
 // Formatting
 // ---------------------------------------------------------------------------
 
-function formatOrder(world: EcommerceWorld, order: Order): string {
+export function formatOrder(world: EcommerceWorld, order: Order): string {
   return [
     `order ${order.id} customer=${order.customerId} status=${order.status} placedAt=${order.placedAt} today=${world.today}`,
-    `paidCents=${order.paidCents} refundedCents=${refundedTotal(world, order.id)} discountCode=${order.discountCode ?? 'none'}`,
+    `paidCents=${order.paidCents} refundedCents=${refundedTotal(world, order.id)} discountCode=${order.discountCode ?? 'none'}${order.shipComplete ? ' shipComplete=yes' : ''}${order.riskHold ? ' riskHold=yes' : ''}`,
     `shippingAddress=${order.shippingAddress}`,
     'lines (paidCents is what the customer was actually charged for the line):',
-    ...order.lines.map((line) => `  ${formatLine(world, line)}`),
+    ...order.lines.map((line) => `  ${formatLine(line)}`),
     `refunds: ${
       refundsForOrder(world, order.id)
         .map((entry) => `${entry.id} lines=${entry.lineIds.join('+')} ${entry.amountCents} ${entry.method}`)
@@ -512,7 +505,7 @@ function formatOrder(world: EcommerceWorld, order: Order): string {
   ].join('\n');
 }
 
-function formatLine(world: EcommerceWorld, line: OrderLine): string {
+function formatLine(line: OrderLine): string {
   const parts = [
     line.id,
     `product=${line.productId}`,
@@ -521,12 +514,10 @@ function formatLine(world: EcommerceWorld, line: OrderLine): string {
     `paidCents=${line.paidCents}`,
     `status=${line.status}`,
   ];
-  const elapsed = daysSinceShipped(world, line);
-  if (line.shippedAt && elapsed !== undefined) {
-    parts.push(`shippedAt=${line.shippedAt}`, `daysSinceShipped=${elapsed}`);
-  }
+  if (line.shippedAt) parts.push(`shippedAt=${line.shippedAt}`);
   parts.push(`refundedCents=${line.refundedCents}`);
   if (line.refundMethod) parts.push(`refundMethod=${line.refundMethod}`);
+  if (line.promisedDate) parts.push(`promisedDate=${line.promisedDate}`);
   return parts.join(' ');
 }
 
@@ -534,15 +525,15 @@ function formatLine(world: EcommerceWorld, line: OrderLine): string {
 // Argument reading and errors
 // ---------------------------------------------------------------------------
 
-function fail(text: string): ToolReply {
+export function fail(text: string): ToolReply {
   return { text: `Error: ${text}`, isError: true };
 }
 
-function readString(value: unknown): string {
+export function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function readStringArray(value: unknown): string[] {
+export function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((item): item is string => typeof item === 'string')
@@ -550,22 +541,22 @@ function readStringArray(value: unknown): string[] {
     .filter((item) => item !== '');
 }
 
-function readInt(value: unknown): number | undefined {
+export function readInt(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) ? value : undefined;
 }
 
-function unknownOrder(world: EcommerceWorld, orderId: string): string {
+export function unknownOrder(world: EcommerceWorld, orderId: string): string {
   return `unknown order id "${orderId}". Known order ids: ${world.orders.map((order) => order.id).join(', ')}`;
 }
 
-function unknownProduct(world: EcommerceWorld, productId: string): string {
+export function unknownProduct(world: EcommerceWorld, productId: string): string {
   return `unknown product id "${productId}". Known product ids: ${world.products.map((product) => product.id).join(', ')}`;
 }
 
-function unknownCustomer(world: EcommerceWorld, customerId: string): string {
+export function unknownCustomer(world: EcommerceWorld, customerId: string): string {
   return `unknown customer id "${customerId}". Known customer ids: ${world.customers.map((customer) => customer.id).join(', ')}`;
 }
 
-function unknownLine(order: Order, lineId: string): string {
+export function unknownLine(order: Order, lineId: string): string {
   return `unknown line id "${lineId}" on order ${order.id}. Known line ids: ${order.lines.map((line) => line.id).join(', ')}`;
 }

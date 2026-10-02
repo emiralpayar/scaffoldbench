@@ -103,17 +103,17 @@ export const statusCodesSpec: BreadthTaskSpec = {
       description:
         'RFC 9110 renamed 413 ("Payload Too Large" in RFC 7231) to "Content Too Large" and 422 ' +
         '("Unprocessable Entity" in WebDAV) to "Unprocessable Content". Memory and the obsolete RFC give the old names.',
-      caughtBy: 'gold:reason',
+      caughtBy: ['gold:reason'],
     },
     {
       id: 'obsolete-sections',
       description: 'RFC 7231 is in the corpus and numbers its status codes 6.x; the current sections are 15.x.',
-      caughtBy: 'gold:section',
+      caughtBy: ['gold:section'],
     },
     {
       id: 'secondary-quote',
       description: 'Quoting MDN, or the overview list, instead of the section that defines the code.',
-      caughtBy: 'quote grounding',
+      caughtBy: ['quote grounding'],
     },
   ],
 };
@@ -195,14 +195,14 @@ export const headerFieldsSpec: BreadthTaskSpec = {
       description:
         'RFC 7231, 7232 and 7234 define Location, Retry-After, Vary, ETag, Last-Modified, Age, ' +
         'Cache-Control and Expires, and are obsoleted by RFC 9110 and 9111.',
-      caughtBy: 'gold:rfc',
+      caughtBy: ['gold:rfc'],
     },
     {
       id: 'same-section-numbers',
       description:
         'RFC 7234 numbers Age, Cache-Control and Expires 5.1, 5.2 and 5.3, exactly like RFC 9111, so the ' +
         'section alone does not reveal an obsolete source; the quote must come from RFC 9111.',
-      caughtBy: 'quote grounding',
+      caughtBy: ['quote grounding'],
     },
   ],
 };
@@ -301,14 +301,14 @@ export const nistPasswordRulesSpec: BreadthTaskSpec = {
       description:
         'Revision 3 sets an 8-character minimum, says composition rules and periodic changes SHOULD NOT ' +
         '(not SHALL NOT) be imposed, and only SHOULD permit paste. It is in the corpus, marked superseded.',
-      caughtBy: 'gold:keyword, gold:value',
+      caughtBy: ['gold:keyword', 'gold:value'],
     },
     {
       id: 'owasp-as-nist',
       description:
         "Answering from OWASP's Authentication Cheat Sheet, which paraphrases NIST in its own words " +
         '("verifiers should not mandate arbitrary password changes") and so cannot settle which keyword NIST uses.',
-      caughtBy: 'gold:keyword, quote grounding',
+      caughtBy: ['gold:keyword', 'quote grounding'],
     },
   ],
 };

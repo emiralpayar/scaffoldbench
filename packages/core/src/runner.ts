@@ -1151,6 +1151,8 @@ async function writeCatalog(config: RunnerConfig, resultsRoot: string): Promise<
     difficulty: t.difficulty,
     tags: t.tags,
     maxTurns: t.maxTurns,
+    ...(t.hypothesis ? { hypothesis: t.hypothesis } : {}),
+    ...(t.traps ? { traps: t.traps } : {}),
   }));
   await writeJson(catalogPath(config.runSetId, resultsRoot), { strategies, tasks });
 }

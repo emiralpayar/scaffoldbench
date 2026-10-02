@@ -1,9 +1,9 @@
 import type { Task, TaskCategory } from '@arena/core';
 
 import { researchTasks } from './research';
-import { airlineTasks } from './worlds/airline';
-import { ecommerceTasks } from './worlds/ecommerce';
-import { supportTasks } from './worlds/support';
+import { airlineExpertTasks, airlineTasks } from './worlds/airline';
+import { ecommerceExpertTasks, ecommerceTasks } from './worlds/ecommerce';
+import { supportExpertTasks, supportTasks } from './worlds/support';
 
 /**
  * The task set, in the order everything renders in.
@@ -14,8 +14,11 @@ import { supportTasks } from './worlds/support';
  */
 export const ALL_TASKS: Task[] = [
   ...airlineTasks,
+  ...airlineExpertTasks,
   ...ecommerceTasks,
+  ...ecommerceExpertTasks,
   ...supportTasks,
+  ...supportExpertTasks,
   ...researchTasks,
 ];
 

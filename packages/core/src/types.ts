@@ -20,6 +20,27 @@ export type { EffortLevel, McpServerConfig };
 
 export type TaskCategory = 'tool-use' | 'research';
 
+/**
+ * Difficulty tiers, easiest first. Rank tables derive from this order, so a
+ * new tier is added here and nowhere else.
+ */
+export const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+/**
+ * A documented way to fail a task, declared up front so a report can say how
+ * often each architecture fell into it.
+ *
+ * `caughtBy` names the scorer items that register the trap: ids of forbidden
+ * rules (penalties) and/or assertions. A trap fired in a run when any listed
+ * penalty was applied or any listed assertion earned less than full credit.
+ */
+export interface TaskTrap {
+  id: string;
+  description: string;
+  caughtBy: string[];
+}
+
 /** A single tool invocation, recorded by the journaling wrapper in `tools.ts`. */
 export interface ToolCall {
   /** Bare tool name as declared on the MCP server, e.g. `cancel_reservation`. */
@@ -227,12 +248,6 @@ export interface ScoringDeps {
 }
 
 /** A known way to get a task wrong, and the part of the scorer that catches it. */
-export interface TaskTrap {
-  id: string;
-  description: string;
-  caughtBy: string;
-}
-
 export interface Task {
   id: string;
   category: TaskCategory;
@@ -245,9 +260,12 @@ export interface Task {
   policy?: string;
   /** Upper bound on agentic turns for a single `query()` call. */
   maxTurns: number;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: Difficulty;
   tags: string[];
-  /** Pre-registered prediction of which architecture should do best here, and why. */
+  /**
+   * Pre-registered prediction of which architecture should do best on this
+   * task and why, written before any result exists.
+   */
   hypothesis?: string;
   /** Known ways to get this task wrong, each with the check that catches it. */
   traps?: TaskTrap[];
@@ -823,4 +841,6 @@ export interface TaskInfo {
   difficulty: Task['difficulty'];
   tags: string[];
   maxTurns: number;
+  hypothesis?: string;
+  traps?: TaskTrap[];
 }

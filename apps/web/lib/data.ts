@@ -15,7 +15,7 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-import { comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@arena/core';
+import { DIFFICULTIES, comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@arena/core';
 import type {
   Aggregate,
   CellSummary,
@@ -99,7 +99,9 @@ export function buildCatalog(
   return { strategies, tasks };
 }
 
-const DIFFICULTY_RANK: Record<TaskInfo['difficulty'], number> = { easy: 0, medium: 1, hard: 2 };
+const DIFFICULTY_RANK = Object.fromEntries(
+  DIFFICULTIES.map((difficulty, rank) => [difficulty, rank]),
+) as Record<TaskInfo['difficulty'], number>;
 const CATEGORY_RANK: Record<TaskCategory, number> = { 'tool-use': 0, research: 1 };
 
 /** Reading order for every task list on the site: category, world, then difficulty. */

@@ -41,6 +41,8 @@ export interface Flight {
   date: string;
   /** Local departure time, `HH:MM`, zero-padded so it sorts lexicographically. */
   departureTime: string;
+  /** Local arrival time at the destination, `HH:MM`, on the departure date. */
+  arrivalTime?: string;
   status: FlightStatus;
   cabins: FlightCabin[];
 }
@@ -50,6 +52,20 @@ export interface Segment {
   origin: string;
   destination: string;
   date: string;
+  /** `flown` once the passenger has travelled on it. Absent means not yet flown. */
+  status?: 'flown';
+  /** This segment's share of the fare, when the ticket prices segments separately. */
+  fareCents?: number;
+}
+
+/** One dated change to a reservation, as the booking history records it. */
+export interface ReservationChange {
+  date: string;
+  field: 'cabin' | 'flight';
+  from: string;
+  to: string;
+  /** Why the change was made, as the agent who made it recorded it. */
+  note?: string;
 }
 
 export interface Passenger {
@@ -72,6 +88,12 @@ export interface Reservation {
   checkedBags: number;
   status: ReservationStatus;
   bookedOn: string;
+  /** Card or account the fare was paid with, when the world models payments. */
+  paymentInstrumentId?: string;
+  /** Reservations booked to travel together share a group id. */
+  groupId?: string;
+  /** Dated changes, oldest first, when the world models history. */
+  history?: ReservationChange[];
 }
 
 export interface LedgerEntry {
@@ -83,7 +105,17 @@ export interface LedgerEntry {
   amountCents: number;
   method?: RefundMethod;
   note: string;
+  /** Date the entry was posted, when the world models history. */
+  postedOn?: string;
+  /** For a refund of a fee: the ledger entry it refunds. */
+  refundOf?: string;
+  /** Set by an audit: what the auditor concluded about this entry. */
+  auditOutcome?: AuditOutcome;
+  /** For a baggage fee: bags added by this charge, and the total on the reservation after it. */
+  bags?: { added: number; total: number };
 }
+
+export type AuditOutcome = 'correct' | 'overcharged' | 'undercharged';
 
 export interface AirlineWorld {
   /** The simulated current date. Eligibility windows are measured from it. */
@@ -209,6 +241,62 @@ export function currentFareCents(
   const flight = findFlight(world, segment.flightId);
   if (!flight) return undefined;
   return findCabin(flight, reservation.cabin)?.fareCents;
+}
+
+/**
+ * Whether a cancellation may return money to the original form of payment.
+ *
+ * Three independent doors, any one of which opens it: a booking made today
+ * (the 24-hour rule), a refundable cabin, or trip insurance used at least
+ * `INSURANCE_CASH_WINDOW_DAYS` before departure. Whether the instrument can
+ * still receive the money is a separate question, answered by the payment
+ * system rather than the fare rules.
+ */
+export function cashRefundPermitted(world: AirlineWorld, reservation: Reservation): boolean {
+  if (bookedWithinFreeWindow(world, reservation)) return true;
+  if (REFUNDABLE_CABINS.includes(reservation.cabin)) return true;
+  if (!reservation.insurancePurchased) return false;
+  const departure = reservation.segments[0]?.date;
+  if (departure === undefined) return false;
+  return daysBetween(world.today, departure) >= INSURANCE_CASH_WINDOW_DAYS;
+}
+
+/** Calendar days are the only clock in this world, so "within 24 hours" means booked today. */
+export function bookedWithinFreeWindow(world: AirlineWorld, reservation: Reservation): boolean {
+  return daysBetween(reservation.bookedOn, world.today) <= 0;
+}
+
+/** Everything ever returned on a reservation, whatever the method. */
+export function returnedCents(world: AirlineWorld, reservationId: string): number {
+  return ledgerFor(world, reservationId)
+    .filter((entry) => entry.kind === 'refund' && entry.refundOf === undefined)
+    .reduce((total, entry) => total + entry.amountCents, 0);
+}
+
+/**
+ * What a cancellation returns before any question of method: the fare, less
+ * the service fee unless the tier is exempt or the 24-hour rule applies, less
+ * whatever was already returned. A fare that only allows a non-refundable
+ * close-out returns nothing; that is decided by the caller.
+ */
+export function cancellationAmountCents(world: AirlineWorld, reservation: Reservation): number {
+  const fee = bookedWithinFreeWindow(world, reservation)
+    ? 0
+    : cancellationServiceFeeCents(tierOf(world, reservation));
+  return Math.max(0, refundableFareCents(reservation) - fee - returnedCents(world, reservation.id));
+}
+
+/**
+ * The part of the fare a cancellation can return: all of it, or once part of
+ * the trip has been flown, only the unflown segments at their segment fares.
+ */
+export function refundableFareCents(reservation: Reservation): number {
+  if (!reservation.segments.some((segment) => segment.status === 'flown')) {
+    return reservation.paidCents;
+  }
+  return reservation.segments
+    .filter((segment) => segment.status !== 'flown')
+    .reduce((total, segment) => total + (segment.fareCents ?? 0), 0);
 }
 
 export function appendLedger(world: AirlineWorld, entry: Omit<LedgerEntry, 'id'>): LedgerEntry {

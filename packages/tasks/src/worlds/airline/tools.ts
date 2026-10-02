@@ -21,19 +21,20 @@ import {
   findReservation,
   formatCents,
   ledgerFor,
+  returnedCents,
   type AirlineWorld,
   type CabinClass,
   type FeeCategory,
   type Flight,
+  type LedgerEntry,
   type RefundMethod,
   type Reservation,
 } from './world';
 
 export const AIRLINE_INSTRUCTIONS = [
   'Reservation system for a regional airline.',
-  'All amounts are integer cents. Dates are YYYY-MM-DD.',
+  'All amounts are integer cents. Dates are YYYY-MM-DD and times are local to the departure airport.',
   'Reads never change anything; every mutating tool reports exactly what it changed.',
-  'Fee and refund amounts are never computed for you: read the rule tools and work them out.',
 ].join(' ');
 
 const cabinSchema = z.enum(['basic_economy', 'economy', 'premium_economy', 'business']);
@@ -48,11 +49,11 @@ const refundMethodSchema = z.enum(['original_payment', 'travel_credit']);
 
 const CABINS: CabinClass[] = ['basic_economy', 'economy', 'premium_economy', 'business'];
 
-function error(message: string): ToolReply {
+export function error(message: string): ToolReply {
   return { text: `Error: ${message}`, isError: true };
 }
 
-function describeCabins(flight: Flight, only?: CabinClass): string {
+export function describeCabins(flight: Flight, only?: CabinClass): string {
   const cabins = only ? flight.cabins.filter((entry) => entry.cabin === only) : flight.cabins;
   if (cabins.length === 0) return '    (no such cabin on this flight)';
   return cabins
@@ -63,17 +64,24 @@ function describeCabins(flight: Flight, only?: CabinClass): string {
     .join('\n');
 }
 
-function flightHeadline(flight: Flight): string {
-  return `${flight.id} ${flight.origin}->${flight.destination} ${flight.date} dep ${flight.departureTime} status=${flight.status}`;
+export function flightHeadline(flight: Flight): string {
+  const arrival = flight.arrivalTime ? ` arr ${flight.arrivalTime}` : '';
+  return `${flight.id} ${flight.origin}->${flight.destination} ${flight.date} dep ${flight.departureTime}${arrival} status=${flight.status}`;
 }
 
-function describeReservation(world: AirlineWorld, reservation: Reservation): string {
+export function describeReservation(world: AirlineWorld, reservation: Reservation): string {
   const segments = reservation.segments
     .map((segment, index) => {
       const flight = findFlight(world, segment.flightId);
       const status = flight ? flight.status : 'unknown';
-      const departure = flight ? ` dep ${flight.departureTime}` : '';
-      return `    [${index}] ${segment.flightId} ${segment.origin}->${segment.destination} ${segment.date}${departure} flight_status=${status}`;
+      const departure = flight
+        ? ` dep ${flight.departureTime}${flight.arrivalTime ? ` arr ${flight.arrivalTime}` : ''}`
+        : '';
+      const extras = [
+        segment.status === 'flown' ? ' FLOWN' : '',
+        segment.fareCents !== undefined ? ` segment_fare_cents=${segment.fareCents}` : '',
+      ].join('');
+      return `    [${index}] ${segment.flightId} ${segment.origin}->${segment.destination} ${segment.date}${departure} flight_status=${status}${extras}`;
     })
     .join('\n');
 
@@ -87,15 +95,35 @@ function describeReservation(world: AirlineWorld, reservation: Reservation): str
     `  trip_insurance_purchased: ${reservation.insurancePurchased ? 'yes' : 'no'}`,
     `  checked_bags: ${reservation.checkedBags}`,
     `  booked_on: ${reservation.bookedOn}`,
+    ...(reservation.groupId ? [`  travelling_with: group ${reservation.groupId} (${groupMembers(world, reservation).join(', ')})`] : []),
     '  segments:',
     segments,
-    // The tier lives on the passenger record, not here, so working out an
-    // allowance or a fee waiver always costs a second lookup.
-    '  note: frequent-flyer tier is on the passenger record, use get_passenger.',
   ].join('\n');
 }
 
-function requireWholeAmount(amountCents: unknown): number | undefined {
+function groupMembers(world: AirlineWorld, reservation: Reservation): string[] {
+  return world.reservations
+    .filter((other) => other.groupId === reservation.groupId)
+    .map((other) => other.id);
+}
+
+export function describeLedgerEntry(entry: LedgerEntry): string {
+  return [
+    entry.id,
+    entry.postedOn ?? '',
+    `${entry.kind}/${entry.category}`,
+    `${entry.amountCents} cents`,
+    entry.bags ? `bags_added=${entry.bags.added} bags_after=${entry.bags.total}` : '',
+    entry.method ? `method=${entry.method}` : '',
+    entry.refundOf ? `refund_of=${entry.refundOf}` : '',
+    entry.auditOutcome ? `audit=${entry.auditOutcome}` : '',
+    `- ${entry.note}`,
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
+}
+
+export function requireWholeAmount(amountCents: unknown): number | undefined {
   return typeof amountCents === 'number' && Number.isSafeInteger(amountCents)
     ? amountCents
     : undefined;
@@ -143,8 +171,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
     },
     {
       name: 'get_passenger',
-      description:
-        'Read a passenger profile, including the frequent-flyer tier that drives allowances and fee waivers.',
+      description: 'Read a passenger profile: name, frequent-flyer tier and contact details.',
       readOnly: true,
       schema: { passengerId: z.string().describe('Passenger id, e.g. P-1001') },
       handler: ({ passengerId }: { passengerId: string }) => {
@@ -251,6 +278,8 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
           '  fare_difference: when the new flight costs more in the same cabin than the fare',
           '    originally paid, the difference is collected in full as a fare_difference fee.',
           '    No tier is exempt from a fare difference. A lower new fare is not refunded.',
+          '    When one segment of a multi-segment trip changes, compare against that',
+          "    segment's own fare (segment_fare_cents on the reservation).",
           '  cabin_changes: the cabin on a reservation may only change if the customer asked for it.',
           refundable
             ? '  refundable: yes, to the original payment method, less the cancellation service fee.'
@@ -262,7 +291,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
     {
       name: 'get_refund_policy',
       description:
-        'Read the refund policy as it applies to one reservation, with the current date. Required before any refund.',
+        'Read the refund policy as it applies to one reservation, with the current date.',
       readOnly: true,
       schema: { reservationId: z.string() },
       handler: ({ reservationId }: { reservationId: string }) => {
@@ -284,9 +313,15 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
           `     ${INSURANCE_CASH_WINDOW_DAYS} days before departure. Closer to departure than that, the insurance`,
           '     instead converts the fare paid into travel credit and no money returns to the card.',
           `  4. Cancellation service fee: ${CANCELLATION_SERVICE_FEE_CENTS} cents (${formatCents(CANCELLATION_SERVICE_FEE_CENTS)}), deducted from`,
-          `     whatever is returned. Waived for these tiers: ${SERVICE_FEE_EXEMPT_TIERS.join(', ')}.`,
+          '     whatever is returned rather than charged separately, except under rule 1.',
+          `     Waived for these tiers: ${SERVICE_FEE_EXEMPT_TIERS.join(', ')}.`,
           '  5. A cancelled reservation must be closed out, either with issue_refund',
           '     (original_payment or travel_credit) or with record_non_refundable.',
+          '  6. Anything already returned on the reservation counts toward what it is owed.',
+          '  7. Once part of a trip has been flown, only the unflown segments are refundable,',
+          '     at their segment fares.',
+          '  8. A customer may choose travel credit instead of money back on any refundable',
+          '     booking. Travel credit chosen this way carries no service fee.',
         ].join('\n');
       },
     },
@@ -302,10 +337,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         if (entries.length === 0) return `Ledger ${reservationId}: 0 entries.`;
         return [
           `Ledger ${reservationId}: ${entries.length} entries`,
-          ...entries.map(
-            (entry) =>
-              `  ${entry.id} ${entry.kind}/${entry.category} ${entry.amountCents} cents${entry.method ? ` method=${entry.method}` : ''} - ${entry.note}`,
-          ),
+          ...entries.map((entry) => `  ${describeLedgerEntry(entry)}`),
         ].join('\n');
       },
     },
@@ -376,6 +408,9 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         const index = segmentIndex ?? 0;
         const segment = reservation.segments[index];
         if (!segment) return error(`reservation ${reservationId} has no segment at index ${index}`);
+        if (segment.status === 'flown') {
+          return error(`segment ${index} of ${reservationId} has already been flown`);
+        }
 
         const target = findFlight(world, newFlightId);
         if (!target) return error(`no flight with id ${newFlightId}`);
@@ -408,11 +443,9 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
 
         return [
           `Reservation ${reservationId} segment ${index}: ${previousFlightId} -> ${target.id}`,
-          `  cabin: ${previousCabin} -> ${newCabin}`,
-          `  new route: ${target.origin}->${target.destination} ${target.date} dep ${target.departureTime}`,
-          `  new fare in ${newCabin}: ${targetCabin.fareCents} cents (${formatCents(targetCabin.fareCents)})`,
-          `  fare originally paid: ${reservation.paidCents} cents (${formatCents(reservation.paidCents)})`,
-          '  no money has moved; settle any fee or fare difference with charge_fee.',
+          `  cabin: ${previousCabin === newCabin ? `${newCabin} (unchanged)` : `${previousCabin} -> ${newCabin}`}`,
+          `  now: ${target.origin}->${target.destination} ${target.date} dep ${target.departureTime}`,
+          '  No money was moved.',
         ].join('\n');
       },
     },
@@ -429,17 +462,14 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
         }
 
         for (const segment of reservation.segments) {
+          if (segment.status === 'flown') continue;
           const flight = findFlight(world, segment.flightId);
           const cabin = flight ? findCabin(flight, reservation.cabin) : undefined;
           if (cabin) cabin.seatsLeft += 1;
         }
         reservation.status = 'cancelled';
 
-        return [
-          `Reservation ${reservationId} is cancelled and its seats are released.`,
-          `  fare paid: ${reservation.paidCents} cents (${formatCents(reservation.paidCents)})`,
-          '  no money has moved yet; close the reservation out with issue_refund or record_non_refundable.',
-        ].join('\n');
+        return `Reservation ${reservationId} is cancelled and its seats are released. No money was moved.`;
       },
     },
     {
@@ -469,9 +499,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
             `cannot return ${amount} cents, only ${reservation.paidCents} cents were paid for ${reservationId}`,
           );
         }
-        const alreadyReturned = ledgerFor(world, reservationId)
-          .filter((entry) => entry.kind === 'refund')
-          .reduce((total, entry) => total + entry.amountCents, 0);
+        const alreadyReturned = returnedCents(world, reservationId);
         if (alreadyReturned + amount > reservation.paidCents) {
           return error(
             `${reservationId} has already been returned ${alreadyReturned} cents; a further ${amount} would exceed the fare paid`,

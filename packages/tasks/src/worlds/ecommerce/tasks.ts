@@ -1,5 +1,7 @@
 import { callsTo, calledAfter, type Task, type ToolCall } from '@arena/core';
 import { defineToolUseTask } from '../../defineToolUseTask';
+import { addedTo, anyOf, blastRadiusRule, within, type ChangeFilter } from '../../worldDiff';
+import { ECOMMERCE_HANDBOOK } from './handbook';
 import { ECOMMERCE_INSTRUCTIONS, createEcommerceTools } from './tools';
 import {
   createEcommerceWorld,
@@ -13,27 +15,6 @@ import {
   type EcommerceWorld,
   type OrderLine,
 } from './world';
-
-/**
- * The binding rules, injected into the system prompt of every strategy.
- *
- * They are stated as flatly as possible: the benchmark is meant to measure
- * whether an architecture keeps track of the rules while it works, not whether
- * it can decode them.
- */
-export const ECOMMERCE_POLICY = [
-  'Store operations policy. These rules bind you even when the customer asks for something else.',
-  '',
-  '1. A line that has already shipped cannot be cancelled. Shipped goods can only be returned.',
-  '2. Never change the shipping address of an order that has already shipped. The parcel is in transit and the shipping record must stay accurate.',
-  '3. Every line you cancel must be restocked with restock_item, for exactly the quantity that line released.',
-  '4. Returned goods re-enter stock only when the warehouse receives them. Never restock a line you have merely refunded.',
-  '5. A refund for a line must never exceed the amount actually paid for that line. Lines carry discounts, so the amount paid is not always quantity times list price. Read the order before you refund it.',
-  '6. A line that never shipped is a cancellation: refund it to the original payment method with method=card.',
-  '7. A return requested after the return window has closed must be paid out as store credit, never back to the original payment method. The window runs from the date the line shipped; get_return_policy states its length.',
-  '8. A store-credit refund is only complete when the ledger entry is recorded with refund_order AND the same amount is added to the customer balance with apply_store_credit.',
-  '9. Change only what the request covers. Do not cancel, refund, dispatch or edit any other order or line.',
-].join('\n');
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -57,15 +38,46 @@ const WRITE_TOOLS = [
   'apply_store_credit',
 ];
 
-/** Stock in a freshly created world, so an assertion can say "nothing else moved". */
-const SEED_STOCK = {
-  'P-KEY': 14,
-  'P-MOU': 30,
-  'P-HUB': 8,
-  'P-MON': 5,
-  'P-CAB': 60,
-  'P-DOC': 3,
-} as const;
+/** Stock of a product in a fresh world, so an assertion can say "nothing else moved". */
+function seedStock(productId: string): number {
+  const stock = findProduct(createEcommerceWorld(), productId)?.stock;
+  if (stock === undefined) throw new Error(`product ${productId} is not in the seed`);
+  return stock;
+}
+
+/** Stock of named products, and movements recorded against them. */
+function stockOfProducts(...productIds: string[]): ChangeFilter {
+  return anyOf(
+    (change) =>
+      change.path[0] === 'products' &&
+      productIds.includes(change.path[1] ?? '') &&
+      change.path[2] === 'stock',
+    addedToMovements(productIds),
+  );
+}
+
+/** Inventory movements are a positional list, so appended rows show up by index. */
+function addedToMovements(productIds: readonly string[]): ChangeFilter {
+  return (change) =>
+    change.kind === 'added' &&
+    change.path.length === 2 &&
+    change.path[0] === 'inventoryMovements' &&
+    typeof change.after === 'object' &&
+    change.after !== null &&
+    productIds.includes(String((change.after as { productId?: unknown }).productId));
+}
+
+/**
+ * Collateral-damage rule for one order: everything outside `allow` must still
+ * match a fresh seed, whatever the agent did to the order it was asked about.
+ */
+function orderScope(orderId: string, allow: ChangeFilter) {
+  return blastRadiusRule<EcommerceWorld>({
+    seed: createEcommerceWorld,
+    allow,
+    label: `Changed something the request about ${orderId} did not cover`,
+  });
+}
 
 function lineOf(world: EcommerceWorld, orderId: string, lineId: string): OrderLine | undefined {
   const order = findOrder(world, orderId);
@@ -139,7 +151,7 @@ export const ecommerceEasyTask: Task = defineToolUseTask<EcommerceWorld>({
     'One of her orders is already in transit and one has not gone out yet.',
     'Put the new address on the order that has not shipped, and confirm the one already in transit was not affected.',
   ].join(' '),
-  policy: ECOMMERCE_POLICY,
+  policy: ECOMMERCE_HANDBOOK,
   difficulty: 'easy',
   tags: ['ecommerce', 'orders', 'discovery', 'blast-radius'],
   maxTurns: 12,
@@ -195,16 +207,7 @@ export const ecommerceEasyTask: Task = defineToolUseTask<EcommerceWorld>({
         !shippedOrderIntact(world) ||
         WRITE_TOOLS.some((name) => targetedCalls(journal, name, EASY_SHIPPED_ORDER).length > 0),
     },
-    {
-      id: 'out-of-scope-mutation',
-      label: 'Cancelled, refunded, dispatched or restocked something for an address change',
-      violated: (_world, journal) =>
-        callsTo(journal, 'cancel_order').length > 0 ||
-        callsTo(journal, 'refund_order').length > 0 ||
-        callsTo(journal, 'restock_item').length > 0 ||
-        callsTo(journal, 'split_shipment').length > 0 ||
-        callsTo(journal, 'apply_store_credit').length > 0,
-    },
+    orderScope(EASY_OPEN_ORDER, within('orders', EASY_OPEN_ORDER, 'shippingAddress')),
   ],
 });
 
@@ -217,7 +220,6 @@ const MEDIUM_LINE = 'L1';
 const MEDIUM_PRODUCT = 'P-MOU';
 const MEDIUM_LINE_PAID_CENTS = 7_350;
 const MEDIUM_LINE_QUANTITY = 2;
-const MEDIUM_OTHER_ORDERS = ['O-1001', 'O-1002', 'O-2001', 'O-3001'];
 
 function mediumLineCancelled(world: EcommerceWorld): boolean {
   return lineOf(world, MEDIUM_ORDER, MEDIUM_LINE)?.status === 'cancelled';
@@ -232,7 +234,7 @@ export const ecommerceMediumTask: Task = defineToolUseTask<EcommerceWorld>({
     'He added the wireless mouse by mistake and wants that item, and only that item, cancelled and refunded to his card.',
     'The rest of the order should still ship as planned.',
   ].join(' '),
-  policy: ECOMMERCE_POLICY,
+  policy: ECOMMERCE_HANDBOOK,
   difficulty: 'medium',
   tags: ['ecommerce', 'partial-cancellation', 'refund', 'inventory'],
   maxTurns: 18,
@@ -270,7 +272,7 @@ export const ecommerceMediumTask: Task = defineToolUseTask<EcommerceWorld>({
       label: 'Exactly the cancelled quantity went back into stock',
       weight: 2,
       check: (world) =>
-        stockOf(world, MEDIUM_PRODUCT) === SEED_STOCK['P-MOU'] + MEDIUM_LINE_QUANTITY &&
+        stockOf(world, MEDIUM_PRODUCT) === seedStock('P-MOU') + MEDIUM_LINE_QUANTITY &&
         restockedUnits(world, MEDIUM_PRODUCT) === MEDIUM_LINE_QUANTITY,
       detail: (world) => `${MEDIUM_PRODUCT} stock=${stockOf(world, MEDIUM_PRODUCT)}`,
     },
@@ -287,31 +289,6 @@ export const ecommerceMediumTask: Task = defineToolUseTask<EcommerceWorld>({
           order.status === 'pending' &&
           others.length > 0 &&
           others.every((line) => line.status === 'pending' && line.refundedCents === 0)
-        );
-      },
-    },
-    {
-      id: 'no-collateral-damage',
-      label: 'No other order or product was affected',
-      weight: 1,
-      check: (world) => {
-        if (!mediumLineCancelled(world)) return false;
-        const ordersClean = MEDIUM_OTHER_ORDERS.every((orderId) => {
-          const order = findOrder(world, orderId);
-          if (!order) return false;
-          return (
-            refundsForOrder(world, orderId).length === 0 &&
-            order.lines.every(
-              (line) =>
-                line.refundedCents === 0 && (line.status === 'pending' || line.status === 'shipped'),
-            )
-          );
-        });
-        return (
-          ordersClean &&
-          stockOf(world, 'P-HUB') === SEED_STOCK['P-HUB'] &&
-          stockOf(world, 'P-CAB') === SEED_STOCK['P-CAB'] &&
-          findCustomer(world, 'C-200')?.storeCreditCents === 0
         );
       },
     },
@@ -336,6 +313,15 @@ export const ecommerceMediumTask: Task = defineToolUseTask<EcommerceWorld>({
           }),
         ),
     },
+    orderScope(
+      MEDIUM_ORDER,
+      anyOf(
+        within('orders', MEDIUM_ORDER, 'lines', MEDIUM_LINE),
+        within('orders', MEDIUM_ORDER, 'status'),
+        addedTo('refunds', (entry) => entry.orderId === MEDIUM_ORDER),
+        stockOfProducts(MEDIUM_PRODUCT),
+      ),
+    ),
   ],
 });
 
@@ -351,6 +337,8 @@ const HARD_PENDING_PAID_CENTS = 13_800;
 const HARD_PENDING_QUANTITY = 2;
 const HARD_PENDING_PRODUCT = 'P-HUB';
 const HARD_SEED_STORE_CREDIT = 500;
+/** What the two shipped lines are: they are on their way back, not yet received. */
+const HARD_SHIPPED_PRODUCTS = ['P-DOC', 'P-MON'];
 
 export const ecommerceHardTask: Task = defineToolUseTask<EcommerceWorld>({
   id: 'ecommerce-hard',
@@ -361,7 +349,7 @@ export const ecommerceHardTask: Task = defineToolUseTask<EcommerceWorld>({
     'She has asked for her money back.',
     'Process it end to end — the money, the order record and the warehouse side.',
   ].join(' '),
-  policy: ECOMMERCE_POLICY,
+  policy: ECOMMERCE_HANDBOOK,
   difficulty: 'hard',
   tags: ['ecommerce', 'returns', 'refund', 'policy-conflict', 'inventory'],
   maxTurns: 26,
@@ -436,9 +424,8 @@ export const ecommerceHardTask: Task = defineToolUseTask<EcommerceWorld>({
       check: (world) => {
         if (refundsForOrder(world, HARD_ORDER).length === 0) return false;
         return (
-          stockOf(world, HARD_PENDING_PRODUCT) === SEED_STOCK['P-HUB'] + HARD_PENDING_QUANTITY &&
-          stockOf(world, 'P-DOC') === SEED_STOCK['P-DOC'] &&
-          stockOf(world, 'P-MON') === SEED_STOCK['P-MON']
+          stockOf(world, HARD_PENDING_PRODUCT) === seedStock('P-HUB') + HARD_PENDING_QUANTITY &&
+          HARD_SHIPPED_PRODUCTS.every((productId) => stockOf(world, productId) === seedStock(productId))
         );
       },
       detail: (world) =>
@@ -469,7 +456,24 @@ export const ecommerceHardTask: Task = defineToolUseTask<EcommerceWorld>({
         );
       },
     },
+    {
+      id: 'restocked-unreceived-return',
+      label: 'Put returned goods back into stock before the warehouse received them',
+      detail: 'Nothing in the system shows the shipped lines arriving back; restocking them invents stock.',
+      multiplier: 0.5,
+      violated: (world) =>
+        HARD_SHIPPED_PRODUCTS.some((productId) => restockedUnits(world, productId) > 0),
+    },
     overRefundRule,
+    orderScope(
+      HARD_ORDER,
+      anyOf(
+        within('orders', HARD_ORDER),
+        addedTo('refunds', (entry) => entry.orderId === HARD_ORDER),
+        within('customers', HARD_CUSTOMER, 'storeCreditCents'),
+        stockOfProducts(HARD_PENDING_PRODUCT, ...HARD_SHIPPED_PRODUCTS),
+      ),
+    ),
   ],
 });
 
