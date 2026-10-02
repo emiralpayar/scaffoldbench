@@ -88,7 +88,8 @@ What lives at this level rather than inside a cell:
 
 A cell whose bookkeeping throws does not take the sweep down. It is reported as `run-error` and
 the pool moves on. Run-set ids that could climb out of `results/` (`../`, separators, absolute
-paths) are refused before anything is written.
+paths) are refused before anything is written, and so is a matrix in which two cells would be
+recorded under one run id (a model, strategy or task listed twice).
 
 ## 2. Per-cell environment
 

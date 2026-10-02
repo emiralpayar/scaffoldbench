@@ -279,6 +279,16 @@ describe('runMatrix', () => {
     await expect(completedCells('../escape', resultsRoot)).rejects.toThrow(/Invalid run set id/);
   });
 
+  it('refuses a matrix in which two cells would be recorded under one run id', async () => {
+    await expect(runMatrix(config({ models: ['model-a', 'model-a'] }))).rejects.toThrow(
+      /Cells model-a\|solver\|stub-task\|1 and model-a\|solver\|stub-task\|1 would both be recorded/,
+    );
+    // Distinct ids that read the same once made file-safe.
+    await expect(runMatrix(config({ models: ['model[1m]', 'model-1m-'] }))).rejects.toThrow(
+      /would both be recorded as model-1m-__/,
+    );
+  });
+
   it('gives every run a fresh world', async () => {
     const { records } = await runMatrix(config({ repeats: 3 }));
     // If the world leaked between repeats the violator check would misfire and

@@ -427,21 +427,37 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
   return { manifest, records: fresh };
 }
 
+/**
+ * Every cell, in matrix order. Refuses a matrix in which two cells would share
+ * a run id — a model, strategy or task listed twice, or two model ids that
+ * read the same once made file-safe — since the second record would silently
+ * replace the first.
+ */
 function buildMatrix(config: RunnerConfig): Cell[] {
   const cells: Cell[] = [];
+  const byRunId = new Map<string, Cell>();
   for (let repeat = 1; repeat <= config.repeats; repeat++) {
     for (const task of config.tasks) {
       for (const model of config.models) {
         for (const strategy of config.strategies) {
           const coordinates = { model, strategyId: strategy.id, taskId: task.id, repeat };
-          cells.push({
+          const cell: Cell = {
             model,
             strategy,
             task,
             repeat,
             key: cellKey(coordinates),
             runId: makeRunId(coordinates),
-          });
+          };
+          const clash = byRunId.get(cell.runId);
+          if (clash) {
+            throw new Error(
+              `Cells ${clash.key} and ${cell.key} would both be recorded as ${cell.runId}: ` +
+                'list each model, strategy and task once.',
+            );
+          }
+          byRunId.set(cell.runId, cell);
+          cells.push(cell);
         }
       }
     }
