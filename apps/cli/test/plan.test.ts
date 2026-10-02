@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { completedCells, runMatrix, runsDir, writeJson } from '@arena/core';
-import type { Judge, RunSetManifest, Strategy, Task } from '@arena/core';
+import type { Judge, RunRecord, RunSetManifest, Strategy, Task } from '@arena/core';
 
 import { parseArgs } from '../src/args';
 import type { RunArgs } from '../src/args';
@@ -228,6 +228,12 @@ describe('spend', () => {
   });
 });
 
+/** A record as written before runs carried an `integrity` verdict. */
+function legacy(record: RunRecord): RunRecord {
+  const { integrity: _integrity, ...rest } = record;
+  return rest;
+}
+
 describe('expected cost from history', () => {
   it('prices cells from their own runs, then from the same model and strategy, and counts the rest', () => {
     const history = emptyHistory();
@@ -238,6 +244,8 @@ describe('expected cost from history', () => {
       // Never counted: what an API error or a broken run cost says nothing about a working one.
       makeRecord({ model: 'm', strategyId: 's2', taskId: 't1', costUsd: 9, failureMode: 'api_error' }),
       makeRecord({ model: 'm', strategyId: 's2', taskId: 't1', costUsd: 9, integrity: { ok: false, checks: [] } }),
+      // Nor one from before the integrity checks existed: nothing says it ran the architecture it is labelled with.
+      legacy(makeRecord({ model: 'm', strategyId: 's2', taskId: 't1', costUsd: 9 })),
     ]);
 
     const expected = expectedCost(

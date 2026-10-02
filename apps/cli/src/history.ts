@@ -9,7 +9,9 @@
  *
  * Only runs that measured something are used: synthetic run sets, API
  * errors and runs whose integrity failed are left out, because a broken
- * architecture that never ran its planner is cheaper than a working one.
+ * architecture that never ran its planner is cheaper than a working one. So
+ * are runs with no integrity at all: they predate the checks, and the first
+ * published run set was full of exactly such runs.
  */
 
 import type { RunRecord } from '@arena/core';
@@ -43,7 +45,7 @@ export function emptyHistory(): CostHistory {
 
 /** Whether a record's cost says anything about what the cell costs when it works. */
 export function usableForCost(record: RunRecord): boolean {
-  return record.failureMode !== 'api_error' && record.integrity?.ok !== false;
+  return record.failureMode !== 'api_error' && record.integrity?.ok === true;
 }
 
 export function addToHistory(history: CostHistory, records: readonly RunRecord[]): void {
