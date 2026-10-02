@@ -133,3 +133,50 @@ export function ownCheckRates(records: readonly RunRecord[], strategyId: string)
 export function harnessCheckRates(records: readonly RunRecord[]): CheckRate[] {
   return checkRates(records).filter((rate) => isHarnessCheck(rate.id));
 }
+
+export interface TaskDelta {
+  taskId: string;
+  title: string;
+  difficulty: Difficulty;
+  /** Mean score of the architecture minus the control's, over the repeats both have. */
+  delta: number;
+  /** Repeats both ran. */
+  pairs: number;
+}
+
+/**
+ * Task by task, how the architecture scored against the control on one
+ * model: the mean over the repeats both completed, so a missing run on one
+ * side never reads as a loss. Pass the runs that count. A task where either
+ * has no such repeat is left out, not drawn as a tie.
+ */
+export function taskDeltas(
+  records: readonly RunRecord[],
+  strategyId: string,
+  model: string,
+  baselineId = 'single',
+): TaskDelta[] {
+  const mine = records.filter((record) => record.model === model && record.strategyId === strategyId);
+  const control = new Map(
+    records
+      .filter((record) => record.model === model && record.strategyId === baselineId)
+      .map((record) => [`${record.taskId}\u0000${record.repeat}`, record] as const),
+  );
+  const tasks = new Map<string, { title: string; difficulty: Difficulty; diffs: number[] }>();
+
+  for (const record of mine) {
+    const other = control.get(`${record.taskId}\u0000${record.repeat}`);
+    if (!other) continue;
+    const task = tasks.get(record.taskId) ?? { title: record.taskTitle, difficulty: record.taskDifficulty, diffs: [] };
+    task.diffs.push(record.score - other.score);
+    tasks.set(record.taskId, task);
+  }
+
+  return [...tasks.entries()].map(([taskId, task]) => ({
+    taskId,
+    title: task.title,
+    difficulty: task.difficulty,
+    delta: task.diffs.reduce((sum, diff) => sum + diff, 0) / task.diffs.length,
+    pairs: task.diffs.length,
+  }));
+}

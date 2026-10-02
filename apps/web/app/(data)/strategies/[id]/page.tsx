@@ -11,6 +11,7 @@ import { StageCostBars } from '../../../../components/strategies/StageCostBars';
 import type { Standing } from '../../../../components/strategies/StandingTable';
 import { StandingTable } from '../../../../components/strategies/StandingTable';
 import { StrategyScroller } from '../../../../components/strategies/StrategyScroller';
+import { TaskDeltaGrid } from '../../../../components/strategies/TaskDeltaGrid';
 import { RunExplorer } from '../../../../components/timeline/RunExplorer';
 import { TimelineChart } from '../../../../components/timeline/TimelineChart';
 import { ARCHITECTURES, architectureColor, architectureInfo, architectureName } from '../../../../lib/architectures';
@@ -23,7 +24,7 @@ import { analysisFor } from '../../../../lib/server/analysis';
 import { loadRepresentativeRun } from '../../../../lib/server/replays';
 import { loadRunSet } from '../../../../lib/server/runSet';
 import { sourceUrl } from '../../../../lib/site';
-import { harnessCheckRates, ownCheckRates, stageCosts } from '../../../../lib/strategies';
+import { harnessCheckRates, ownCheckRates, stageCosts, taskDeltas } from '../../../../lib/strategies';
 import { timelineFromPhases, timelineFromTrace } from '../../../../lib/timeline';
 import { buildViewGroups, trimGroups } from '../../../../lib/traceView';
 import { formatInt } from '../../../../lib/format';
@@ -75,6 +76,9 @@ export default async function StrategyPage({ params }: Params) {
   const verified = data ? data.verification !== 'unverified' : false;
   const analysis = data && mine.length > 0 ? analysisFor(data) : null;
   const costs = stageCosts(ranked, info.id);
+  // Against the control, so the control's runs are needed too.
+  const rankedAll = (data?.records ?? []).filter(isRankable);
+  const deltaModels = (data?.models ?? []).map((model) => ({ model, deltas: taskDeltas(rankedAll, info.id, model) }));
   const own = ownCheckRates(mine, info.id);
   const harness = harnessCheckRates(mine);
   const harnessFailed = harness.some((rate) => rate.ok < rate.total);
@@ -153,6 +157,19 @@ export default async function StrategyPage({ params }: Params) {
                     : `${info.name} against a single agent on the same tasks and repeats, on each model. The interval is on the paired difference, so it is as wide as the evidence is thin.`}
               </p>
               <StandingTable standings={standings} verified={verified} />
+            </section>
+          ) : null}
+
+          {verified && info.id !== 'single' && deltaModels.some((entry) => entry.deltas.length > 0) ? (
+            <section aria-labelledby="tasks-title" className="mb-24">
+              <h2 id="tasks-title" className="h2 mb-3 max-w-3xl text-ink">
+                Task by task against a single agent
+              </h2>
+              <p className="prose-serif mb-8 max-w-3xl">
+                A mean can hide whether a design helps everywhere a little or on one task a lot. Each bar is the
+                difference from a single agent on one task; the best-served tasks are at the top.
+              </p>
+              <TaskDeltaGrid models={deltaModels} />
             </section>
           ) : null}
 

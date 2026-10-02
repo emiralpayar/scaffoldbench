@@ -4,7 +4,6 @@ import type { CellSummary } from '@arena/core';
 
 import type { RunRecord } from '../lib/records';
 
-import type { AssertionStat } from '../lib/derive';
 import {
   formatDuration,
   formatFailureMode,
@@ -28,132 +27,96 @@ export function TaskStrategyTable({ rows }: { rows: readonly StrategyCellRow[] }
   }
 
   return (
-    <ScrollRegion label="Results of each strategy on this task">
-      <table className="w-full min-w-[42rem] border-collapse text-[13px]">
-        <thead>
-          <tr className="border-b border-rule">
-            <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
-              Strategy
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              n
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
-              Mean score
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Pass
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Cost / run
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Latency
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
-              Failure modes
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.strategyId} className="border-b border-rule/70 last:border-0">
-              <td className="px-2 py-2 text-ink">{row.label}</td>
-              <td className="num px-2 py-2 text-right text-ink-2">{row.cell.runs}</td>
-              <td className="px-2 py-2">
-                <span className="flex items-center gap-2">
-                  <MiniBar value={row.cell.meanScore} />
-                  <span className="num text-ink">{formatScore(row.cell.meanScore)}</span>
-                </span>
-              </td>
-              <td className="num px-2 py-2 text-right text-ink-2">
-                {formatPercent(row.cell.passRate)}
-              </td>
-              <td className="num px-2 py-2 text-right text-ink-2">
-                {formatUsd(row.cell.meanCostUsd)}
-              </td>
-              <td className="num px-2 py-2 text-right text-ink-2">
-                {formatDuration(row.cell.meanLatencyMs)}
-              </td>
-              <td className="px-2 py-2 text-[11.5px] text-muted">
+    <>
+      {/* On a phone, a card per strategy: seven columns do not fit across. */}
+      <ul className="divide-y divide-rule md:hidden">
+        {rows.map((row) => (
+          <li key={row.strategyId} className="py-3.5 first:pt-0 last:pb-0">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[0.9375rem] text-ink">{row.label}</span>
+              <span className="flex items-center gap-2">
+                <MiniBar value={row.cell.meanScore} />
+                <span className="num text-ink">{formatScore(row.cell.meanScore)}</span>
+              </span>
+            </div>
+            <p className="num mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.75rem] text-ink-2">
+              <span>{row.cell.runs} runs</span>
+              <span>{formatPercent(row.cell.passRate)} pass</span>
+              <span>{formatUsd(row.cell.meanCostUsd)} / run</span>
+              <span>{formatDuration(row.cell.meanLatencyMs)}</span>
+            </p>
+            {Object.entries(row.cell.failureModes).some(([mode]) => mode !== 'none') ? (
+              <p className="mt-1 text-[0.75rem] text-muted">
                 {Object.entries(row.cell.failureModes)
                   .filter(([mode]) => mode !== 'none')
                   .map(([mode, count]) => `${formatFailureMode(mode)} ×${count}`)
-                  .join(', ') || '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </ScrollRegion>
-  );
-}
-
-/**
- * How often each graded assertion held, across every strategy and repeat.
- *
- * This is the column that says *which part* of the task the architectures keep
- * getting wrong — the thing a mean score cannot tell you.
- */
-export function AssertionTable({ stats }: { stats: readonly AssertionStat[] }) {
-  if (stats.length === 0) {
-    return (
-      <p className="text-[13px] text-muted">
-        This task is graded by a judge rather than by assertions, so there is no assertion list.
-      </p>
-    );
-  }
-
-  return (
-    <ScrollRegion label="Graded assertions of this task">
-      <table className="w-full min-w-[40rem] border-collapse text-[13px]">
-        <thead>
-          <tr className="border-b border-rule">
-            <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
-              Assertion
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Weight
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
-              Passed
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Partial
-            </th>
-            <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
-              Mean credit
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {stats.map((stat) => (
-            <tr key={stat.id} className="border-b border-rule/70 last:border-0">
-              <td className="px-2 py-2">
-                <span className="text-ink">{stat.label}</span>
-                <span className="num ml-2 text-[11px] text-muted">{stat.id}</span>
-              </td>
-              <td className="num px-2 py-2 text-right text-ink-2">{stat.weight}</td>
-              <td className="px-2 py-2">
-                <span className="flex items-center gap-2">
-                  <MiniBar value={stat.passRate} />
-                  <span className="num text-ink">
-                    {stat.passed}/{stat.runs}
-                  </span>
-                  <span className="num text-[11px] text-muted">
-                    {formatPercent(stat.passRate)}
-                  </span>
-                </span>
-              </td>
-              <td className="num px-2 py-2 text-right text-ink-2">{stat.partial}</td>
-              <td className="num px-2 py-2 text-right text-ink-2">
-                {stat.meanEarned.toFixed(2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </ScrollRegion>
+                  .join(', ')}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block">
+        <ScrollRegion label="Results of each strategy on this task">
+          <table className="w-full min-w-[42rem] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-rule">
+                <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
+                  Strategy
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
+                  n
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
+                  Mean score
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
+                  Pass
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
+                  Cost / run
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-right font-normal">
+                  Latency
+                </th>
+                <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal">
+                  Failure modes
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.strategyId} className="border-b border-rule/70 last:border-0">
+                  <td className="px-2 py-2 text-ink">{row.label}</td>
+                  <td className="num px-2 py-2 text-right text-ink-2">{row.cell.runs}</td>
+                  <td className="px-2 py-2">
+                    <span className="flex items-center gap-2">
+                      <MiniBar value={row.cell.meanScore} />
+                      <span className="num text-ink">{formatScore(row.cell.meanScore)}</span>
+                    </span>
+                  </td>
+                  <td className="num px-2 py-2 text-right text-ink-2">
+                    {formatPercent(row.cell.passRate)}
+                  </td>
+                  <td className="num px-2 py-2 text-right text-ink-2">
+                    {formatUsd(row.cell.meanCostUsd)}
+                  </td>
+                  <td className="num px-2 py-2 text-right text-ink-2">
+                    {formatDuration(row.cell.meanLatencyMs)}
+                  </td>
+                  <td className="px-2 py-2 text-[11.5px] text-muted">
+                    {Object.entries(row.cell.failureModes)
+                      .filter(([mode]) => mode !== 'none')
+                      .map(([mode, count]) => `${formatFailureMode(mode)} ×${count}`)
+                      .join(', ') || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollRegion>
+      </div>
+    </>
   );
 }
 

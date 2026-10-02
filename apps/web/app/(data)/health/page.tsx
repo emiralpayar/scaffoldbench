@@ -5,7 +5,6 @@ import { ArchitectureGlyph } from '../../../components/ArchitectureGlyph';
 import { EmptyState } from '../../../components/EmptyState';
 import { PageHeader } from '../../../components/Layout';
 import { RunSetBanner } from '../../../components/RunSetMeta';
-import { ScrollRegion } from '../../../components/ScrollRegion';
 import { CheckRateList } from '../../../components/health/CheckRateList';
 import { HealthStrip } from '../../../components/leaderboard/HealthStrip';
 import { ARCHITECTURES, architectureName } from '../../../lib/architectures';
@@ -190,44 +189,37 @@ function ExcludedRuns({ runs }: { runs: readonly RunRecord[] }) {
   const shown = runs.slice(0, LISTED);
   return (
     <div className="card overflow-hidden">
-      <ScrollRegion label="Runs excluded for failing a check">
-        <table className="w-full min-w-[44rem] border-collapse text-[0.8125rem]">
-          <caption className="sr-only">Runs excluded because an integrity check failed, with the check and what it found.</caption>
-          <thead>
-            <tr className="border-b border-rule text-left">
-              {['Run', 'Model', 'What failed'].map((heading) => (
-                <th key={heading} scope="col" className="eyebrow px-4 py-3 font-normal !text-[0.6875rem]">
-                  {heading}
-                </th>
+      <div className="hidden grid-cols-[minmax(0,1.3fr)_7rem_minmax(0,2fr)] gap-x-5 border-b border-rule px-5 py-3 md:grid">
+        <span className="eyebrow !text-[0.6875rem]">Run</span>
+        <span className="eyebrow !text-[0.6875rem]">Model</span>
+        <span className="eyebrow !text-[0.6875rem]">What failed</span>
+      </div>
+      <ul>
+        {shown.map((record) => (
+          <li
+            key={record.runId}
+            className="grid gap-x-5 gap-y-2 border-b border-rule px-5 py-3.5 text-[0.8125rem] last:border-0 md:grid-cols-[minmax(0,1.3fr)_7rem_minmax(0,2fr)]"
+          >
+            <div className="min-w-0">
+              <Link href={`/runs/${record.runId}/`} className="link font-mono text-[0.75rem] [overflow-wrap:anywhere]">
+                {record.runId}
+              </Link>
+              <span className="mt-0.5 block text-ink-2 md:hidden">{modelShortName(record.model)}</span>
+            </div>
+            <span className="hidden text-ink-2 md:block">{modelShortName(record.model)}</span>
+            <ul className="space-y-1.5">
+              {failedChecks(record).map((check) => (
+                <li key={check.id}>
+                  <span className="text-ink">{checkWords(check.id).title}</span>
+                  {check.detail ? <span className="block text-ink-2">{check.detail}</span> : null}
+                </li>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((record) => (
-              <tr key={record.runId} className="border-t border-rule align-top">
-                <td className="px-4 py-3">
-                  <Link href={`/runs/${record.runId}/`} className="link font-mono text-[0.75rem] [overflow-wrap:anywhere]">
-                    {record.runId}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-ink-2">{modelShortName(record.model)}</td>
-                <td className="px-4 py-3">
-                  <ul className="space-y-1.5">
-                    {failedChecks(record).map((check) => (
-                      <li key={check.id}>
-                        <span className="text-ink">{checkWords(check.id).title}</span>
-                        {check.detail ? <span className="block text-ink-2">{check.detail}</span> : null}
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </ScrollRegion>
+            </ul>
+          </li>
+        ))}
+      </ul>
       {runs.length > shown.length ? (
-        <p className="border-t border-rule px-4 py-3 text-[0.8125rem] text-muted">
+        <p className="border-t border-rule px-5 py-3 text-[0.8125rem] text-muted">
           and {formatInt(runs.length - shown.length)} more, in the run records.
         </p>
       ) : null}

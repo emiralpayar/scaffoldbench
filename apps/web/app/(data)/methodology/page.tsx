@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { PageHeader } from '../../../components/Layout';
+import { RunSetBanner } from '../../../components/RunSetMeta';
 import { ScrollRegion } from '../../../components/ScrollRegion';
 import { VerdictDiagram } from '../../../components/methodology/VerdictDiagram';
 import { analyzeForSite } from '../../../lib/analysis';
@@ -55,6 +56,8 @@ export default async function MethodologyPage() {
 
   return (
     <>
+      {data && data.records.length > 0 ? <RunSetBanner data={data} /> : null}
+
       <PageHeader
         eyebrow="Methodology"
         title="How the numbers are made."

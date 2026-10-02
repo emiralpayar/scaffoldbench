@@ -206,7 +206,7 @@ export default async function PostmortemPage() {
           >
             <p>
               The verifier was never asked for a structured verdict, and when its prose could not be read as
-              one the code treated it as approval. The revise loop was dead code. The one run that did fail its
+              one the code treated it as approval. The revise loop could never run. The one run that did fail its
               scorer was approved with a list of checks that all passed, including a restock that the
               task&rsquo;s own policy forbids (&ldquo;Never restock a line you have merely refunded&rdquo;).
             </p>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { harnessCheckRates, ownCheckRates, pickRepresentative, stageCosts } from '../lib/strategies';
+import { harnessCheckRates, ownCheckRates, pickRepresentative, stageCosts, taskDeltas } from '../lib/strategies';
 import { phase, run } from './fixtures';
 
 const proposeSelect = (overrides: Parameters<typeof run>[0]) => run({ strategyId: 'propose-select', ...overrides });
@@ -102,5 +102,48 @@ describe('check rates', () => {
 
   it("keeps the runner's checks apart from the design's", () => {
     expect(harnessCheckRates(records).map((rate) => rate.id)).toEqual(['harness.api']);
+  });
+});
+
+describe('taskDeltas', () => {
+  const at = (strategyId: string, taskId: string, repeat: number, score: number, model = 'claude-sonnet-5-5') =>
+    run({ runId: `${strategyId}-${taskId}-${repeat}-${model}`, strategyId, taskId, taskTitle: `Task ${taskId}`, repeat, score, model });
+
+  it('is the mean paired difference from the control, over the repeats both ran', () => {
+    const records = [
+      at('single', 'a', 1, 0.5),
+      at('single', 'a', 2, 0.5),
+      at('plan-execute', 'a', 1, 1),
+      at('plan-execute', 'a', 2, 0.5),
+      at('single', 'b', 1, 1),
+      at('plan-execute', 'b', 1, 0.25),
+    ];
+    const deltas = taskDeltas(records, 'plan-execute', 'claude-sonnet-5-5');
+    expect(deltas.map((d) => [d.taskId, d.delta, d.pairs])).toEqual([
+      ['a', 0.25, 2],
+      ['b', -0.75, 1],
+    ]);
+  });
+
+  it('leaves out a task the control never ran, and a repeat only one side has', () => {
+    const records = [
+      at('plan-execute', 'a', 1, 1),
+      at('plan-execute', 'c', 1, 1),
+      at('single', 'c', 2, 0),
+      at('single', 'c', 1, 0.5),
+      at('plan-execute', 'c', 2, 0),
+    ];
+    const deltas = taskDeltas(records, 'plan-execute', 'claude-sonnet-5-5');
+    expect(deltas.map((d) => [d.taskId, d.delta, d.pairs])).toEqual([['c', 0.25, 2]]);
+  });
+
+  it('keeps models apart', () => {
+    const records = [
+      at('single', 'a', 1, 0.5, 'claude-sonnet-5-5'),
+      at('plan-execute', 'a', 1, 1, 'claude-sonnet-5-5'),
+      at('single', 'a', 1, 1, 'claude-opus-5-5'),
+      at('plan-execute', 'a', 1, 1, 'claude-opus-5-5'),
+    ];
+    expect(taskDeltas(records, 'plan-execute', 'claude-opus-5-5')[0]?.delta).toBe(0);
   });
 });

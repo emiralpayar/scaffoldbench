@@ -29,7 +29,78 @@ export interface Standing {
  */
 export function StandingTable({ standings, verified }: { standings: readonly Standing[]; verified: boolean }) {
   return (
-    <div className="card overflow-hidden">
+    <>
+      <StandingCards standings={standings} verified={verified} />
+      <StandingGrid standings={standings} verified={verified} />
+    </>
+  );
+}
+
+/** On a phone, one card per model, so every number is on screen without a sideways scroll. */
+function StandingCards({ standings, verified }: { standings: readonly Standing[]; verified: boolean }) {
+  return (
+    <ul className="space-y-3 md:hidden">
+      {standings.map(({ model, row, of }) => (
+        <li key={model} className="card p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <Link href={`/results/${model}/`} className="link text-[1rem] text-ink">
+              {modelShortName(model)}
+            </Link>
+            <span className="num text-[0.875rem] text-ink">
+              {verified && row.rank !== null ? (
+                <>
+                  {rankLabel(row)} <span className="text-muted">of {of}</span>
+                </>
+              ) : null}
+            </span>
+          </div>
+          <dl className="mt-3 grid grid-cols-3 gap-3">
+            <div>
+              <dt className="eyebrow !text-[0.6875rem]">Score</dt>
+              <dd className="num mt-1 text-ink">{formatScore(row.score.mean)}</dd>
+              {verified ? (
+                <dd className="num text-[0.6875rem] text-muted">
+                  {formatScore(row.score.low)}–{formatScore(row.score.high)}
+                </dd>
+              ) : null}
+            </div>
+            <div>
+              <dt className="eyebrow !text-[0.6875rem]">Cost / run</dt>
+              <dd className="num mt-1 text-ink">{formatUsd(row.costUsd.mean)}</dd>
+              <dd className="num text-[0.6875rem] text-muted">
+                {row.costRatio ? `${formatMultiple(row.costRatio.mean)} single` : 'baseline'}
+              </dd>
+            </div>
+            <div>
+              <dt className="eyebrow !text-[0.6875rem]">Ranked</dt>
+              <dd className="num mt-1 text-ink">
+                {row.ranked}/{row.total}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 border-t border-rule pt-3">
+            {verified && row.verdict ? (
+              <>
+                <span className={VERDICT[row.verdict].className}>{VERDICT[row.verdict].text}</span>
+                {row.delta ? (
+                  <span className="num mt-1.5 block text-[0.75rem] text-ink-2">
+                    {formatDelta(row.delta.mean)} [{formatDelta(row.delta.low)}, {formatDelta(row.delta.high)}]
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <span className="text-[0.8125rem] text-muted">no verdict without fidelity checks</span>
+            )}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StandingGrid({ standings, verified }: { standings: readonly Standing[]; verified: boolean }) {
+  return (
+    <div className="card hidden overflow-hidden md:block">
       <ScrollRegion label="This architecture’s standing on each model">
         <table className="w-full min-w-[40rem] border-collapse text-[0.875rem]">
           <caption className="sr-only">

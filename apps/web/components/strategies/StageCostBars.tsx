@@ -57,7 +57,7 @@ export function StageCostBars({ strategyId, costs }: { strategyId: string; costs
         </ul>
 
         <ScrollRegion label="Cost of each stage, per model" className="mt-6 border-t border-rule pt-4">
-          <table className="w-full min-w-[26rem] border-collapse text-[0.8125rem]">
+          <table className="w-full min-w-[19rem] border-collapse text-[0.8125rem]">
             <thead>
               <tr className="border-b border-rule">
                 <th scope="col" className="eyebrow px-2 py-1.5 text-left font-normal !text-[0.6875rem]">
@@ -85,8 +85,13 @@ export function StageCostBars({ strategyId, costs }: { strategyId: string; costs
                       <td key={cost.model} className="num px-2 py-2 text-right text-ink-2">
                         {mine ? (
                           <>
-                            <span className="text-ink">{formatUsd(mine.costUsd)}</span>{' '}
-                            <span className="text-muted">{formatPercent(cost.costUsd === 0 ? 0 : mine.costUsd / cost.costUsd)}</span>
+                            <span className="text-ink">{formatUsd(mine.costUsd)}</span>
+                            <span className="ml-1.5 hidden text-muted sm:inline">
+                              {formatPercent(cost.costUsd === 0 ? 0 : mine.costUsd / cost.costUsd)}
+                            </span>
+                            <span className="block text-[0.75rem] text-muted sm:hidden">
+                              {formatPercent(cost.costUsd === 0 ? 0 : mine.costUsd / cost.costUsd)}
+                            </span>
                           </>
                         ) : (
                           '—'
