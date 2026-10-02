@@ -169,7 +169,21 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
     );
     return 1;
   }
-  const skip = args.resume !== undefined ? await completedCells(runSetId, resultsRoot) : new Set<string>();
+  const completed = args.resume !== undefined ? await completedCells(runSetId, resultsRoot) : new Set<string>();
+  const skip = new Set(completed);
+  // Deferred models stay in the plan, and so in the manifest a later resume
+  // checks against, but none of their cells starts in this session.
+  const unknownDeferred = args.deferModels.filter((model) => !args.models.includes(model));
+  if (unknownDeferred.length > 0) {
+    ctx.fail(`--defer-models names ${unknownDeferred.join(', ')}, which this run set does not measure (models: ${args.models.join(', ')}).`);
+    return 1;
+  }
+  if (args.deferModels.length > 0 && args.deferModels.length === args.models.length) {
+    ctx.fail('--defer-models defers every model, so this session would run nothing.');
+    return 1;
+  }
+  const deferred = new Set(args.deferModels);
+  for (const cell of cells) if (deferred.has(cell.model)) skip.add(cell.key);
   const pending = cells.filter((cell) => !skip.has(cell.key));
   const recorded = args.resume !== undefined ? await recordedByCell(runSetId, resultsRoot) : new Map<string, RunRecord>();
 
@@ -199,7 +213,13 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
     'Matrix',
     `${plural(args.models.length, 'model')} × ${plural(strategies.length, 'strategy', 'strategies')} × ` +
       `${plural(tasks.length, 'task')} × ${plural(args.repeats, 'repeat')} = ${plural(cells.length, 'run')}` +
-      (skip.size > 0 ? style.dim(` · ${skip.size} already recorded, ${pending.length} to run`) : ''),
+      (skip.size > 0
+        ? style.dim(
+            ` · ${completed.size} already recorded, ` +
+              (skip.size > completed.size ? `${skip.size - completed.size} deferred, ` : '') +
+              `${pending.length} to run`,
+          )
+        : ''),
   );
   row(
     'Judge',
@@ -301,7 +321,7 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
       judgeSamples: args.judgeSamples,
       persist: args.persist,
       resultsRoot,
-      ...(args.resume !== undefined ? { skipCells: skip } : {}),
+      ...(args.resume !== undefined || deferred.size > 0 ? { skipCells: skip } : {}),
       signal: stop.abort.signal,
       drainSignal: stop.drain.signal,
       updateLatestPointer: args.updateLatest,

@@ -238,6 +238,55 @@ describe('arena run', () => {
     expect(again.err.join('\n')).toMatch(/--repeats is 3, but the run set was measured with 1/);
   });
 
+  it('defers a model to a later session of the same run set, and resume runs only its cells', async () => {
+    setScript(async function* () {
+      yield assistant('Nothing to do.');
+      yield success({ text: 'Nothing to do.', costUsd: 0.01 });
+    });
+    const twoModels = [
+      '--strategies', 'single',
+      '--tasks', 'airline-easy',
+      '--models', 'claude-haiku-4-5-20251001,claude-sonnet-5-5',
+      '--repeats', '1',
+      '--max-cost', '0.5',
+      '--total-budget', '5',
+      '--plain',
+    ];
+
+    const first = fakeContext();
+    const code = await runCommand(
+      args(...twoModels, '--run-set', 'e2e-defer', '--defer-models', 'claude-sonnet-5-5'),
+      first.ctx,
+    );
+    expect(code).toBe(0);
+    expect(first.stderrText()).toMatch(/0 already recorded, 1 deferred, 1 to run/);
+    const firstRuns = await listJsonFiles(runsDir('e2e-defer', root));
+    expect(firstRuns).toHaveLength(1);
+    expect(firstRuns[0]).toMatch(/claude-haiku-4-5-20251001__single__airline-easy__r1/);
+    const planned = await readJson<RunSetManifest>(manifestPath('e2e-defer', root));
+    // The deferred model is part of the plan a resume is checked against.
+    expect(planned.models).toEqual(['claude-haiku-4-5-20251001', 'claude-sonnet-5-5']);
+
+    const second = fakeContext();
+    expect(await runCommand(args('--resume', 'e2e-defer', '--plain'), second.ctx)).toBe(0);
+    const allRuns = await listJsonFiles(runsDir('e2e-defer', root));
+    expect(allRuns).toHaveLength(2);
+    expect(second.stderrText()).not.toMatch(/claude-haiku-4-5-20251001__single__airline-easy__r1 /);
+  });
+
+  it('refuses to defer a model the run set does not measure, or every model it does', async () => {
+    setScript(async function* () {
+      throw new Error('nothing may start');
+    });
+    const unknown = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--defer-models', 'claude-opus-5-5', '--dry-run'), unknown.ctx)).toBe(1);
+    expect(unknown.err.join('\n')).toMatch(/--defer-models names claude-opus-5-5, which this run set does not measure/);
+
+    const everything = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--defer-models', 'claude-haiku-4-5-20251001', '--dry-run'), everything.ctx)).toBe(1);
+    expect(everything.err.join('\n')).toMatch(/defers every model/);
+  });
+
   it('refuses two models that would share a run id before it plans, instead of dying with a stack trace', async () => {
     setScript(async function* () {
       throw new Error('nothing may start');

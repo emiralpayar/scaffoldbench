@@ -90,6 +90,12 @@ export interface RunArgs {
   runSetId?: string;
   /** Run set to resume: only its missing cells run, under its own settings. */
   resume?: string;
+  /**
+   * Models planned into the run set whose cells this session leaves for a
+   * later `--resume`: one run set measured in sessions split by model, decided
+   * up front rather than by any outcome.
+   */
+  deferModels: string[];
   /** Results root, when not the repository's `results/`. */
   resultsDir?: string;
   persist: boolean;
@@ -179,6 +185,12 @@ const RUN_FLAGS: FlagSpec[] = [
     fallback: DEFAULT_MODEL,
   },
   { name: 'model', kind: 'value', value: '<id>', help: 'Same as --models', aliasOf: 'models' },
+  {
+    name: 'defer-models',
+    kind: 'value',
+    value: '<ids>',
+    help: 'Plan these models into the run set but run none of their cells now; --resume runs them later',
+  },
   {
     name: 'repeats',
     kind: 'value',
@@ -590,6 +602,7 @@ function parseRun(collected: Collected, env: NodeJS.ProcessEnv): ParsedCommand {
     fixtureMode,
     ...(runSetId !== undefined ? { runSetId } : {}),
     ...(resume !== undefined ? { resume } : {}),
+    deferModels: unique(list(flags, 'defer-models', [], errors)),
     ...(resultsDir ? { resultsDir } : {}),
     persist,
     dryRun: flags.has('dry-run'),
