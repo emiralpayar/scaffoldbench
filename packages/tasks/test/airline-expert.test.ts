@@ -774,6 +774,19 @@ describe('airline-baggage-audit', () => {
     }
   });
 
+  it('names, for second-page, only later-page entries that no other trap names', () => {
+    for (const variant of [undefined, 1, 2, 3, 99]) {
+      const traps = createBaggageAuditSpec(variant).traps ?? [];
+      const secondPage = traps.find((trap) => trap.id === 'second-page')!.caughtBy;
+      const others = new Set(traps.filter((trap) => trap.id !== 'second-page').flatMap((trap) => trap.caughtBy));
+      const entries = (ids: string[]) => ids.map((id) => id.split(':')[1]);
+      expect(secondPage.length, `seed ${variant}`).toBeGreaterThan(0);
+      for (const entry of entries(secondPage)) {
+        expect([...others].some((id) => id.endsWith(`:${entry}`)), `seed ${variant} ${entry}`).toBe(false);
+      }
+    }
+  });
+
   it('scores 0 on an untouched world', async () => {
     expect((await score(airlineBaggageAuditTask, drive(airlineBaggageAuditSpec))).score).toBe(0);
   });
@@ -832,7 +845,7 @@ describe('airline-baggage-audit', () => {
       await solve(d, createBaggageAuditWorld(), { refund: (id, owed) => (id === target ? amount(owed) : owed) });
       const result = await score(airlineBaggageAuditTask, d);
       expect(missed(result)).toEqual([`refund:${target}`]);
-      expect(firedTraps(airlineBaggageAuditTask, result)).toContain(trap);
+      expect(firedTraps(airlineBaggageAuditTask, result)).toEqual([trap]);
     });
   }
 

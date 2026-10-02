@@ -607,6 +607,23 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       .filter(([, kind]) => kinds.includes(kind))
       .map(([entryId]) => `${prefix}:${entryId}`);
 
+  /**
+   * The later-page entries that only an unread page gets wrong: those whose
+   * kind no other trap names. A planted error on page two also fails its own
+   * trap's items, so naming it here would fire this trap for a run that read
+   * every page and misjudged one charge. Every seed tried has such entries;
+   * the fallback keeps the trap alive for one that does not.
+   */
+  const plainKinds: readonly CaseKind[] = ['correct', 'first-bag-overpriced', 'second-bag-underpriced'];
+  const laterPages = findings.filter((finding) => finding.page > 1);
+  const plainLater = laterPages.filter((finding) => {
+    const kind = generated.plantedKinds.get(finding.entryId);
+    return kind === undefined || plainKinds.includes(kind);
+  });
+  const laterPageItems = (plainLater.length > 0 ? plainLater : laterPages).map(
+    (finding) => `outcome:${finding.entryId}`,
+  );
+
   /** Refunds this run made against charges that had nothing left to refund. */
   const wrongfulRefunds = (world: AirlineOpsWorld): string[] =>
     findings
@@ -691,9 +708,7 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       {
         id: 'second-page',
         description: 'Stops after the first page of ledger results.',
-        caughtBy: findings
-          .filter((finding) => finding.page > 1)
-          .map((finding) => `outcome:${finding.entryId}`),
+        caughtBy: laterPageItems,
       },
       {
         id: 'rebill',
