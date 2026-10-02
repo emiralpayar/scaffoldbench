@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 
 import { architectureName } from '../../lib/architectures';
 import type { RepeatCell, RunOutcome } from '../../lib/derive';
-import { formatDuration, formatFailureMode, formatScore, formatUsd } from '../../lib/format';
+import { formatDuration, formatFailureMode, formatScore, formatUsd, plural } from '../../lib/format';
 import type { Difficulty } from '../../lib/records';
 import { ArchitectureColumnHeader, ArchitectureKey, architectureGridClass } from './ArchitectureColumns';
 import { Readout } from './Readout';
@@ -70,6 +70,7 @@ export function RepeatMatrix({
   /** Keyed by `${architecture}::${taskId}`. */
   cells: Record<string, RepeatCell[]>;
 }) {
+  const flagged = Object.values(cells).some((runs) => runs.some((run) => run.legacyProblems > 0));
   return (
     <figure>
       <ArchitectureKey architectures={architectures} className="mb-4" />
@@ -119,10 +120,20 @@ export function RepeatMatrix({
       <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[0.8125rem] text-ink-2">
         {(Object.keys(OUTCOME) as RunOutcome[]).map((outcome) => (
           <span key={outcome} className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="block h-3 w-3 rounded-[3px] border" style={OUTCOME[outcome].style} />
+            <span aria-hidden className="block h-3 w-3">
+              <Square outcome={outcome} />
+            </span>
             {OUTCOME[outcome].label}
           </span>
         ))}
+        {flagged ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="block h-3 w-3">
+              <Square outcome="pass" cut />
+            </span>
+            corner cut: its own records show it did not run as designed
+          </span>
+        ) : null}
         <span className="text-muted">One square per run; each opens its run.</span>
       </figcaption>
     </figure>
@@ -148,11 +159,29 @@ function Squares({ runs, architecture, task }: { runs: RepeatCell[]; architectur
           data-readout-title={`${name} on ${task}, repeat ${run.repeat}`}
           data-readout-detail={detailOf(run)}
           aria-label={`${name}, repeat ${run.repeat}: ${detailOf(run)}`}
-          className="block h-3 w-3 rounded-[3px] border transition-transform hover:scale-125 focus-visible:scale-125 sm:h-3.5 sm:w-3.5"
-          style={OUTCOME[run.outcome].style}
-        />
+          className="block h-3 w-3 rounded-[3px] transition-transform hover:scale-125 focus-visible:scale-125 sm:h-3.5 sm:w-3.5"
+        >
+          <Square outcome={run.outcome} cut={run.legacyProblems > 0} />
+        </Link>
       ))}
     </span>
+  );
+}
+
+/**
+ * One run's mark. `cut` clips the top-right corner off: the run predates
+ * integrity checks and its own records show the architecture did not run as
+ * designed. A change of shape rather than colour, so it reads on every
+ * outcome's fill and in both themes. The clip is on this inner mark, not on
+ * the link around it, so it never clips the focus ring.
+ */
+function Square({ outcome, cut = false }: { outcome: RunOutcome; cut?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="block h-full w-full rounded-[3px] border"
+      style={{ ...OUTCOME[outcome].style, ...(cut ? { clipPath: 'polygon(0 0, 45% 0, 100% 55%, 100% 100%, 0 100%)' } : {}) }}
+    />
   );
 }
 
@@ -164,5 +193,8 @@ function detailOf(run: RepeatCell): string {
     formatDuration(run.latencyMs),
   ];
   if (run.outcome !== 'pass' && run.failureMode !== 'none') parts.push(formatFailureMode(run.failureMode));
+  if (run.legacyProblems > 0) {
+    parts.push(`did not run as designed (${plural(run.legacyProblems, 'problem')} in its records)`);
+  }
   return parts.join(' · ');
 }

@@ -35,6 +35,7 @@ import {
   joinList,
   plural,
 } from './format';
+import { runReceipts } from './postmortem';
 import type { Catalog, Difficulty, RunRecord, TaskInfo } from './records';
 import { isRankable } from './records';
 
@@ -178,6 +179,13 @@ export interface RepeatCell {
   costUsd: number;
   latencyMs: number;
   failureMode: string;
+  /**
+   * For a run recorded before integrity checks existed, how many things its
+   * own records show went wrong (`runReceipts`): the only fidelity signal such
+   * a run has. Always 0 for a run with an integrity verdict, which `outcome`
+   * already reflects.
+   */
+  legacyProblems: number;
 }
 
 /** Runs of one architecture on one task, ordered by repeat. */
@@ -197,6 +205,7 @@ export function repeatCells(
       costUsd: record.costUsd,
       latencyMs: record.latencyMs,
       failureMode: record.failureMode,
+      legacyProblems: record.integrity ? 0 : runReceipts(record).length,
     }));
 }
 

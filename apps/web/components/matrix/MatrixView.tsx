@@ -30,6 +30,10 @@ export function MatrixView({ data, model }: { data: RunSetData; model: string })
     for (const task of tasks) cells[`${architecture}::${task.id}`] = repeatCells(scoped, architecture, task.id);
   }
   const ranked = scoped.filter(isRankable);
+  // A run set that predates the fidelity gate ranks nothing; what its runs'
+  // own records show is the only fidelity signal it has.
+  const unverified = data.verification === 'unverified';
+  const flagged = unverified ? Object.values(cells).flat().filter((cell) => cell.legacyProblems > 0).length : 0;
   const traps = tasks.flatMap((task) => {
     const table = trapTable(task, ranked);
     return table && table.architectures.length > 0 ? [{ task, table }] : [];
@@ -52,14 +56,26 @@ export function MatrixView({ data, model }: { data: RunSetData; model: string })
         </div>
       ) : null}
 
+      {flagged > 0 ? (
+        <p className="prose-serif mb-6 max-w-3xl">
+          This run set predates the fidelity checks. By their own phase records,{' '}
+          <span className="num text-ink">
+            {flagged} of {scoped.length}
+          </span>{' '}
+          runs on {modelShortName(model)} did not run as designed; their squares have a corner cut off. Their scores are
+          real, but they measure a different harness from the one named.
+        </p>
+      ) : null}
+
       {hardest ? (
         <p className="prose-serif mb-8 max-w-3xl">
           The hardest task on {modelShortName(model)} is{' '}
           <Link href={`/tasks/${hardest.id}/`} className="link text-ink">
             {hardest.title}
           </Link>
-          , where ranked runs average <span className="num text-ink">{formatScore(hardest.mean)}</span> across every
-          architecture. A difference between harnesses is easiest to see where the ceiling is far away.
+          , where {unverified ? 'runs' : 'ranked runs'} average{' '}
+          <span className="num text-ink">{formatScore(hardest.mean)}</span> across every architecture. A difference
+          between harnesses is easiest to see where the ceiling is far away.
         </p>
       ) : null}
 

@@ -18,7 +18,7 @@ import {
 } from '../lib/derive';
 import { formatDuration, formatUsd } from '../lib/format';
 import type { TaskInfo } from '../lib/records';
-import { event, run } from './fixtures';
+import { event, phase, run } from './fixtures';
 
 function strategyInfo(id: string, label: string): StrategyInfo {
   return { id, label, description: `${label} description.` };
@@ -150,6 +150,21 @@ describe('runOutcome', () => {
       'alpha',
     );
     expect(cell).toMatchObject({ outcome: 'partial', score: 0.5, costUsd: 0.25, latencyMs: 4_200, failureMode: 'wrong_answer' });
+  });
+
+  it('flags a legacy run whose own records show it did not run as designed', () => {
+    const errored = { phases: [phase({ phase: 'plan', label: 'Plan', error: 'Reached maximum number of turns (1)' })] };
+    const [legacy] = repeatCells([run({ strategyId: 'plan-execute', ...errored })], 'plan-execute', 'alpha');
+    expect(legacy?.outcome).toBe('pass');
+    expect(legacy?.legacyProblems).toBe(1);
+
+    // A run with an integrity verdict is judged by it, never by the legacy reading.
+    const [checked] = repeatCells(
+      [run({ strategyId: 'plan-execute', integrity: { ok: true, checks: [] }, ...errored })],
+      'plan-execute',
+      'alpha',
+    );
+    expect(checked?.legacyProblems).toBe(0);
   });
 });
 
