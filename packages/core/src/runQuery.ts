@@ -8,7 +8,6 @@ import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
 import { CallMeter } from './meter';
 import { normalizeSdkMessage } from './trace';
 import type {
-  AgentDefinition,
   ApiError,
   BudgetStopReason,
   McpServerConfig,
@@ -57,7 +56,6 @@ export interface QuerySpec {
    * its siblings are skipped rather than handed money the run does not have.
    */
   maxBudgetUsd?: number;
-  agents?: Record<string, AgentDefinition>;
   /**
    * JSON Schema. When set, the reply is parsed into `structured`, the
    * `StructuredOutput` tool is allowed, and the call gets at least
@@ -228,7 +226,9 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     // are the whole toolset — so it holds only the harness's structured-output
     // tool when a schema needs it. Left unset, the session would load its
     // agent tools (Task, Skill, ToolSearch, …), which vary by host and would
-    // make two runs of the same task incomparable.
+    // make two runs of the same task incomparable. Without the Agent tool the
+    // SDK's own subagents are out too: an architecture's sub-agents are its
+    // own `runQuery` calls (`depth` > 0), each traced and charged like any other.
     tools: [...harnessTools],
     allowedTools: [...permitted],
     disallowedTools: [...SANDBOX_DENYLIST],
@@ -253,7 +253,6 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       }),
     },
     ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),
-    ...(spec.agents ? { agents: spec.agents } : {}),
     ...(schema ? { outputFormat: { type: 'json_schema' as const, schema } } : {}),
   };
 
