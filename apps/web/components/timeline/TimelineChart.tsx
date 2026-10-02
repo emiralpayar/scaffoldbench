@@ -106,15 +106,19 @@ function Row({
   const words = rowWords(call);
 
   const labelCell = (
-    <span className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] leading-tight">
+    // The chips wrap under the name: beside it they took the room and left "P".
+    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 py-0.5 text-[0.8125rem] leading-tight">
       {call.depth > 0 ? (
         <span aria-hidden className="text-muted">
           ↳
         </span>
       ) : null}
       <span className={`truncate ${started ? 'text-ink' : 'text-muted'}`}>{call.label}</span>
-      {blind && started ? <span className="chip-bad">no tools</span> : null}
-      {call.degraded && !running && started ? <span className="chip-warn">fell back</span> : null}
+      {/* Invisible rather than absent until their moment, so the row does not grow mid-replay. */}
+      {blind ? <span className={`chip-bad ${started ? '' : 'invisible'}`}>no tools</span> : null}
+      {call.degraded ? (
+        <span className={`chip-warn ${started && !running ? '' : 'invisible'}`}>fell back</span>
+      ) : null}
     </span>
   );
 
