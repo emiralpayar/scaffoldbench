@@ -17,6 +17,12 @@ export interface CliContext {
   stdout: OutputStream;
   stderr: OutputStream;
   stdin?: KeyInput;
+  /**
+   * Ask one question and return the answer, or undefined when the question
+   * was abandoned (Ctrl-C, end of input). Present only when both input and
+   * output are a terminal: without it, nobody can be asked.
+   */
+  ask?: (question: string) => Promise<string | undefined>;
   /** Where SIGINT, SIGTERM and SIGHUP arrive: the process, or a stand-in in tests. */
   signals: SignalSource;
   out(line: string): void;

@@ -10,7 +10,7 @@ import type { Judge, RunRecord, RunSetManifest, Strategy, Task } from '@arena/co
 import { parseArgs } from '../src/args';
 import type { RunArgs } from '../src/args';
 import { addToHistory, emptyHistory, expectedCost } from '../src/history';
-import { MAX_ATTEMPTS, ceilingText, firstRunIdClash, matrixCells, resolveResume, spendPlan } from '../src/plan';
+import { MAX_ATTEMPTS, ceilingText, firstRunIdClash, matrixCells, needsConfirmation, resolveResume, spendPlan } from '../src/plan';
 import { makeRecord } from './support';
 
 function run(argv: string[]): RunArgs {
@@ -243,6 +243,22 @@ function legacy(record: RunRecord): RunRecord {
   const { integrity: _integrity, ...rest } = record;
   return rest;
 }
+
+describe('needsConfirmation', () => {
+  const ask = { interactive: true, yes: false, budgetGiven: false, ceilingUsd: 31 };
+
+  it('asks a person at a terminal who is about to spend a lot on a limit they did not pick', () => {
+    expect(needsConfirmation(ask)).toBe(true);
+    expect(needsConfirmation({ ...ask, ceilingUsd: 5.01 })).toBe(true);
+  });
+
+  it('does not ask when anything says it need not: a small run, a chosen budget, --yes, or nobody to ask', () => {
+    expect(needsConfirmation({ ...ask, ceilingUsd: 5 })).toBe(false);
+    expect(needsConfirmation({ ...ask, budgetGiven: true })).toBe(false);
+    expect(needsConfirmation({ ...ask, yes: true })).toBe(false);
+    expect(needsConfirmation({ ...ask, interactive: false })).toBe(false);
+  });
+});
 
 describe('expected cost from history', () => {
   it('prices cells from their own runs, then from the same model and strategy, and counts the rest', () => {

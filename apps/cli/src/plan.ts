@@ -9,6 +9,7 @@
 import { DEFAULT_RETRY_POLICY, cellKey, makeRunId } from '@arena/core';
 import type { CellCoordinates, EffortLevel, FixtureMode, RunSetManifest } from '@arena/core';
 
+import { CONFIRM_ABOVE_USD } from './args';
 import type { MeasurementSetting, RunArgs } from './args';
 import { formatBudget, formatDuration, plural } from './format';
 
@@ -222,6 +223,21 @@ export function spendPlan(input: SpendInput): SpendPlan {
   const judgeOverBudget = Math.min(maxInFlight, input.gradedRuns) * judgeCapPerRun;
   const ceiling = Math.min(uncapped, input.totalBudgetUsd + judgeOverBudget);
   return { maxInFlight, judgeCapPerRun, agentCeiling, judgeOverBudget, ceiling };
+}
+
+/**
+ * Whether to ask before starting. Only a person at a terminal can be asked,
+ * and only when the run could cost real money on a limit they did not pick:
+ * typing `--total-budget` is a decision, and so is `--yes`. A script, a pipe
+ * or a CI job has neither a terminal nor anyone to ask, and is never held up.
+ */
+export function needsConfirmation(input: {
+  interactive: boolean;
+  yes: boolean;
+  budgetGiven: boolean;
+  ceilingUsd: number;
+}): boolean {
+  return input.interactive && !input.yes && !input.budgetGiven && input.ceilingUsd > CONFIRM_ABOVE_USD;
 }
 
 /** The plan's "Ceiling" line, saying where the number comes from. */

@@ -15,6 +15,7 @@
  */
 
 import { realpathSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 import { parseArgs } from './args';
@@ -76,6 +77,7 @@ function createContext(argv: readonly string[], options: MainOptions): CliContex
     stdout: process.stdout,
     stderr: process.stderr,
     ...(process.stdin.isTTY ? { stdin: process.stdin } : {}),
+    ...(process.stdin.isTTY && process.stderr.isTTY ? { ask: askOnTerminal } : {}),
     signals: process,
     out: (line) => process.stdout.write(`${line}\n`),
     err: (line) => process.stderr.write(`${line}\n`),
@@ -85,6 +87,22 @@ function createContext(argv: readonly string[], options: MainOptions): CliContex
     width: Math.max(60, Math.min(columns ?? 100, 160)),
     dotEnvKeys: new Set(options.dotEnv?.keys ?? []),
   };
+}
+
+/** One line typed at the terminal, asked on stderr so stdout stays data. Ctrl-C or Ctrl-D abandons it. */
+function askOnTerminal(question: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const lines = createInterface({ input: process.stdin, output: process.stderr });
+    let answered = false;
+    lines.on('close', () => {
+      if (!answered) resolve(undefined);
+    });
+    lines.question(question, (answer) => {
+      answered = true;
+      lines.close();
+      resolve(answer);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

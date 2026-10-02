@@ -46,6 +46,11 @@ export const DEFAULT_MAX_SECONDS = 600;
  */
 export const MAX_SECONDS = 86_400;
 export const DEFAULT_TOTAL_BUDGET_USD = 25;
+/**
+ * On a terminal, a run whose ceiling is above this asks before it starts,
+ * unless the budget was chosen on the command line (see `needsConfirmation`).
+ */
+export const CONFIRM_ABOVE_USD = 5;
 export const DEFAULT_JUDGE_SAMPLES = 3;
 export const DEFAULT_FIXTURE_MODE: FixtureMode = 'replay';
 
@@ -94,6 +99,10 @@ export interface RunArgs {
   updateLatest: boolean;
   /** Line-per-run output even on a terminal. */
   plain: boolean;
+  /** Start without asking, whatever the run could cost. */
+  yes: boolean;
+  /** `--total-budget` was typed: a limit someone chose rather than the default. */
+  budgetGiven: boolean;
   /** Measurement settings set by a flag, which a resume must not contradict. */
   explicit: ReadonlySet<MeasurementSetting>;
 }
@@ -231,6 +240,7 @@ const RUN_FLAGS: FlagSpec[] = [
   { name: 'no-persist', kind: 'boolean', help: 'Score everything but write nothing' },
   { name: 'dry-run', kind: 'boolean', help: 'Print the plan and the expected spend, then stop' },
   { name: 'plain', kind: 'boolean', help: 'One line per run, even on a terminal' },
+  { name: 'yes', kind: 'boolean', help: 'Never ask before starting; see the note on asking below' },
 ];
 
 const REPORT_FLAGS: FlagSpec[] = [
@@ -275,8 +285,9 @@ export const COMMANDS: readonly CommandSpec[] = [
       'arena run --resume 2026-10-02T09-14-03Z-k2p9',
     ],
     notes: [
+      `On a terminal, a run that can cost more than ${money(CONFIRM_ABOVE_USD)} and uses the default --total-budget asks before it starts. Typing --total-budget (or --yes) is the answer; scripts and pipes are never asked.`,
       'Ctrl-C once stops starting runs and lets the runs in flight finish and be recorded; Ctrl-C again aborts them. Either way the manifest says the run set was interrupted, and --resume picks it up.',
-      'Exit status: 0 every cell ran · 1 usage or setup error, no run recorded, or nothing measured (every run hit an API error) · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "arena report --strict" is the gate for that.',
+      'Exit status: 0 every cell ran · 1 usage or setup error, a start declined at the prompt, no run recorded, or nothing measured (every run hit an API error) · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "arena report --strict" is the gate for that.',
     ],
   },
   {
@@ -584,6 +595,8 @@ function parseRun(collected: Collected, env: NodeJS.ProcessEnv): ParsedCommand {
     dryRun: flags.has('dry-run'),
     updateLatest: flags.has('update-latest'),
     plain: flags.has('plain'),
+    yes: flags.has('yes'),
+    budgetGiven: flags.has('total-budget'),
     explicit,
   };
 

@@ -197,6 +197,77 @@ describe('arena run', () => {
     expect(clash.stderrText()).not.toMatch(/Matrix/);
   });
 
+  describe('on a terminal, with a run that can cost more than $5 on the default budget', () => {
+    // 4 runs x $0.50 x 3 attempts is $6.00 of ceiling, and no --total-budget was typed.
+    const UNCHOSEN = [
+      '--strategies', 'single',
+      '--tasks', 'airline-easy,airline-medium',
+      '--models', 'claude-haiku-4-5-20251001',
+      '--repeats', '2',
+      '--concurrency', '1',
+      '--max-cost', '0.5',
+    ];
+    const answering = (answer: string | undefined) => {
+      const asked: string[] = [];
+      const context = fakeContext({
+        ask: async (question) => {
+          asked.push(question);
+          return answer;
+        },
+      });
+      return { ...context, asked };
+    };
+    const script = () =>
+      setScript(async function* () {
+        yield success({ text: 'done', costUsd: 0.01 });
+      });
+
+    it('asks, says what it could cost, and starts nothing on anything but yes', async () => {
+      script();
+      for (const answer of ['', 'n', 'no', 'yes please', undefined]) {
+        const declined = answering(answer);
+        const code = await runCommand(args(...UNCHOSEN, '--run-set', 'e2e-ask-no', '--plain'), declined.ctx);
+
+        expect(code, String(answer)).toBe(1);
+        expect(declined.asked).toEqual(['This can spend up to $6.00 on the default budget. Start? [y/N] ']);
+        expect(declined.stderrText()).toMatch(/Not started\. Choose a limit with --total-budget \(or pass --yes\)/);
+      }
+      expect(await listJsonFiles(runsDir('e2e-ask-no', root))).toHaveLength(0);
+    });
+
+    it('starts on y or yes', async () => {
+      script();
+      for (const [answer, runSet] of [['y', 'e2e-ask-y'], [' YES ', 'e2e-ask-yes']] as const) {
+        const accepted = answering(answer);
+        expect(await runCommand(args(...UNCHOSEN, '--run-set', runSet, '--plain'), accepted.ctx)).toBe(0);
+        expect(accepted.asked).toHaveLength(1);
+        expect(await listJsonFiles(runsDir(runSet, root))).toHaveLength(4);
+      }
+    });
+
+    it('does not ask when the budget was typed, when --yes was, or when the run is small', async () => {
+      script();
+      const typed = answering('n');
+      expect(await runCommand(args(...UNCHOSEN, '--total-budget', '25', '--run-set', 'e2e-ask-a', '--plain'), typed.ctx)).toBe(0);
+      const waived = answering('n');
+      expect(await runCommand(args(...UNCHOSEN, '--yes', '--run-set', 'e2e-ask-b', '--plain'), waived.ctx)).toBe(0);
+      const small = answering('n');
+      expect(await runCommand(args(...ONE_CELL, '--run-set', 'e2e-ask-c', '--plain'), small.ctx)).toBe(0);
+      expect(typed.asked.length + waived.asked.length + small.asked.length).toBe(0);
+    });
+
+    it('does not ask a dry run, and cannot ask anyone who is not at a terminal', async () => {
+      script();
+      const dry = answering('n');
+      expect(await runCommand(args(...UNCHOSEN, '--dry-run'), dry.ctx)).toBe(0);
+      expect(dry.asked).toEqual([]);
+
+      // fakeContext has no `ask`, as main.ts leaves it out unless stdin and stderr are terminals.
+      const piped = fakeContext();
+      expect(await runCommand(args(...UNCHOSEN, '--run-set', 'e2e-ask-d', '--plain'), piped.ctx)).toBe(0);
+    });
+  });
+
   it('plans without starting anything on --dry-run', async () => {
     setScript(async function* () {
       throw new Error('a dry run must not start a session');

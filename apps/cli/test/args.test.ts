@@ -203,6 +203,14 @@ describe('parseArgs: run', () => {
     expect(expectError(parseArgs(['run'], { ARENA_MAX_COST_USD: huge }))).toMatch(/ARENA_MAX_COST_USD must be a positive number/);
   });
 
+  it('knows whether the budget was chosen, and whether the question was waived', () => {
+    const none = expectRun(parseArgs(['run'], {}));
+    expect(none).toMatchObject({ yes: false, budgetGiven: false });
+    expect(expectRun(parseArgs(['run', '--yes'], {}))).toMatchObject({ yes: true, budgetGiven: false });
+    // Typing the default value is still choosing it.
+    expect(expectRun(parseArgs(['run', '--total-budget', '25'], {}))).toMatchObject({ yes: false, budgetGiven: true });
+  });
+
   it('bounds concurrency', () => {
     expect(expectRun(parseArgs(['run', '--concurrency', '32'], {})).concurrency).toBe(32);
     expect(expectError(parseArgs(['run', '--concurrency', '33'], {}))).toMatch(/from 1 to 32/);

@@ -30,7 +30,7 @@ import { getTasks } from '@arena/tasks';
 
 import type { RunArgs } from '../args';
 import { credentialText, describeCredential } from '../env';
-import { displayPath, formatDuration, formatUsd, plural } from '../format';
+import { displayPath, formatBudget, formatDuration, formatUsd, plural } from '../format';
 import { emptyHistory, expectedCost, loadCostHistory } from '../history';
 import { createLiveState } from '../live';
 import {
@@ -40,6 +40,7 @@ import {
   ceilingText,
   firstRunIdClash,
   matrixCells,
+  needsConfirmation,
   resolveResume,
   spendPlan,
 } from '../plan';
@@ -199,6 +200,22 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
   if (pending.length === 0) {
     err(`Nothing to run: every cell of ${runSetId} is recorded.`);
     return 0;
+  }
+
+  if (
+    ctx.ask &&
+    needsConfirmation({ interactive: true, yes: args.yes, budgetGiven: args.budgetGiven, ceilingUsd: spend.ceiling })
+  ) {
+    const answer = await ctx.ask(
+      `This can spend up to ${formatBudget(spend.ceiling)} on the default budget. Start? [y/N] `,
+    );
+    if (!/^y(es)?$/i.test((answer ?? '').trim())) {
+      // An abandoned question (Ctrl-C, Ctrl-D) leaves the cursor at the end of it.
+      if (answer === undefined) err('');
+      err(style.dim('Not started. Choose a limit with --total-budget (or pass --yes) to run without being asked.'));
+      return 1;
+    }
+    err('');
   }
 
   // -- Running --------------------------------------------------------------
