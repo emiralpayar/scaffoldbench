@@ -54,5 +54,6 @@ describe('check-wiring --init-only', () => {
 
     expect(stdout).toMatch(/Wiring check OK \(init only\)/);
     expect(requests).toEqual([]);
-  });
+    // Four real Claude Code processes: seconds on a laptop, longer on a loaded runner.
+  }, 60_000);
 });
