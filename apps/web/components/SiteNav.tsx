@@ -1,51 +1,44 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import Link from './Link';
+
 const LINKS = [
-  { href: '/', label: 'Leaderboard' },
-  { href: '/pareto', label: 'Score vs cost' },
-  { href: '/matrix', label: 'Matrix' },
-  { href: '/live', label: 'Run one live' },
+  { href: '/results/', label: 'Results', match: ['/results', '/runs', '/pareto'] },
+  { href: '/matrix/', label: 'Matrix', match: ['/matrix', '/tasks'] },
+  { href: '/strategies/', label: 'Designs', match: ['/strategies'] },
+  { href: '/methodology/', label: 'Method', match: ['/methodology', '/health', '/postmortem'] },
+  { href: '/live/', label: 'Replay', match: ['/live'] },
 ];
 
+/** Primary navigation. Client-side only to know which section is current. */
 export function SiteNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
 
   return (
-    <header className="sticky top-0 z-30 border-b border-rule bg-plane/92 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[80rem] flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 sm:px-8">
-        <Link href="/" className="group flex items-baseline gap-2">
-          <span className="font-mono text-[12px] uppercase tracking-[0.22em] text-ink">
-            Agent&nbsp;Arena
-          </span>
-          <span className="hidden text-[11px] text-muted sm:inline">
-            harness architectures, measured
-          </span>
-        </Link>
-
-        <nav className="ml-auto flex items-center gap-1">
-          {LINKS.map((link) => {
-            const active =
-              link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={active ? 'page' : undefined}
-                className={`rounded-[2px] px-2 py-1 text-[12px] transition-colors ${
-                  active
-                    ? 'bg-accent/12 text-accent'
-                    : 'text-ink-2 hover:bg-sunken hover:text-ink'
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-    </header>
+    <nav aria-label="Primary" className="flex items-center gap-1">
+      {LINKS.map((link) => {
+        const active = link.match.some((prefix) => pathname.startsWith(prefix));
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={active ? 'page' : undefined}
+            className={`relative rounded-full px-2.5 py-2 text-[0.9375rem] transition-colors sm:px-3 ${
+              active ? 'text-ink' : 'text-ink-2 hover:bg-sunken hover:text-ink'
+            }`}
+          >
+            {link.label}
+            {active ? (
+              <span
+                aria-hidden
+                className="absolute inset-x-2.5 -bottom-[3px] h-[2px] rounded-full bg-ink sm:inset-x-3"
+              />
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

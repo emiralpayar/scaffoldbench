@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 
 import type { TraceEvent } from '@arena/core';
 
-import { formatDuration, formatUsd, groupTraceByPhase, indexToolResults } from '../lib/data';
+import { groupTraceByPhase, indexToolResults } from '../lib/derive';
+import { formatDuration, formatUsd } from '../lib/format';
 import { Tag } from './Layout';
 
 const KIND_LABEL: Record<string, string> = {

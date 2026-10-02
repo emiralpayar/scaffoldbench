@@ -1,5 +1,5 @@
 const COMMANDS = [
-  'npm run arena -- run --strategies single,plan-execute --tasks airline-easy --repeats 1',
+  'npm run arena -- run --strategies single,plan-execute --tasks airline-easy --repeats 1 --update-latest',
   'npm run demo:data   # synthetic numbers, clearly labelled, for reviewing the interface',
 ];
 

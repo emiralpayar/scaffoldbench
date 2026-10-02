@@ -1,0 +1,71 @@
+name: Pages
+
+# Publishes the static site to GitHub Pages. One-time setup: Settings → Pages →
+# Build and deployment → Source: "GitHub Actions".
+#
+# The site is a static export with no server and no API: it never asks a
+# visitor for a key, and the live demo route is not part of this build.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deployment at a time, and never cancel one halfway through: a cancelled
+# deploy can leave Pages serving a partial upload.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build static site
+    # A fork has no Pages site of its own unless its owner sets one up; skip
+    # rather than fail on every push there.
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Reports where Pages will serve the site: a project site lives under
+      # /<repository>, a custom domain at the root.
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build
+        run: npm run build:web
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url }}
+          NEXT_PUBLIC_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          # Fabricated demo numbers can never be published: if anything points
+          # the build at a synthetic run set, the build fails instead.
+          ARENA_REQUIRE_REAL_DATA: '1'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
