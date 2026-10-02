@@ -103,6 +103,7 @@ export function TraceRace({
   }, [duration]);
   const pct = (ms: number) => `${((Math.min(ms, duration) / duration) * 100).toFixed(3)}%`;
   const finished = t >= duration;
+  const spread = recorded ? spreadOf(lanes) : null;
 
   return (
     <div ref={root} className="min-w-0">
@@ -168,9 +169,34 @@ export function TraceRace({
             <Lane key={lane.strategyId} lane={lane} t={t} pct={pct} ticks={ticks} recorded={recorded} />
           ))}
         </ol>
+        {spread ? (
+          // Present from the start and hidden until the race ends, so it does not push the page down.
+          <p
+            className={`num mt-1 border-t border-rule pt-3 text-[0.8125rem] leading-relaxed text-ink-2 ${
+              finished ? '' : 'invisible'
+            }`}
+          >
+            {spread}
+          </p>
+        ) : null}
       </div>
     </div>
   );
+}
+
+/**
+ * What the finished race shows, in one line, from the lanes themselves: the
+ * same task on the same model, and how far apart the designs landed.
+ */
+function spreadOf(lanes: RaceLane[]): string | null {
+  const outcomes = lanes.flatMap((lane) => (lane.outcome ? [lane.outcome] : []));
+  if (outcomes.length < 2) return null;
+  const range = (values: number[]) => [Math.min(...values), Math.max(...values)] as const;
+  const [cheap, dear] = range(outcomes.map((o) => o.costUsd));
+  const [fast, slow] = range(outcomes.map((o) => o.latencyMs));
+  const [low, high] = range(outcomes.map((o) => o.score));
+  const ratio = cheap > 0 ? ` (${(dear / cheap).toFixed(1)}×)` : '';
+  return `Same task, same model, ${lanes.length} harnesses: ${formatUsd(cheap)} to ${formatUsd(dear)} a run${ratio}, ${formatDuration(fast)} to ${formatDuration(slow)}, scores ${formatScore(low)} to ${formatScore(high)}.`;
 }
 
 function Lane({
