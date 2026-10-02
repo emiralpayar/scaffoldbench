@@ -10,7 +10,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
   return { ...actual, query: fake.fakeQuery };
 });
 
-import { listJsonFiles, manifestPath, readJson, runsDir } from '@arena/core';
+import { latestPointerPath, listJsonFiles, manifestPath, readJson, readJsonIfExists, runsDir } from '@arena/core';
 import type { RunSetManifest } from '@arena/core';
 
 import { assistant, resetFake, setScript, sleep, success } from '../../../packages/core/test/support/fakeClaudeCode';
@@ -102,6 +102,61 @@ describe('arena run', () => {
     const report = plain(second.out.join('\n'));
     expect(report).toMatch(/HEALTH {2}4 of 4 runs ranked/);
     expect(report).toMatch(/single\s+4\s+0\.\d{3}/);
+  });
+
+  it('aborts on the second Ctrl-C, discards the run it cut off, and runs it again on resume', async () => {
+    const first = fakeContext();
+    let calls = 0;
+    setScript(async function* (session) {
+      calls += 1;
+      if (calls === 1) {
+        // Two presses while the first run is in flight: drain, then abort.
+        first.signals.emit('SIGINT');
+        first.signals.emit('SIGINT');
+        await session.untilAborted();
+      }
+      yield assistant('Nothing to do.');
+      yield success({ text: 'Nothing to do.', costUsd: 0.01 });
+    });
+
+    const code = await runCommand(args(...MATRIX, '--run-set', 'e2e-abort', '--plain'), first.ctx);
+
+    expect(code).toBe(EXIT_INTERRUPTED);
+    const log = first.stderrText();
+    expect(log).toMatch(/Stopping: no new runs will start; 1 in flight will finish/);
+    expect(log).toMatch(/Aborting the runs in flight; they are discarded and run again on --resume/);
+    expect(log).toMatch(/cut off by the stop and discarded/);
+    expect(log).toMatch(/Resume with: arena run --resume e2e-abort/);
+    // Nothing was recorded for the run that was cut off, and the manifest says why.
+    expect(await listJsonFiles(runsDir('e2e-abort', root))).toHaveLength(0);
+    expect(await readJson<RunSetManifest>(manifestPath('e2e-abort', root))).toMatchObject({
+      status: 'interrupted',
+      stoppedBy: 'signal',
+      completedRuns: 0,
+      totalRuns: 4,
+    });
+    // No run finished, so there is no report to render.
+    expect(first.out.join('\n')).toBe('');
+
+    const second = fakeContext();
+    expect(await runCommand(args('--resume', 'e2e-abort', '--plain'), second.ctx)).toBe(0);
+    expect(second.stderrText()).toMatch(/= 4 runs\n/);
+    expect(await listJsonFiles(runsDir('e2e-abort', root))).toHaveLength(4);
+  });
+
+  it('moves the pointer the site follows only when asked, and says so either way', async () => {
+    setScript(async function* () {
+      yield success({ text: 'done', costUsd: 0.01 });
+    });
+    const quiet = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--run-set', 'e2e-ptr-a', '--plain'), quiet.ctx)).toBe(0);
+    expect(await readJsonIfExists(latestPointerPath(root))).toBeUndefined();
+    expect(quiet.stderrText()).toMatch(/results\/latest\.json, which the site shows, was left alone/);
+
+    const moves = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--run-set', 'e2e-ptr-b', '--plain', '--update-latest'), moves.ctx)).toBe(0);
+    expect(await readJson(latestPointerPath(root))).toEqual({ runSetId: 'e2e-ptr-b' });
+    expect(moves.stderrText()).not.toMatch(/left alone/);
   });
 
   it('refuses to write into a run set that already holds runs unless resuming', async () => {
