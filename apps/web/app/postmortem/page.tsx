@@ -71,7 +71,7 @@ export default async function PostmortemPage() {
         </p>
       </header>
 
-      <div role="note" className="banner banner-bad mt-8 max-w-[50rem]">
+      <div role="note" className="banner banner-bad mt-8 max-w-[54rem]">
         <p className="banner-title">Retracted</p>
         <p className="banner-body">
           That run set is withdrawn. Its runs stay in the repository exactly as recorded
