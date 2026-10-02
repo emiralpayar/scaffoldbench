@@ -10,6 +10,10 @@ import { useState } from 'react';
  * sticky line under a large grid reads better than a tooltip per mark, which
  * a scrolling table would clip at its edges; it is also where a keyboard
  * user's focus is announced, politely.
+ *
+ * A device that cannot hover gets no line at all: a tap there opens the mark
+ * straight away, so the line would rarely say anything and would cover the
+ * grid while it scrolls.
  */
 export function Readout({ children, prompt }: { children: ReactNode; prompt: string }) {
   const [current, setCurrent] = useState<{ title: string; detail: string } | null>(null);
@@ -26,7 +30,7 @@ export function Readout({ children, prompt }: { children: ReactNode; prompt: str
   return (
     <div onMouseOver={pick} onFocus={pick}>
       {children}
-      <div className="sticky bottom-3 z-10 mt-3">
+      <div className="sticky bottom-3 z-10 mt-3 [@media(hover:none)]:hidden">
         <p
           aria-live="polite"
           className="flex min-h-[3.25rem] flex-col justify-center rounded-[12px] border border-rule-strong bg-surface/95 px-4 py-2 shadow-[var(--shadow-card)] backdrop-blur"
