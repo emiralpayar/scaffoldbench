@@ -253,7 +253,10 @@ function Lane({
             <Link href={`/runs/${outcome.runId}/`} className="group inline-flex flex-col items-end leading-tight">
               <span className={`num text-[0.9375rem] ${STAMP[stampOf(outcome)].className}`}>
                 <span aria-hidden>{STAMP[stampOf(outcome)].glyph}</span>
-                <span className="sr-only">{STAMP[stampOf(outcome)].words}, score </span> {formatScore(outcome.score)}
+                <span className="sr-only">
+                  {lane.name} {STAMP[stampOf(outcome)].words}, score{' '}
+                </span>{' '}
+                {formatScore(outcome.score)}
               </span>
               <span className="num text-[0.6875rem] text-muted group-hover:text-ink-2">
                 {formatUsd(outcome.costUsd)} · {formatDuration(outcome.latencyMs)}

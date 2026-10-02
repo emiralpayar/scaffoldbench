@@ -83,7 +83,7 @@ export async function RunSetFooter() {
           {facts.map(([label, value]) => (
             <div key={label} className="min-w-0">
               <dt className="eyebrow">{label}</dt>
-              <dd className="num mt-0.5 truncate text-[13px] text-ink-2" title={value}>
+              <dd className="num mt-0.5 text-[13px] text-ink-2 [overflow-wrap:anywhere]">
                 {value}
               </dd>
             </div>
