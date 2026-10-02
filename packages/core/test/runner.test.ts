@@ -889,6 +889,32 @@ describe('stopping', () => {
     expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'drain', completedRuns: 1 });
   });
 
+  it('says the runs in flight were discarded when a hard stop cuts a drain short', async () => {
+    // The CLI's two presses of Ctrl-C: drain first, then stop hard.
+    const drain = new AbortController();
+    const hard = new AbortController();
+    let started = 0;
+
+    const { records, manifest } = await runMatrix(
+      config({
+        strategies: [waitsForAbort],
+        repeats: 3,
+        concurrency: 1,
+        drainSignal: drain.signal,
+        signal: hard.signal,
+        onEvent: (event) => {
+          if (event.type !== 'run-start' || ++started > 1) return;
+          drain.abort();
+          setTimeout(() => hard.abort(), 20);
+        },
+      }),
+    );
+
+    expect(records).toHaveLength(0);
+    expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'signal', completedRuns: 0 });
+    expect(manifest.notes).toMatch(/aborted and discarded/);
+  });
+
   it('starts nothing when the signal has already fired', async () => {
     const controller = new AbortController();
     controller.abort();

@@ -400,7 +400,11 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
 
   const status: RunSetStatus =
     handedOut >= pending.length && discarded === 0 ? 'complete' : 'interrupted';
-  if (status === 'interrupted' && stoppedBy === undefined) stoppedBy = 'signal';
+  // A drain that a hard stop cut short did not let its runs finish: say what
+  // happened to them, not what was first asked for.
+  if (status === 'interrupted' && (stoppedBy === undefined || (stoppedBy === 'drain' && discarded > 0))) {
+    stoppedBy = 'signal';
+  }
 
   const manifest = manifestNow(status);
   await writeManifest(manifest);
