@@ -11,6 +11,7 @@ import {
   describeApiError,
   harnessChecks,
   integrityOf,
+  modelStopsOf,
   tracedCalls,
 } from './integrity';
 import { JudgeError, judgeInfoOf } from './judge';
@@ -614,6 +615,7 @@ async function executeAttempt(
   // Also when the strategy threw: a run that lost a call to the API is an
   // API failure, whatever the strategy did next.
   agentApiError ??= apiErrorsOf(calls, outcome.phases)[0];
+  const modelStops = modelStopsOf(calls);
   const effectiveEffort = commonEffort(
     calls.flatMap((call) => (call.end?.effectiveEffort !== undefined ? [call.end.effectiveEffort] : [])),
   );
@@ -639,6 +641,7 @@ async function executeAttempt(
     agentApiError,
     judgeOutage,
     checks,
+    modelStop: modelStops.length > 0,
     maxTurns: env ? actingCallOutOfTurns(calls, actingTools(env)) !== undefined : false,
   });
 
@@ -680,6 +683,7 @@ async function executeAttempt(
     finalText: outcome.finalText.slice(0, 20_000),
     ...(verdict.error !== undefined ? { error: verdict.error } : {}),
     ...(apiError ? { apiError } : {}),
+    modelStops,
     ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
   };
 
@@ -701,6 +705,8 @@ interface ClassifyInput {
   agentApiError: ApiError | undefined;
   judgeOutage: boolean;
   checks: readonly IntegrityCheck[];
+  /** True when any call ended on a model stop. */
+  modelStop: boolean;
   /** True when a phase acting on the task ran out of turns. */
   maxTurns: boolean;
 }
@@ -708,7 +714,14 @@ interface ClassifyInput {
 /**
  * Settle a run's failure mode, most fundamental cause first: the
  * infrastructure, then the harness, then how the scorer saw the answer, then
- * the run's own limits.
+ * the run's own limits — its ceilings, then a model that could not finish a
+ * turn, then an acting phase out of turns.
+ *
+ * Running out of turns names the failure only in a phase acting on the task:
+ * a planner that runs out of turns has lost its plan, which is a fidelity
+ * problem. A model stop names it wherever it happened, because that a model
+ * refused or overflowed is worth knowing in any phase: how often each
+ * architecture provokes one is part of what it costs.
  */
 function classify(input: ClassifyInput): { score: TaskScore; error?: string } {
   const unscored = (failureMode: FailureMode, metadata: Record<string, unknown> = {}): TaskScore => ({
@@ -761,6 +774,7 @@ function classify(input: ClassifyInput): { score: TaskScore; error?: string } {
 
   const runtime = runtimeFailure(input.stoppedBy);
   if (runtime) return { score: { ...score, failureMode: runtime } };
+  if (input.modelStop) return { score: { ...score, failureMode: 'model_stop' } };
   if (input.maxTurns) return { score: { ...score, failureMode: 'max_turns' } };
   return { score };
 }

@@ -10,13 +10,12 @@ import {
   modelStopOfAssistant,
   modelStopOfResult,
   recognizeFailureText,
-  type ModelStop,
 } from './apiErrors';
 import { emptyUsage } from './budget';
 import { asUsageLimit, observeRateLimit, type RateLimitState } from './usageLimit';
 import { estimateCostUsd, type PricedUsage } from './pricing';
 import { usageFrom } from './trace';
-import type { ApiError, McpServerStatus, ModelSpend, UsageTotals } from './types';
+import type { ApiError, McpServerStatus, ModelSpend, ModelStop, UsageTotals } from './types';
 
 /** Everything one `query()` call said about itself, read from its own message stream. */
 export interface CallReport {

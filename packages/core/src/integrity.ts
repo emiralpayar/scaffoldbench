@@ -17,7 +17,7 @@
  * denied or never got its structured reply has not been measured at all.
  */
 
-import { MODEL_STOP_LABELS, type ModelStop } from './apiErrors';
+import { MODEL_STOP_LABELS } from './apiErrors';
 import { matchesToolList } from './guard';
 import { STRUCTURED_OUTPUT_TOOL } from './hermetic';
 import type {
@@ -25,7 +25,9 @@ import type {
   Integrity,
   IntegrityCheck,
   McpServerStatus,
+  ModelStop,
   PhaseRecord,
+  RunModelStop,
   TraceEvent,
 } from './types';
 
@@ -353,6 +355,13 @@ export function actingCallOutOfTurns(
     (call) =>
       call.end?.subtype === 'error_max_turns' &&
       (call.init?.tools ?? []).some((tool) => matchesToolList(tool, actingTools)),
+  );
+}
+
+/** Every call that ended on a model stop, in start order: `RunRecord.modelStops`. */
+export function modelStopsOf(calls: readonly TracedCall[]): RunModelStop[] {
+  return calls.flatMap((call) =>
+    call.end?.modelStop ? [{ phase: call.phase, callId: call.callId, ...call.end.modelStop }] : [],
   );
 }
 

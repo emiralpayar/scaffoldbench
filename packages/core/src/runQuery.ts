@@ -1,6 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { MODEL_STOP_LABELS, assistantText, isSyntheticAssistant, type ModelStop } from './apiErrors';
+import { MODEL_STOP_LABELS, assistantText, isSyntheticAssistant } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
 import type { ToolCallReviewer } from './guard';
@@ -13,6 +13,7 @@ import type {
   McpServerConfig,
   McpServerStatus,
   ModelSpend,
+  ModelStop,
   RunContext,
   TraceSink,
   UsageTotals,

@@ -408,6 +408,11 @@ stops on a model stop, without giving its structured reply is different: it ran 
 architecture still did not get the plan, split, choice or verdict it is built on, so that run
 fails `harness.structured-output` and the strategy's own check.
 
+Every call that ended on a model stop is listed in the record's `modelStops` (phase, call, reason
+and, for a refusal, the category the API named), passed run or not, and on its phase record as
+`modelStop`: how often an architecture's prompts run a model out of room or into its safeguards is
+part of what that architecture costs, so it is counted rather than excused.
+
 `failureMode` names why a run did not pass, and every member is one the pipeline produces:
 
 | Mode | Set by | When |
@@ -418,8 +423,14 @@ fails `harness.structured-output` and the strategy's own check.
 | `max_turns` | runner | a phase holding tools that act on the task ran out of turns |
 | `budget_exceeded` | runner | the run hit its cost cap |
 | `timeout` | runner | the run hit its wall-clock cap |
+| `model_stop` | runner | a call ended because its model could not finish the turn: out of output tokens or context, unable to form a tool call, or refusing |
 | `harness_error` | runner | the environment, strategy or grader threw, the judge never answered usably, or a call that crashed, lost its tool server or had a harness tool denied explains a run that did not pass |
 | `api_error` | runner | a model or every grading call failed at the API; never graded, never ranked |
+
+Where the scorer says only `wrong_answer`, the runner names the most fundamental cause it can
+instead: a harness failure, then the run's caps, then a model stop, then turns. `max_turns`,
+`budget_exceeded`, `timeout` and `model_stop` are the run's own limits, so those runs are ranked
+like any other.
 
 ## 9. The fixture layer
 

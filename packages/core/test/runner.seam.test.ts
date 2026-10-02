@@ -130,6 +130,7 @@ function phaseOf(outcome: QueryOutcome, phase: string): PhaseRecord {
     subtype: outcome.subtype,
     ...(outcome.error ? { error: outcome.error } : {}),
     ...(outcome.apiError ? { apiError: outcome.apiError } : {}),
+    ...(outcome.modelStop ? { modelStop: outcome.modelStop } : {}),
     ...(outcome.costEstimated ? { costEstimated: true } : {}),
     ...(outcome.structuredMissing ? { structuredMissing: true } : {}),
   };
@@ -194,6 +195,25 @@ async function* answersInProse() {
   await sleep(10);
   yield assistant('Look up the order, then refund it.');
   yield success({ text: 'Look up the order, then refund it.', costUsd: 0.01 });
+}
+
+/** The model's side of a session its safeguards ended: the CLI's notice, then an error result. */
+async function* refuses() {
+  const notice = "API Error: Haiku 4.5's safeguards flagged this message.";
+  yield {
+    type: 'assistant',
+    parent_tool_use_id: null,
+    error: 'invalid_request',
+    message: {
+      id: 'msg_refusal',
+      model: '<synthetic>',
+      content: [{ type: 'text', text: notice }],
+      stop_reason: 'refusal',
+      stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+      usage: {},
+    },
+  };
+  yield success({ text: notice, isError: true, costUsd: 0.002 });
 }
 
 function apiFailure(code: string, text: string) {
@@ -373,8 +393,44 @@ describe('failure modes through the real call path', () => {
 
     const record = await onlyRecord();
 
-    expect(record.failureMode).toBe('wrong_answer');
+    expect(record.failureMode).toBe('model_stop');
     expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([{ phase: 'main', callId: 'call-1', reason: 'malformed_tool_use' }]);
+  });
+
+  it('calls a run its model refused model_stop, never an API failure, and still ranks it', async () => {
+    setScript(refuses);
+
+    const record = await onlyRecord();
+
+    expect(record).toMatchObject({ failureMode: 'model_stop', attempts: 1, passed: false });
+    expect(record.apiError).toBeUndefined();
+    expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([
+      { phase: 'main', callId: 'call-1', reason: 'refusal', category: 'cyber' },
+    ]);
+    expect(record.phases[0]?.modelStop).toMatchObject({ reason: 'refusal', category: 'cyber' });
+    expect(record.phases[0]?.error).toMatch(/^refused: Haiku 4\.5's safeguards/);
+  });
+
+  it('keeps a model stop on the record of a run that passed anyway', async () => {
+    let proposals = 0;
+    setScript((session) =>
+      session.prompt !== 'PROPOSE' ? solves(session) : ++proposals === 1 ? refuses() : answersInProse(),
+    );
+
+    const record = await onlyRecord({ strategies: [proposeThenAct] });
+
+    expect(record).toMatchObject({ passed: true, failureMode: 'none' });
+    expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([
+      { phase: 'propose-1', callId: 'call-1', reason: 'refusal', category: 'cyber' },
+    ]);
+  });
+
+  it('records no model stops when every call finished its turn', async () => {
+    setScript(solves);
+    expect((await onlyRecord()).modelStops).toEqual([]);
   });
 
   it('times out a run that would not finish, and charges what it streamed', async () => {

@@ -14,7 +14,7 @@
  * same way, is not excused as one (`ModelStop`).
  */
 
-import type { ApiError, ApiErrorKind } from './types';
+import type { ApiError, ApiErrorKind, ModelStop } from './types';
 
 /**
  * Whether a kind of failure is worth retrying.
@@ -196,9 +196,8 @@ export function apiErrorOfAssistant(message: unknown): ApiError | undefined {
   return undefined;
 }
 
-/**
- * A turn the model could not finish for a reason of its own, which the CLI
- * reports in the shape of an API failure.
+/*
+ * How the CLI reports each kind of `ModelStop` (see `types.ts`):
  *
  * - `output_limit`: a response ran past the output-token maximum (`API Error:
  *   Claude's response exceeded the 64000 output token maximum…`, typed code
@@ -212,19 +211,7 @@ export function apiErrorOfAssistant(message: unknown): ApiError | undefined {
  *   could parse, even when asked again (`malformed_tool_use_exhausted`).
  * - `refusal`: the model's safeguards declined the request (`API Error:
  *   …'s safeguards flagged this message…`, `stop_reason: 'refusal'`).
- *
- * Nothing failed at the API. The run met a limit of its own, as when it runs
- * out of turns, so it is a losing data point. Excusing it as an
- * infrastructure failure would retry it and then drop it from the rankings,
- * flattering whichever architecture provokes it most.
  */
-export interface ModelStop {
-  reason: 'output_limit' | 'context_limit' | 'malformed_tool_use' | 'refusal';
-  /** The CLI's notice, without the "API Error:" it is written with. */
-  message: string;
-  /** For a refusal, the safeguard category the API named, if it named one. */
-  category?: string;
-}
 
 /** How a model stop is named in errors and integrity details: `refused: …`. */
 export const MODEL_STOP_LABELS: Readonly<Record<ModelStop['reason'], string>> = {

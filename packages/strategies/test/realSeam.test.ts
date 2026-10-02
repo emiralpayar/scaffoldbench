@@ -463,6 +463,34 @@ describe('single through the real runQuery', () => {
     expect(failures(strategy, ctx, outcome)).toEqual([]);
     expect(sessions()[0]?.tools).toEqual(['mcp__shop__get_order', 'mcp__shop__refund']);
   });
+
+  it('records a model that refused on its phase, as the run’s own ending, not a lapse of fidelity', async () => {
+    const notice = "API Error: Haiku 4.5's safeguards flagged this message.";
+    setScript(async function* () {
+      yield {
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'invalid_request',
+        message: {
+          id: 'msg_refusal',
+          model: '<synthetic>',
+          content: [{ type: 'text', text: notice }],
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+          usage: {},
+        },
+      };
+      yield success({ text: notice, isError: true, costUsd: 0.002 });
+    });
+    const ctx = makeCtx(makeEnv());
+    const strategy = createSingleStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases[0]?.modelStop).toMatchObject({ reason: 'refusal', category: 'cyber' });
+    expect(outcome.phases[0]?.apiError).toBeUndefined();
+    expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
 });
 
 describe('plan-execute-verify through the real runQuery', () => {

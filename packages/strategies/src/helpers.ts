@@ -104,6 +104,7 @@ export function recordPhase(
     subtype: outcome.subtype,
     ...(outcome.error ? { error: outcome.error } : {}),
     ...(outcome.apiError ? { apiError: outcome.apiError } : {}),
+    ...(outcome.modelStop ? { modelStop: outcome.modelStop } : {}),
     ...(outcome.costEstimated ? { costEstimated: true } : {}),
     ...(outcome.structuredMissing ? { structuredMissing: true } : {}),
   };

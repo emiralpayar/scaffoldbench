@@ -128,7 +128,9 @@ export interface Penalty {
  * data. `buildScore` produces the first four, the runner the rest. The last
  * two are failures of the harness or of the infrastructure, never of the
  * architecture under test, and a record carrying either always has
- * `integrity.ok === false`.
+ * `integrity.ok === false`. `max_turns`, `budget_exceeded`, `timeout` and
+ * `model_stop` are the run's own limits: losing data points, ranked like any
+ * other.
  */
 export type FailureMode =
   /** The run passed. */
@@ -148,6 +150,12 @@ export type FailureMode =
   | 'budget_exceeded'
   /** The run hit its per-run wall-clock ceiling before it could finish. */
   | 'timeout'
+  /**
+   * A call ended because its model could not finish the turn — out of output
+   * tokens or context, unable to form a tool call, or refusing — and the run
+   * did not pass. `RunRecord.modelStops` says which calls and why.
+   */
+  | 'model_stop'
   /**
    * The harness failed: the environment, the strategy or the grader threw, a
    * task tool server never connected, the guard blocked a tool the harness
@@ -261,6 +269,8 @@ export interface PhaseRecord {
   subtype?: string;
   /** Present when the call failed at the API rather than in the architecture. */
   apiError?: ApiError;
+  /** Present when the call ended because its model could not finish the turn; see `ModelStop`. */
+  modelStop?: ModelStop;
   /** True when `costUsd` was estimated from streamed usage; see `QueryOutcome.costEstimated`. */
   costEstimated?: boolean;
   /** True when the phase asked for structured output and none came back. */
@@ -405,6 +415,36 @@ export interface ApiError {
   status?: number;
   /** When a spent usage limit lifts (ISO 8601), when the CLI said. */
   resetsAt?: string;
+}
+
+/**
+ * A turn the model could not finish for a reason of its own, which the CLI
+ * reports in the shape of an API failure: a response past the output-token
+ * maximum (`output_limit`), a conversation that no longer fits the context
+ * window even compacted (`context_limit`), a tool call the CLI could not
+ * parse even when the model was asked again (`malformed_tool_use`), or the
+ * model's safeguards declining (`refusal`). `apiErrors.ts` recognises each.
+ *
+ * Nothing failed at the API. The run met a limit of its own, as when it runs
+ * out of turns, so it is a losing data point. Excusing it as an
+ * infrastructure failure would retry it and then drop it from the rankings,
+ * flattering whichever architecture provokes it most.
+ */
+export interface ModelStop {
+  reason: 'output_limit' | 'context_limit' | 'malformed_tool_use' | 'refusal';
+  /** The CLI's notice, without the "API Error:" it is written with. */
+  message: string;
+  /** For a refusal, the safeguard category the API named, if it named one. */
+  category?: string;
+}
+
+/** A call of a run that ended on a model stop, as `RunRecord.modelStops` lists it. */
+export interface RunModelStop {
+  phase: string;
+  callId: string;
+  reason: ModelStop['reason'];
+  /** For a refusal, the safeguard category the API named, if it named one. */
+  category?: string;
 }
 
 /** One model's share of a call, as the SDK's `modelUsage` reports it. */
@@ -589,6 +629,13 @@ export interface RunRecord {
   discardedCostUsd?: number;
   /** The infrastructure failure behind an `api_error` record. */
   apiError?: ApiError;
+  /**
+   * Every call of the recorded attempt that ended on a model stop, in start
+   * order, whether or not the run passed: a refusal by one worker of a fan-out
+   * that still succeeded is as much a property of the architecture as one
+   * that sank it. Empty when there were none.
+   */
+  modelStops?: RunModelStop[];
   /**
    * Whether this run measured the architecture it claims to. A record with
    * `integrity.ok === false` must not be ranked; see `Integrity`.

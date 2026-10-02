@@ -1,6 +1,6 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { apiErrorOfAssistant, modelStopOfAssistant, type ModelStop } from './apiErrors';
-import type { TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
+import { apiErrorOfAssistant, modelStopOfAssistant } from './apiErrors';
+import type { ModelStop, TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
 import { observeRateLimit } from './usageLimit';
 
 const MAX_TEXT = 8_000;
