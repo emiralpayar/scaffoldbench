@@ -46,13 +46,13 @@ export function ReplayGallery({ entries, initial }: { entries: ReplayEntry[]; in
               type="button"
               aria-pressed={checked}
               onClick={() => setSelected(option.runId)}
-              className={`flex cursor-pointer items-center gap-2.5 rounded-full border py-1.5 pl-2 pr-3.5 text-[0.875rem] transition-colors ${
+              className={`flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-2 pr-3 text-[0.8125rem] transition-colors ${
                 checked ? 'border-ink bg-surface text-ink' : 'border-rule-strong text-ink-2 hover:border-ink-2 hover:text-ink'
               }`}
             >
-              <ArchitectureGlyph id={option.strategyId} width={30} />
+              <ArchitectureGlyph id={option.strategyId} width={22} />
               {option.name}
-              <span className={`num text-[0.75rem] ${option.passed ? 'text-good' : 'text-muted'}`}>
+              <span className={`num text-[0.6875rem] ${option.passed ? 'text-good' : 'text-muted'}`}>
                 {formatScore(option.score)}
               </span>
             </button>

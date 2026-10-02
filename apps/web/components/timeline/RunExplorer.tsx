@@ -1,5 +1,6 @@
 'use client';
 
+import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatDuration, formatUsd } from '../../lib/format';
@@ -40,10 +41,11 @@ export function RunExplorer({
 }) {
   const [view, setView] = useState<ExplorerView>(initialView);
   const pairs = useMemo(() => joinGroups(timeline.calls, groups), [timeline, groups]);
-  const playback = usePlayback(timeline.durationMs, initialView === 'replay' && autoplay);
+  const root = useRef<HTMLDivElement>(null);
+  const playback = usePlayback(timeline.durationMs, initialView === 'replay' && autoplay, root);
 
   return (
-    <div className="card overflow-hidden">
+    <div ref={root} className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-4 py-3 sm:px-5">
         <div role="group" aria-label="View" className="segmented">
           {(['explore', 'replay'] as const).map((id) => (
@@ -206,7 +208,7 @@ interface Playback {
   setSpeed: (speed: 1 | 8) => void;
 }
 
-function usePlayback(duration: number, autoplay: boolean): Playback {
+function usePlayback(duration: number, autoplay: boolean, root: RefObject<HTMLElement | null>): Playback {
   const reduced = useReducedMotion();
   const [t, setT] = useState(autoplay ? 0 : duration);
   const [playing, setPlaying] = useState(false);
@@ -215,12 +217,31 @@ function usePlayback(duration: number, autoplay: boolean): Playback {
   tRef.current = t;
 
   // Autoplay only for readers who have not asked for less motion; they get
-  // the finished run and a play button.
+  // the finished run and a play button. It starts when the player is on
+  // screen: a replay lower on the page would otherwise have ended unseen.
   useEffect(() => {
     if (!autoplay) return;
-    if (reduced) setT(duration);
-    else setPlaying(true);
-  }, [autoplay, reduced, duration]);
+    if (reduced) {
+      setT(duration);
+      return;
+    }
+    const element = root.current;
+    if (!element || typeof IntersectionObserver === 'undefined') {
+      setPlaying(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setPlaying(true);
+        observer.disconnect();
+      },
+      // Not the bottom quarter of the screen: a player only peeking in is not yet being read.
+      { rootMargin: '0px 0px -25% 0px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [autoplay, reduced, duration, root]);
 
   useEffect(() => {
     if (!playing) return;

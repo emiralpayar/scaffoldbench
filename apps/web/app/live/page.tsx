@@ -48,29 +48,31 @@ export default async function LivePage() {
   const verification = race?.data.verification;
 
   return (
-    <div className="container-page pb-20 pt-10 sm:pt-14">
-      <header className="mb-10 max-w-3xl border-b border-rule pb-8">
+    <div className="container-page pb-20 pt-8 sm:pt-12">
+      {/* Short on purpose: the player is what this page is for and should be on the first screen. */}
+      <header className="mb-8 max-w-3xl">
         <p className="eyebrow">Replay</p>
         <h1 className="h1 mt-3 text-ink">Watch a run, call by call.</h1>
-        <p className="lede mt-5">
+        <p className="lede mt-4">
           A score is the end of a story. The replay is the story: which model calls ran, in
           parallel or not, which tools they called, what the sandbox guard refused, and what the run
-          had spent at every moment. Pick an architecture; every one ran the same task.
+          had spent at every moment.
         </p>
       </header>
 
       {race && initial ? (
         <section aria-labelledby="replay-title" className="mb-20">
-          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
             <h2 id="replay-title" className="h3 text-ink">
               {race.taskTitle}
             </h2>
             <p className="num text-[0.8125rem] text-muted">
-              {modelShortName(race.model)} · repeat {race.repeat} · run set {race.data.runSetId}
+              The same task for {race.runs.length} architectures · {modelShortName(race.model)} · repeat {race.repeat} · run set{' '}
+              {race.data.runSetId}
             </p>
           </div>
           {verification === 'synthetic' ? (
-            <div role="note" className="banner banner-warn mb-5">
+            <div role="note" className="banner banner-warn mb-4">
               <p className="banner-title">Synthetic trace — not a recording</p>
               <p className="banner-body">
                 These runs were fabricated by <code className="code-inline">scripts/generate-demo-data.ts</code> to
@@ -78,7 +80,7 @@ export default async function LivePage() {
               </p>
             </div>
           ) : verification === 'unverified' ? (
-            <div role="note" className="banner banner-bad mb-5">
+            <div role="note" className="banner banner-bad mb-4">
               <p className="banner-title">From the retracted first run set</p>
               <p className="banner-body">
                 These are recordings of runs whose architectures mostly did not run as designed. Watch for the
