@@ -319,19 +319,22 @@ function deadlinesPulledIn(world: SupportOpsWorld): string[] {
 /**
  * Tickets that are not this outage but were treated as part of it: any of
  * them linked to an incident (the two look-alikes, or anything else in the
- * queue, open or closed), and a look-alike re-graded or re-dated. Postmortem
- * tickets the run created are not in the seed, so linking them is fine.
+ * queue, open or closed), and a look-alike re-graded, re-dated, closed or
+ * handed to someone else. A comment on one, saying why it stays out, is
+ * fine. Postmortem tickets the run created are not in the seed, so linking
+ * them is fine too.
  */
 function lookalikesTouched(world: SupportOpsWorld): string[] {
   const seed = createIncidentWorld();
   const linked = new Set(world.incidents.flatMap((incident) => incident.ticketIds));
+  const worked = ['severity', 'slaDueAt', 'status', 'assignee', 'escalatedTo', 'mergedInto'] as const;
   return [...SEED_TICKETS].filter((id) => {
     if (OUTAGE_REPORTS.includes(id)) return false;
     if (linked.has(id)) return true;
     if (!LOOKALIKES.includes(id)) return false;
     const before = ticketOrThrow(seed, id);
     const after = ticketOrThrow(world, id);
-    return after.severity !== before.severity || after.slaDueAt !== before.slaDueAt;
+    return worked.some((field) => after[field] !== before[field]);
   });
 }
 
@@ -379,7 +382,7 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     {
       id: 'lookalike-reports',
       description:
-        'Links a report of a different problem to the outage: a known flaky test, a local build problem, or anything else in the queue.',
+        'Treats a report of a different problem as part of the outage: links it (a known flaky test, a local build problem, anything else in the queue), or closes, re-grades or reassigns a look-alike.',
       caughtBy: ['lookalike-linked'],
     },
     {
@@ -438,15 +441,21 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
       },
       {
         id: `sev1:${ticketId}`,
-        label: `${ticketId} raised to sev1 with its deadline intact`,
+        // Closed is not kept: the outage is still on, and closing a report
+        // tells its requester the problem is solved.
+        label: `${ticketId} kept open, raised to sev1 with its deadline intact`,
         weight: 0.5,
         check: (world) => {
           const entry = ticketOrThrow(world, ticketId);
-          return entry.severity === 'sev1' && sameInstant(entry.slaDueAt, PLAN.deadlines[ticketId]);
+          return (
+            entry.status !== 'closed' &&
+            entry.severity === 'sev1' &&
+            sameInstant(entry.slaDueAt, PLAN.deadlines[ticketId])
+          );
         },
         detail: (world) => {
           const entry = ticketOrThrow(world, ticketId);
-          return `severity=${entry.severity} due=${entry.slaDueAt ?? '-'} (expected sev1, ${PLAN.deadlines[ticketId]})`;
+          return `status=${entry.status} severity=${entry.severity} due=${entry.slaDueAt ?? '-'} (expected sev1, ${PLAN.deadlines[ticketId]})`;
         },
       },
     ]),

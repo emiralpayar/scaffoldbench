@@ -531,6 +531,26 @@ describe('support-major-incident', () => {
     }
   });
 
+  it('gives no credit for an outage report closed while the outage is still on', async () => {
+    // Closing a report "as tracked in INC-1" tells its requester the problem
+    // is solved; the runbook keeps every report linked, graded and on its deadline.
+    const d = drive(supportIncidentSpec);
+    await solve(d);
+    await d.call('close_ticket', { ticketId: 'T-3102', resolution: 'Tracked in INC-1.' });
+    const result = await score(supportIncidentTask, d);
+    expect(missed(result)).toEqual(['sev1:T-3102']);
+  });
+
+  it('penalises closing or reassigning a look-alike as well as linking it', async () => {
+    const d = drive(supportIncidentSpec);
+    await solve(d);
+    await d.call('close_ticket', { ticketId: 'T-3108', resolution: 'Local Xcode problem, see KB-42.' });
+    const result = await score(supportIncidentTask, d);
+    expect(penaltyIds(result)).toEqual(['lookalike-linked']);
+    expect(result.penalties[0]?.detail).toBe('Touched: T-3108.');
+    expect(firedTraps(supportIncidentTask, result)).toEqual(['lookalike-reports']);
+  });
+
   it('trap other-service-report: reports of the outage filed against other services are missed', async () => {
     const d = drive(supportIncidentSpec);
     await solve(d, { links: REPORTS.filter((id) => id !== 'T-3113' && id !== 'T-3114') });
