@@ -22,6 +22,15 @@ function steps(workflow: string): string[] {
   return workflow.split(/\n(?=      - )/).slice(1);
 }
 
+/** A workflow's jobs by id: each starts at a key two spaces in, under `jobs:`. */
+function jobs(workflow: string): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const job of workflow.slice(workflow.indexOf('\njobs:') + 1).split(/\n(?=  [a-z][\w-]*:\n)/).slice(1)) {
+    found[/^ {2}([\w-]+):/.exec(job)?.[1] ?? ''] = job;
+  }
+  return found;
+}
+
 describe('bench.yml', () => {
   it('runs only when someone dispatches it', async () => {
     const text = await read('bench.yml');
@@ -36,8 +45,57 @@ describe('bench.yml', () => {
     const holder = steps(text).filter((step) => step.includes('secrets.ANTHROPIC_API_KEY'));
     expect(holder).toHaveLength(1);
     expect(holder[0]).toMatch(/name: Run the benchmark/);
-    // Nothing above the steps (workflow or job env) mentions it either.
-    expect(text.slice(0, text.indexOf('    steps:'))).not.toMatch(/ANTHROPIC_API_KEY/);
+    // Nothing above the steps (workflow or job env) names it either; comments may.
+    expect(code(text.slice(0, text.indexOf('    steps:')))).not.toMatch(/ANTHROPIC_API_KEY/);
+  });
+
+  it('keeps the key and the power to write in different jobs', async () => {
+    const text = await read('bench.yml');
+    const { bench, propose, ...others } = jobs(text);
+    expect(Object.keys(others)).toEqual([]);
+    expect(bench).toBeDefined();
+    expect(propose).toBeDefined();
+
+    // The workflow is read-only unless a job asks for more, and only `propose` does.
+    const workflowPermissions = text.slice(0, text.indexOf('\njobs:'));
+    expect(workflowPermissions).toMatch(/permissions:\n {2}contents: read\n/);
+    expect(workflowPermissions).not.toMatch(/: write/);
+    expect(bench).not.toMatch(/: write/);
+    expect(propose).toMatch(/contents: write/);
+    expect(propose).toMatch(/pull-requests: write/);
+
+    // The job that runs the model holds the key but not a token that could use it to change the repository.
+    expect(bench).toMatch(/secrets\.ANTHROPIC_API_KEY/);
+    expect(bench).toMatch(/uses: actions\/checkout@[0-9a-f]{40}.*\n\s+with:\n\s+# .*\n\s+persist-credentials: false/);
+    expect(bench).toMatch(/environment: benchmark/);
+
+    // The job that can write has no key, installs nothing and runs nothing from the repository.
+    expect(code(propose ?? '')).not.toMatch(/secrets\.|ANTHROPIC_API_KEY/);
+    expect(code(propose ?? '')).not.toMatch(/npm |npx |setup-node|arena/);
+  });
+
+  it('proposes a result only once the gate has passed', async () => {
+    const text = await read('bench.yml');
+    const { propose } = jobs(text);
+    // `needs` alone means "after it succeeded"; an `if:` could say otherwise.
+    expect(propose).toMatch(/needs: bench\n/);
+    expect(propose).not.toMatch(/\n {4}if:/);
+    // The gate is the last thing the benchmark job does.
+    const benchSteps = steps(jobs(text).bench ?? '');
+    expect(benchSteps[benchSteps.length - 1]).toMatch(/name: Health gate/);
+  });
+
+  it('looks for the key in the results before they leave the job that held it', async () => {
+    const text = await read('bench.yml');
+    const run = steps(text).find((step) => step.includes('name: Run the benchmark')) ?? '';
+    const check = /leak_check\(\) \{[\s\S]*?\n {10}\}/.exec(run)?.[0] ?? '';
+    expect(check).toMatch(/grep -rqF -- "\$ANTHROPIC_API_KEY" "results\/\$BENCH_RUN_SET"/);
+    // Delete, not just fail: the upload that follows runs whatever the step did.
+    expect(check).toMatch(/rm -rf "results\/\$BENCH_RUN_SET"/);
+    expect(run).toMatch(/trap leak_check EXIT/);
+    // ...and only after the key is known to be non-empty, since an empty pattern matches everything.
+    expect(run.indexOf('-z "$ANTHROPIC_API_KEY"')).toBeGreaterThan(-1);
+    expect(run.indexOf('-z "$ANTHROPIC_API_KEY"')).toBeLessThan(run.indexOf('trap leak_check'));
   });
 
   it('keeps the results whatever happened, and gates what it publishes', async () => {
@@ -106,5 +164,13 @@ describe('ci.yml', () => {
   it('pins every third-party action to a commit', async () => {
     const text = await read('ci.yml');
     for (const use of text.matchAll(/uses: (\S+)/g)) expect(use[1]).toMatch(/@[0-9a-f]{40}$/);
+  });
+});
+
+describe.each(['bench.yml', 'ci.yml'])('%s', (name) => {
+  it('gives every job a time limit, so a hung step cannot hold a runner for six hours', async () => {
+    const all = jobs(await read(name));
+    expect(Object.keys(all).length).toBeGreaterThan(0);
+    for (const [id, job] of Object.entries(all)) expect(job, id).toMatch(/\n {4}timeout-minutes: \d+\n/);
   });
 });

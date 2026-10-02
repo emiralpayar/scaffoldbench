@@ -61,17 +61,32 @@ concurrency:
 permissions:
   contents: read
 
+# Two jobs, so that the key and the power to write never meet. The model-driven
+# code runs in `bench`, which can read the repository and nothing else; the
+# token that can push a branch and open a pull request belongs to `propose`,
+# which runs nothing from the repository and never sees the key.
 jobs:
   bench:
-    name: Run the matrix and propose the result
+    name: Run the matrix
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    # A job in an environment gets that environment's secrets, and the
+    # environment can restrict which branches may use them. Store
+    # ANTHROPIC_API_KEY there (Settings > Environments > benchmark) and
+    # restrict it to the default branch: anyone with write access can dispatch
+    # this workflow on any branch, including one that edits this file. (The
+    # environment is created by this name if it does not exist; a key kept as
+    # an ordinary repository secret works too, but without that protection.)
+    environment: benchmark
     permissions:
-      # Pushes a branch and opens a pull request; never writes to main.
-      contents: write
-      pull-requests: write
+      contents: read
+    outputs:
+      run-set: ${{ steps.name.outputs.run-set }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing later in this job needs to push.
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -83,16 +98,21 @@ jobs:
       - run: npm ci
 
       - name: Check the SDK wiring (free)
+        # Offline by construction: the sessions are given no credential and
+        # an address nothing listens on.
         run: npm run --silent check:wiring -- --init-only
 
       - name: Name the run set
+        id: name
         # Chosen here, not discovered afterwards, so every later step names the
         # same run set explicitly. (An id valid for --run-set: letters, digits,
         # dots, dashes and underscores.)
-        run: echo "BENCH_RUN_SET=$(date -u +%Y-%m-%dT%H-%M-%SZ)-gh${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+        run: |
+          id="$(date -u +%Y-%m-%dT%H-%M-%SZ)-gh${GITHUB_RUN_ID}"
+          echo "BENCH_RUN_SET=$id" >> "$GITHUB_ENV"
+          echo "run-set=$id" >> "$GITHUB_OUTPUT"
 
       - name: Run the benchmark
-        id: run
         # The only step that sees the key. Inputs reach the shell through the
         # environment, never by interpolation into the script.
         env:
@@ -109,9 +129,21 @@ jobs:
           BENCH_JUDGE_SAMPLES: ${{ inputs.judge-samples }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY is not set. Add it as a repository secret before running the benchmark."
+            echo "::error::ANTHROPIC_API_KEY is not set. Add it as a secret of the benchmark environment (or of the repository) before running the benchmark."
             exit 1
           fi
+          # The results are uploaded as an artifact, which anyone who can read
+          # the repository can download. Logs mask the key; files do not. However
+          # this step ends, look for the key in what it wrote, and delete the
+          # lot rather than upload it.
+          leak_check() {
+            if [ -d "results/$BENCH_RUN_SET" ] && grep -rqF -- "$ANTHROPIC_API_KEY" "results/$BENCH_RUN_SET"; then
+              rm -rf "results/$BENCH_RUN_SET"
+              echo "::error::The API key appeared in the results, so they were deleted instead of uploaded."
+              exit 1
+            fi
+          }
+          trap leak_check EXIT
           # Fails before any spend if the key is malformed, the SDK cannot start,
           # or a research task cannot build its environment from the fixtures.
           npm run --silent arena -- doctor
@@ -121,6 +153,8 @@ jobs:
           # with the live web. It is the default; it is spelled out because a
           # benchmark that quietly started hitting the network would be a
           # different measurement.
+          # No --update-latest: the pointer that makes the site show this run
+          # set moves only when the pull request is merged (see `propose`).
           npm run --silent arena -- run \
             --run-set "$BENCH_RUN_SET" \
             --models "$BENCH_MODELS" \
@@ -133,8 +167,7 @@ jobs:
             --concurrency "$BENCH_CONCURRENCY" \
             --judge-model "$BENCH_JUDGE_MODEL" \
             --judge-samples "$BENCH_JUDGE_SAMPLES" \
-            --replay \
-            --update-latest
+            --replay
 
       - name: Write the report
         # After a failed or stopped run too: the report says what was recorded
@@ -171,6 +204,25 @@ jobs:
         # published; its artifact stays for diagnosis and for --resume.
         run: npm run --silent arena -- report "$BENCH_RUN_SET" --strict > /dev/null
 
+  propose:
+    name: Propose the result as a pull request
+    # Only after the gate: a job that needs another runs when that one succeeded.
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Pushes a branch and opens a pull request; never writes to main.
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fetch the results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bench-${{ needs.bench.outputs.run-set }}
+          path: results/${{ needs.bench.outputs.run-set }}
+
       - name: Open a pull request
         # Needs "Allow GitHub Actions to create and approve pull requests" in the
         # repository's Actions settings. A pull request opened with the workflow
@@ -178,11 +230,14 @@ jobs:
         # close and reopen it, to get the checks.
         env:
           GH_TOKEN: ${{ github.token }}
+          BENCH_RUN_SET: ${{ needs.bench.outputs.run-set }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           branch="bench/$BENCH_RUN_SET"
           report="results/$BENCH_RUN_SET/REPORT.md"
+          # What `arena run --update-latest` writes, which is what the site follows.
+          node -e 'require("node:fs").writeFileSync("results/latest.json", JSON.stringify({ runSetId: process.env.BENCH_RUN_SET }, null, 2) + "\n")'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
