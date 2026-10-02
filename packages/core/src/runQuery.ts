@@ -1,5 +1,5 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { apiErrorOfAssistant, assistantText } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
@@ -118,6 +118,13 @@ export interface QueryOutcome {
    * a failure that is not the architecture's.
    */
   apiError?: ApiError;
+  /**
+   * The effort level the CLI reported applying to this call's turns, after
+   * any silent downgrade for the model: `null` when it sent no effort
+   * parameter (a model without effort support), absent when no reply or tool
+   * call came back to report it. See `watchEffort`.
+   */
+  effectiveEffort?: string | null;
   /** Names of the MCP servers this call was given. */
   mcpServersExpected: string[];
   /** MCP servers as the session reported them at start-up; empty if it never got that far. */
@@ -216,6 +223,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const requestedTurns = spec.maxTurns ?? ctx.task.maxTurns;
 
   let deniedToolCalls = 0;
+  const appliedEffort = watchEffort();
   const options: Options = {
     ...hermeticOptions(),
     model: spec.model ?? ctx.model,
@@ -239,18 +247,22 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     abortController: controller,
     includePartialMessages: false,
     hooks: {
-      PreToolUse: createSandboxGuard({
-        allowedTools: permitted,
-        trace: ctx.trace,
-        phase: spec.phase,
-        depth,
-        ...(spec.agentLabel !== undefined ? { agent: spec.agentLabel } : {}),
-        callId,
-        onDenied: () => {
-          deniedToolCalls += 1;
-        },
-        ...(spec.reviewToolCall ? { review: spec.reviewToolCall } : {}),
-      }),
+      PreToolUse: [
+        ...createSandboxGuard({
+          allowedTools: permitted,
+          trace: ctx.trace,
+          phase: spec.phase,
+          depth,
+          ...(spec.agentLabel !== undefined ? { agent: spec.agentLabel } : {}),
+          callId,
+          onDenied: () => {
+            deniedToolCalls += 1;
+          },
+          ...(spec.reviewToolCall ? { review: spec.reviewToolCall } : {}),
+        }),
+        appliedEffort.matcher,
+      ],
+      Stop: [appliedEffort.matcher],
     },
     ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),
     ...(schema ? { outputFormat: { type: 'json_schema' as const, schema } } : {}),
@@ -338,6 +350,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   lease.settle({ costUsd: report.costUsd, turns: report.turns, usage: report.usage });
 
   const structuredMissing = schema !== undefined && (structured === undefined || structured === null);
+  const effectiveEffort = appliedEffort.level();
   const mcpServersExpected = Object.keys(mcpServers);
   const durationMs = Date.now() - startedAtMs;
 
@@ -360,6 +373,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       ...(report.unpricedModels.length > 0 ? { unpricedModels: report.unpricedModels } : {}),
       ...(structuredMissing ? { structuredMissing: true } : {}),
       ...(apiError ? { apiError } : {}),
+      ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
       costByModel: Object.fromEntries(
         Object.entries(report.byModel).map(([model, spend]) => [model, spend.costUsd]),
       ),
@@ -384,10 +398,38 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     subtype,
     ...(error !== undefined ? { error } : {}),
     ...(apiError ? { apiError } : {}),
+    ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
     mcpServersExpected,
     mcpServers: report.mcpServers,
     startedAtMs,
     durationMs,
+  };
+}
+
+/**
+ * Watches the effort level the CLI actually applies to a call.
+ *
+ * `effort` is a request. The CLI silently drops it for a model without effort
+ * support — Haiku 4.5 is sent none, whatever was asked — and caps it where the
+ * model or the account says so. Neither the init message nor the result says
+ * which level it settled on; only hooks that fire inside a turn are told:
+ * `PreToolUse` before each tool call, `Stop` when the reply ends. So these two
+ * hooks are how a record can say what effort its model really ran at.
+ */
+function watchEffort(): { matcher: HookCallbackMatcher; level(): string | null | undefined } {
+  let level: string | null | undefined;
+  return {
+    matcher: {
+      hooks: [
+        async (input: HookInput) => {
+          const applied = input.effort?.level;
+          // A hook told no level means none was sent; a level once told is the call's.
+          level = typeof applied === 'string' ? applied : (level ?? null);
+          return {};
+        },
+      ],
+    },
+    level: () => level,
   };
 }
 

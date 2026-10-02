@@ -701,3 +701,56 @@ describe('reviewed tool calls', () => {
     expect(ctx.budget.spentUsd).toBeCloseTo(0.03, 10);
   });
 });
+
+describe('effort', () => {
+  it('records the effort level the CLI applied, from a tool call or the end of the reply', async () => {
+    setScript(async function* (session) {
+      if (session.prompt === 'act') {
+        const refund = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+        yield toolUse('mcp__shop__refund', { id: 'O-1' });
+        yield toolResult(refund);
+      }
+      yield assistant('Done.');
+      yield success({ text: 'Done.' });
+    });
+    const ctx = { ...makeCtx(), model: 'claude-sonnet-5-5' };
+
+    const acting = await runQuery(ctx, { phase: 'execute', prompt: 'act' });
+    const answering = await runQuery(ctx, { phase: 'answer', prompt: 'answer', allowedTools: [] });
+
+    expect(sessions()[0]!.options.effort).toBe('low');
+    expect(acting.effectiveEffort).toBe('low');
+    expect(answering.effectiveEffort).toBe('low');
+    const ends = ctx.trace.events.filter((e) => e.kind === 'phase_end');
+    expect(ends.map((e) => e.meta?.effectiveEffort)).toEqual(['low', 'low']);
+  });
+
+  it('records that a model without effort support was sent none, whatever was asked', async () => {
+    setScript(async function* () {
+      yield assistant('Done.');
+      yield success({ text: 'Done.' });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(ctx.model).toContain('haiku');
+    expect(ctx.effort).toBe('low');
+    expect(outcome.effectiveEffort).toBeNull();
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.effectiveEffort).toBeNull();
+  });
+
+  it('claims no level for a call that never got a reply to report one', async () => {
+    setScript(async function* () {
+      yield assistant('API Error: 529 Overloaded', { model: '<synthetic>', error: 'overloaded', usage: {} });
+      yield success({ text: 'API Error: 529 Overloaded', isError: true });
+    });
+    const ctx = { ...makeCtx(), model: 'claude-sonnet-5-5' };
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError?.kind).toBe('overloaded');
+    expect(outcome).not.toHaveProperty('effectiveEffort');
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta).not.toHaveProperty('effectiveEffort');
+  });
+});
