@@ -6,12 +6,14 @@ import { PageHeader } from '../../../components/Layout';
 import { GlyphLegend } from '../../../components/strategies/GlyphLegend';
 import { ARCHITECTURES } from '../../../lib/architectures';
 import { DESIGNS, TOOL_EXPOSURE } from '../../../lib/designs';
+import { pageMetadata } from '../../../lib/pageMetadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'The six designs',
   description:
     'The six agent harness architectures ScaffoldBench compares: what each one is made of, which calls it makes, and the question it exists to answer.',
-};
+  path: '/strategies/',
+});
 
 export default function StrategiesPage() {
   return (

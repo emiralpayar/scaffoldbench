@@ -10,17 +10,19 @@ import { ReplayGallery } from '../../components/timeline/ReplayGallery';
 import { summarizeHealth } from '../../lib/analysis';
 import { formatInt, formatPercent, formatScore, formatUsd } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
+import { pageMetadata } from '../../lib/pageMetadata';
 import type { Postmortem } from '../../lib/postmortem';
 import { ACT_ONE, derivePostmortem } from '../../lib/postmortem';
 import { loadEvidenceRace, toReplayEntries } from '../../lib/server/replays';
 import { POSTMORTEM_RUN_SET_ID, hasTrace, loadPostmortemRunSet, loadRunSet } from '../../lib/server/runSet';
 import { sourceUrl, treeUrl } from '../../lib/site';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Post-mortem: the run set that tied',
   description:
     'The first run set scored five agent architectures between 0.980 and 1.000. The traces showed that four of them never ran as designed: what broke, the receipts, and why every score still looked plausible.',
-};
+  path: '/postmortem/',
+});
 
 const PUBLISHED_HERE = 'results';
 

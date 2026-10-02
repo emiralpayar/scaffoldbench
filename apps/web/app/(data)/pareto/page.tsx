@@ -11,14 +11,16 @@ import { architectureName } from '../../../lib/architectures';
 import { describeUnverifiedModel, paretoPoints } from '../../../lib/chartData';
 import { formatUsd, joinList } from '../../../lib/format';
 import { modelShortName } from '../../../lib/models';
+import { pageMetadata } from '../../../lib/pageMetadata';
 import { analysisFor } from '../../../lib/server/analysis';
 import { loadRunSet } from '../../../lib/server/runSet';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Score against cost',
   description:
     'Mean score against mean cost per run for every harness architecture, with intervals on both axes and the frontier marked.',
-};
+  path: '/pareto/',
+});
 
 export default async function ParetoPage() {
   const data = await loadRunSet();

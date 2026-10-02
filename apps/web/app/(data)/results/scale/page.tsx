@@ -10,14 +10,16 @@ import { resultsSwitcher } from '../../../../components/leaderboard/ModelResults
 import { ScaleTable } from '../../../../components/leaderboard/ScaleTable';
 import { scaffoldScaleGroups, scaleHeadline } from '../../../../lib/chartData';
 import { modelShortName } from '../../../../lib/models';
+import { pageMetadata } from '../../../../lib/pageMetadata';
 import { analysisFor } from '../../../../lib/server/analysis';
 import { loadRunSet } from '../../../../lib/server/runSet';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Scaffold or scale?',
   description:
     'Is a scaffold on a smaller model worth more than a plain agent on the next model up? Every architecture on every model on one score-against-cost plane, with the paired contrasts.',
-};
+  path: '/results/scale/',
+});
 
 export default async function ScalePage() {
   const data = await loadRunSet();

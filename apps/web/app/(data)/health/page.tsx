@@ -11,17 +11,19 @@ import { ARCHITECTURES, architectureName } from '../../../lib/architectures';
 import { checkWords, failedChecks } from '../../../lib/integrity';
 import { formatInt, formatPercent } from '../../../lib/format';
 import { modelShortName } from '../../../lib/models';
+import { pageMetadata } from '../../../lib/pageMetadata';
 import { runReceipts } from '../../../lib/postmortem';
 import type { RunRecord } from '../../../lib/records';
 import { analysisFor } from '../../../lib/server/analysis';
 import { loadRunSet } from '../../../lib/server/runSet';
 import { harnessCheckRates, ownCheckRates } from '../../../lib/strategies';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Harness health',
   description:
     'Did every run measure what it claims? The integrity checks behind every number on ScaffoldBench, how often each held, and the runs that were excluded because one did not.',
-};
+  path: '/health/',
+});
 
 /** Excluded runs are listed in full up to here; the rest are counted. */
 const LISTED = 40;

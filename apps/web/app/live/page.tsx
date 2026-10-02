@@ -11,6 +11,7 @@ import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { ReplayGallery } from '../../components/timeline/ReplayGallery';
 import { architectureName, compareArchitectures } from '../../lib/architectures';
 import { modelShortName, formatModelPrice } from '../../lib/models';
+import { pageMetadata } from '../../lib/pageMetadata';
 import {
   LIVE_DEFAULT_MODEL,
   LIVE_MAX_COST_USD,
@@ -20,11 +21,12 @@ import {
 import { loadReplays, toReplayEntries } from '../../lib/server/replays';
 import { LIVE_ENABLED } from '../../lib/site';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Replay a run',
   description:
     'Watch recorded benchmark runs play back call by call: parallel subagents, tool calls and the sandbox guard, at real speed or eight times faster. Then re-run any cell yourself.',
-};
+  path: '/live/',
+});
 
 const STEPS = [
   { label: 'Install', command: 'npm ci' },

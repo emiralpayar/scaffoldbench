@@ -20,8 +20,8 @@ export async function generateStaticParams(): Promise<{ taskId: string; model: s
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const { taskId } = await params;
-  return taskMetadata(taskId);
+  const { taskId, model } = await params;
+  return taskMetadata(taskId, model);
 }
 
 export default async function TaskModelPage({ params }: Params) {

@@ -15,6 +15,7 @@ import { architectureColor, architectureName } from '../../../../lib/architectur
 import { buildPhaseRows, findRun } from '../../../../lib/derive';
 import { formatDuration, formatFailureMode, formatInt, formatScore, formatUsd } from '../../../../lib/format';
 import { modelShortName } from '../../../../lib/models';
+import { pageMetadata } from '../../../../lib/pageMetadata';
 import { EMPTY_PARAM, loadRunSet, loadTrace } from '../../../../lib/server/runSet';
 import { normalizeError, timelineFromPhases, timelineFromTrace } from '../../../../lib/timeline';
 import { buildViewGroups } from '../../../../lib/traceView';
@@ -35,10 +36,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const data = await loadRunSet();
   const record = data ? findRun(data.records, runId) : undefined;
   if (!record) return { title: runId };
-  return {
+  return pageMetadata({
     title: `${architectureName(record.strategyId)} on ${record.taskTitle}, repeat ${record.repeat}`,
     description: `The trace, timeline and score of run ${runId}: ${architectureName(record.strategyId)} on "${record.taskTitle}" with ${modelShortName(record.model)}.`,
-  };
+    path: `/runs/${runId}/`,
+  });
 }
 
 export default async function RunPage({ params }: Params) {

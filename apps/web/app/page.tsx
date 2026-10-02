@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+
 import { ActOne } from '../components/landing/ActOne';
 import { ActTwo } from '../components/landing/ActTwo';
 import { Explore } from '../components/landing/Explore';
@@ -14,7 +16,11 @@ import { loadHeroRace } from '../lib/server/replays';
 import type { RaceGroup } from '../lib/server/replays';
 import { loadPostmortemRunSet, loadRunSet } from '../lib/server/runSet';
 import { schematicTimeline } from '../lib/schematic';
+import { absoluteUrl } from '../lib/site';
 import { timelineFromTrace } from '../lib/timeline';
+
+// Title, description and social card come from the root layout.
+export const metadata: Metadata = { alternates: { canonical: absoluteUrl('/') } };
 
 export default async function HomePage() {
   const [published, evidence, recorded] = await Promise.all([

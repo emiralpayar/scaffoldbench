@@ -10,15 +10,17 @@ import { analyzeForSite } from '../../../lib/analysis';
 import { ARCHITECTURES } from '../../../lib/architectures';
 import { formatInt } from '../../../lib/format';
 import { modelShortName } from '../../../lib/models';
+import { pageMetadata } from '../../../lib/pageMetadata';
 import { analysisFor } from '../../../lib/server/analysis';
 import { loadRunSet } from '../../../lib/server/runSet';
 import { sourceUrl } from '../../../lib/site';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Methodology',
   description:
     'How ScaffoldBench scores a run, proves an architecture ran, turns runs into claims with paired, task-clustered statistics, and what the benchmark does not show.',
-};
+  path: '/methodology/',
+});
 
 const SECTIONS = [
   { id: 'design', label: 'What is compared' },

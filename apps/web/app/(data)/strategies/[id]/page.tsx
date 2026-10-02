@@ -19,6 +19,7 @@ import type { ArchitectureId } from '../../../../lib/architectures';
 import { DESIGNS } from '../../../../lib/designs';
 import { leaderboardRows } from '../../../../lib/leaderboard';
 import { modelShortName } from '../../../../lib/models';
+import { pageMetadata } from '../../../../lib/pageMetadata';
 import { isRankable } from '../../../../lib/records';
 import { analysisFor } from '../../../../lib/server/analysis';
 import { loadRepresentativeRun } from '../../../../lib/server/replays';
@@ -52,12 +53,12 @@ export function generateStaticParams(): { id: string }[] {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
   const info = architectureInfo(id);
-  return {
-    title: info ? `${info.name}: how it runs and what it costs` : id,
-    description: info
-      ? `${info.summary} The stages of the design, where a run's money goes, and the fidelity checks that prove it ran.`
-      : undefined,
-  };
+  if (!info) return { title: id };
+  return pageMetadata({
+    title: `${info.name}: how it runs and what it costs`,
+    description: `${info.summary} The stages of the design, where a run's money goes, and the fidelity checks that prove it ran.`,
+    path: `/strategies/${id}/`,
+  });
 }
 
 export default async function StrategyPage({ params }: Params) {

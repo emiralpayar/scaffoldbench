@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { EmptyState } from '../../../../components/EmptyState';
 import { ModelResults } from '../../../../components/leaderboard/ModelResults';
 import { modelLabel } from '../../../../lib/models';
+import { pageMetadata } from '../../../../lib/pageMetadata';
 import { analysisFor } from '../../../../lib/server/analysis';
 import { EMPTY_PARAM, loadRunSet } from '../../../../lib/server/runSet';
 
@@ -19,10 +20,11 @@ export async function generateStaticParams(): Promise<{ model: string }[]> {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { model } = await params;
-  return {
+  return pageMetadata({
     title: `Results on ${modelLabel(model)}`,
     description: `Every harness architecture on ${modelLabel(model)}, ranked by paired comparison with intervals on score, pass rate, cost and latency.`,
-  };
+    path: `/results/${model}/`,
+  });
 }
 
 export default async function ModelResultsPage({ params }: Params) {
