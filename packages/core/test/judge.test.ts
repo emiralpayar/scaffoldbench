@@ -53,7 +53,27 @@ describe('createJudge', () => {
     expect(options.settingSources).toEqual([]);
     expect(options.effort).toBe(DEFAULT_JUDGE_EFFORT);
     expect(options.abortController).toBeInstanceOf(AbortController);
-    expect(options.env).toBeUndefined();
+    expect(options.env?.PATH).toBe(process.env.PATH);
+  });
+
+  it('grades outside any Claude Code session the benchmark may run inside', async () => {
+    vi.stubEnv('CLAUDECODE', '1');
+    vi.stubEnv('CLAUDE_CODE_MESSAGING_SOCKET', '/tmp/host.sock');
+    setScript(async function* () {
+      yield success({ structured: { met: true } });
+    });
+
+    try {
+      await createJudge({ model: MODEL })(REQUEST);
+      await createJudge({ model: MODEL })(REQUEST, { env: { PATH: '/usr/bin', CLAUDECODE: '1' } });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const [own, given] = sessions().map((s) => s.options.env ?? {});
+    expect(own).not.toHaveProperty('CLAUDECODE');
+    expect(own).not.toHaveProperty('CLAUDE_CODE_MESSAGING_SOCKET');
+    expect(given).toEqual({ PATH: '/usr/bin' });
   });
 
   it('grades at the effort a request names, and at its own otherwise', async () => {

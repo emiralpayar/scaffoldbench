@@ -267,6 +267,35 @@ describe('MCP servers', () => {
     expect(end?.meta?.mcpServers).toEqual([{ name: 'shop', status: 'connected' }]);
     expect(end?.meta?.mcpServersExpected).toEqual(['shop']);
   });
+
+  it('runs nothing as a child of the Claude Code session the benchmark may run inside', async () => {
+    // What a Claude Code session puts in the environment of what it starts.
+    vi.stubEnv('CLAUDECODE', '1');
+    vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', 'cli');
+    vi.stubEnv('CLAUDE_CODE_CHILD_SESSION', '1');
+    vi.stubEnv('CLAUDE_CODE_MESSAGING_SOCKET', '/tmp/host.sock');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-host');
+    setScript(async function* () {
+      yield success({ text: 'ok' });
+    });
+    const visitor = { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-visitor', CLAUDECODE: '1' };
+
+    try {
+      await runQuery(makeCtx(), { phase: 'host', prompt: 'go' });
+      await runQuery({ ...makeCtx(), subprocessEnv: visitor }, { phase: 'visitor', prompt: 'go' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const [host, visited] = sessions().map((s) => s.options.env ?? {});
+    for (const name of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION']) {
+      expect(host).not.toHaveProperty(name);
+    }
+    expect(host).not.toHaveProperty('CLAUDE_CODE_MESSAGING_SOCKET');
+    expect(host?.ANTHROPIC_API_KEY).toBe('sk-ant-host');
+    expect(host?.PATH).toBe(process.env.PATH);
+    expect(visited).toEqual({ PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-visitor' });
+  });
 });
 
 describe('API errors', () => {
@@ -396,7 +425,9 @@ describe('API errors', () => {
 
   it('counts a context that no longer fits against the run, as the terminal reason says', async () => {
     setScript(async function* () {
-      yield assistant('I have read eleven pages so far.', { usage: { input_tokens: 190_000, output_tokens: 50 } });
+      yield assistant('I have read eleven pages so far.', {
+        usage: { input_tokens: 190_000, output_tokens: 50 },
+      });
       yield assistant('Prompt is too long', { model: '<synthetic>', error: 'invalid_request', usage: {} });
       yield success({ text: 'Prompt is too long', isError: true, terminalReason: 'prompt_too_long' });
     });

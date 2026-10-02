@@ -99,14 +99,13 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
     if (call.signal?.aborted) controller.abort();
     call.signal?.addEventListener('abort', onAbort, { once: true });
 
-    const env = call.env ?? options.env;
     const meter = new CallMeter(options.model);
 
     try {
       for await (const message of query({
         prompt: req.prompt,
         options: {
-          ...hermeticOptions(),
+          ...hermeticOptions(call.env ?? options.env),
           model: options.model,
           effort: req.effort ?? effort,
           systemPrompt: req.system,
@@ -120,7 +119,6 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
           maxBudgetUsd: options.maxBudgetUsd ?? 0.5,
           outputFormat: { type: 'json_schema', schema: req.schema },
           abortController: controller,
-          ...(env ? { env } : {}),
         },
       }) as AsyncIterable<SDKMessage>) {
         meter.observe(message);

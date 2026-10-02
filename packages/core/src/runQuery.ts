@@ -239,7 +239,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   let deniedToolCalls = 0;
   const appliedEffort = watchEffort();
   const options: Options = {
-    ...hermeticOptions(),
+    ...hermeticOptions(ctx.subprocessEnv),
     model: spec.model ?? ctx.model,
     effort: ctx.effort,
     systemPrompt: spec.systemPrompt ?? ctx.systemPrompt,
@@ -278,7 +278,6 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       ],
       Stop: [appliedEffort.matcher],
     },
-    ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),
     ...(schema ? { outputFormat: { type: 'json_schema' as const, schema } } : {}),
   };
 
