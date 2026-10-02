@@ -200,15 +200,18 @@ export function apiErrorOfAssistant(message: unknown): ApiError | undefined {
  * A turn the model could not finish for a reason of its own, which the CLI
  * reports in the shape of an API failure.
  *
- * - `output_limit`: a response ran past the output-token maximum, or the
- *   conversation filled the context window (`API Error: Claude's response
- *   exceeded the 64000 output token maximum…`, `API Error: The model has
- *   reached its context window limit.`, typed code `max_output_tokens`). The
- *   CLI first lets the model try to carry on; the notice ends the turn only
- *   when that fails.
+ * - `output_limit`: a response ran past the output-token maximum (`API Error:
+ *   Claude's response exceeded the 64000 output token maximum…`, typed code
+ *   `max_output_tokens`). The CLI first lets the model try to carry on; the
+ *   notice ends the turn only when that fails.
+ * - `context_limit`: the conversation no longer fits the context window, and
+ *   compacting it did not help (`API Error: The model has reached its context
+ *   window limit.`, `Prompt is too long`; terminal reasons `prompt_too_long`,
+ *   `blocking_limit`, `rapid_refill_breaker`).
+ * - `malformed_tool_use`: the model could not produce a tool call the CLI
+ *   could parse, even when asked again (`malformed_tool_use_exhausted`).
  * - `refusal`: the model's safeguards declined the request (`API Error:
- *   …'s safeguards flagged this message…`, typed code `invalid_request`,
- *   `stop_reason: 'refusal'`).
+ *   …'s safeguards flagged this message…`, `stop_reason: 'refusal'`).
  *
  * Nothing failed at the API. The run met a limit of its own, as when it runs
  * out of turns, so it is a losing data point. Excusing it as an
@@ -216,12 +219,16 @@ export function apiErrorOfAssistant(message: unknown): ApiError | undefined {
  * flattering whichever architecture provokes it most.
  */
 export interface ModelStop {
-  reason: 'output_limit' | 'refusal';
+  reason: 'output_limit' | 'context_limit' | 'malformed_tool_use' | 'refusal';
   /** The CLI's notice, without the "API Error:" it is written with. */
   message: string;
   /** For a refusal, the safeguard category the API named, if it named one. */
   category?: string;
 }
+
+/** The CLI's own wording for a context that no longer fits, and for a tool call it gave up parsing. */
+const CONTEXT_LIMIT_NOTICE = /^(?:Prompt is too long|The model has reached its context window limit)/;
+const MALFORMED_TOOL_USE_NOTICE = /^The model's tool call could not be parsed/;
 
 /** The model stop an assistant message reports, if it is one of the CLI's notices of one. */
 export function modelStopOfAssistant(message: unknown): ModelStop | undefined {
@@ -234,21 +241,55 @@ export function modelStopOfAssistant(message: unknown): ModelStop | undefined {
       stop_details?: { category?: unknown } | null;
     };
   };
-  const notice = (fallback: string) =>
-    assistantText(m).replace(API_ERROR_PREFIX, '').trim() || fallback;
 
   if (m.message?.stop_reason === 'refusal') {
     const category = m.message.stop_details?.category;
     return {
       reason: 'refusal',
-      message: notice('refusal'),
+      message: noticeText(m) || 'refusal',
       ...(typeof category === 'string' ? { category } : {}),
     };
   }
+  // Everything else is recognised only on a message the CLI wrote itself, so
+  // a model that merely talks about prompts or limits is never taken for one.
+  if (!isSyntheticAssistant(message)) return undefined;
+  const text = noticeText(m);
+  if (CONTEXT_LIMIT_NOTICE.test(text)) return { reason: 'context_limit', message: text };
   if (m.error === 'max_output_tokens') {
-    return { reason: 'output_limit', message: notice('max_output_tokens') };
+    return { reason: 'output_limit', message: text || 'max_output_tokens' };
   }
+  if (MALFORMED_TOOL_USE_NOTICE.test(text)) return { reason: 'malformed_tool_use', message: text };
   return undefined;
+}
+
+/** How the CLI's terminal reasons for a turn map onto model stops. */
+const MODEL_STOP_TERMINAL_REASONS: Readonly<Record<string, ModelStop['reason']>> = {
+  prompt_too_long: 'context_limit',
+  blocking_limit: 'context_limit',
+  rapid_refill_breaker: 'context_limit',
+  malformed_tool_use_exhausted: 'malformed_tool_use',
+};
+
+/**
+ * The model stop a result message reports through its `terminal_reason`, if
+ * any: the CLI's own structured account of why the turn ended, which holds
+ * even when its wording changes.
+ */
+export function modelStopOfResult(result: {
+  subtype: string;
+  terminal_reason?: string;
+  result?: string;
+  errors?: string[];
+}): ModelStop | undefined {
+  const terminal = result.terminal_reason;
+  const reason = terminal !== undefined ? MODEL_STOP_TERMINAL_REASONS[terminal] : undefined;
+  if (terminal === undefined || reason === undefined) return undefined;
+  const text = result.subtype === 'success' ? (result.result ?? '') : (result.errors ?? []).join('; ');
+  return { reason, message: text.replace(API_ERROR_PREFIX, '').trim() || terminal };
+}
+
+function noticeText(message: { message?: { content?: unknown } }): string {
+  return assistantText(message).replace(API_ERROR_PREFIX, '').trim();
 }
 
 /**

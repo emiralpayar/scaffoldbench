@@ -21,6 +21,8 @@ import type {
 /** How `QueryOutcome.error` names a model stop. */
 const MODEL_STOP_LABEL: Record<ModelStop['reason'], string> = {
   output_limit: 'output limit',
+  context_limit: 'context limit',
+  malformed_tool_use: 'malformed tool call',
   refusal: 'refused',
 };
 

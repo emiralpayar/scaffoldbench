@@ -7,6 +7,7 @@ import {
   kindFromStatus,
   makeApiError,
   modelStopOfAssistant,
+  modelStopOfResult,
   recognizeFailureText,
   type ModelStop,
 } from './apiErrors';
@@ -117,9 +118,13 @@ export class CallMeter {
       result?.subtype === 'success' && result.is_error !== true && !isApiErrorText(result.result);
     const cost = this.#cost(result);
 
-    // A turn the CLI ended with a model-stop notice reports itself the way an
-    // API failure does — `is_error`, the notice as its text — but is not one.
-    const modelStop = success ? undefined : this.#modelStop;
+    // A turn the CLI ended on a model stop reports itself the way an API
+    // failure does — `is_error`, the notice as its text — but is not one.
+    // Its last notice says which and why; the terminal reason, when the
+    // notice was not recognised, says which.
+    const modelStop = success
+      ? undefined
+      : (this.#modelStop ?? (result ? modelStopOfResult(result) : undefined));
 
     let apiError: ApiError | undefined;
     if (modelStop !== undefined) {

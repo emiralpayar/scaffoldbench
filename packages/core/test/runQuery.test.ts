@@ -374,6 +374,21 @@ describe('API errors', () => {
     });
   });
 
+  it('counts a context that no longer fits against the run, as the terminal reason says', async () => {
+    setScript(async function* () {
+      yield assistant('I have read eleven pages so far.', { usage: { input_tokens: 190_000, output_tokens: 50 } });
+      yield assistant('Prompt is too long', { model: '<synthetic>', error: 'invalid_request', usage: {} });
+      yield success({ text: 'Prompt is too long', isError: true, terminalReason: 'prompt_too_long' });
+    });
+
+    const outcome = await runQuery(makeCtx(), { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.modelStop).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    expect(outcome.error).toBe('context limit: Prompt is too long');
+    expect(outcome.text).toBe('I have read eleven pages so far.');
+  });
+
   it('counts a refusal against the run, never as an API failure', async () => {
     const notice =
       "API Error: Haiku 4.5's safeguards flagged this message (https://www.anthropic.com/legal/aup).";

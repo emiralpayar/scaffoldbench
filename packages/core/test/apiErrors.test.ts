@@ -7,6 +7,7 @@ import {
   kindFromSdkCode,
   kindFromStatus,
   modelStopOfAssistant,
+  modelStopOfResult,
   recognizeFailureText,
 } from '@arena/core';
 
@@ -148,10 +149,27 @@ describe('modelStopOfAssistant', () => {
       reason: 'output_limit',
       message: expect.stringMatching(/^Claude's response exceeded the 64000 output token maximum\./),
     });
+  });
+
+  it('reads a context that no longer fits, and a tool call the CLI gave up parsing', () => {
     expect(modelStopOfAssistant(limitNotice(CONTEXT_LIMIT))).toEqual({
-      reason: 'output_limit',
+      reason: 'context_limit',
       message: 'The model has reached its context window limit.',
     });
+    const tooLong = message(
+      'Prompt is too long',
+      { error: 'invalid_request', is_api_error_message: true },
+      '<synthetic>',
+    );
+    expect(modelStopOfAssistant(tooLong)).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    const malformed = message(
+      "The model's tool call could not be parsed (retry also failed).",
+      { is_api_error_message: true },
+      '<synthetic>',
+    );
+    expect(modelStopOfAssistant(malformed)?.reason).toBe('malformed_tool_use');
+    expect(apiErrorOfAssistant(tooLong)).toBeUndefined();
+    expect(apiErrorOfAssistant(malformed)).toBeUndefined();
   });
 
   it('reads a refusal and the category the API gave for it', () => {
@@ -167,6 +185,27 @@ describe('modelStopOfAssistant', () => {
     const overloaded = message('API Error: 529 Overloaded', { error: 'overloaded' }, '<synthetic>');
     expect(modelStopOfAssistant(overloaded)).toBeUndefined();
     expect(modelStopOfAssistant(message('The reply exceeded the output token maximum.'))).toBeUndefined();
+    const talk = message('Prompt is too long for this model, so I summarised it.');
+    expect(modelStopOfAssistant(talk)).toBeUndefined();
+  });
+});
+
+describe('modelStopOfResult', () => {
+  it('reads the terminal reasons that mean the model could not finish', () => {
+    const tooLong = { subtype: 'success', terminal_reason: 'prompt_too_long', result: 'Prompt is too long' };
+    expect(modelStopOfResult(tooLong)).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    expect(modelStopOfResult({ subtype: 'success', terminal_reason: 'blocking_limit', result: '' })).toEqual({
+      reason: 'context_limit',
+      message: 'blocking_limit',
+    });
+    const malformed = { subtype: 'error_during_execution', terminal_reason: 'malformed_tool_use_exhausted' };
+    expect(modelStopOfResult(malformed)).toMatchObject({ reason: 'malformed_tool_use' });
+  });
+
+  it('leaves API failures and ordinary endings alone', () => {
+    for (const terminal_reason of ['api_error', 'completed', undefined]) {
+      expect(modelStopOfResult({ subtype: 'success', result: 'x', terminal_reason })).toBeUndefined();
+    }
   });
 });
 
