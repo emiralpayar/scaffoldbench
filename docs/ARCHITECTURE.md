@@ -170,6 +170,10 @@ bookkeeping every architecture shares:
 - **`runAll`** for fan-out, which gives each sibling an equal share of the budget available when
   the batch starts, so none can be starved by another.
 - **`canContinue()`**, the budget and abort check every strategy makes before another phase.
+- **A halt on the first API failure.** A run that lost a call to the API is recorded as
+  `api_error`, ranked nowhere and run again, so the phase runner stops it there: `canContinue()`
+  turns false and the calls still in flight are aborted, rather than paying for a selection or an
+  execution nobody will use and making more calls to an API that is turning them away.
 
 ### Prompt parity
 

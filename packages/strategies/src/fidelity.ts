@@ -8,9 +8,9 @@ import { interrupted } from './helpers';
  * A fidelity check asks whether the architecture ran as designed: the plan
  * was a plan, the fan-out fanned out, the selector chose. It judges only what
  * the architecture could have done. A phase the run's cost or time limit cut
- * short, or that never started because the run had already stopped, is the
- * run's failure and passes; a phase that ran to its end and still produced
- * nothing usable does not.
+ * short or the API failed, or that never started because the run had already
+ * stopped, is the run's failure and passes; a phase that ran to its end and
+ * still produced nothing usable does not.
  */
 
 export function pass(id: string, detail?: string): IntegrityCheck {
@@ -27,6 +27,18 @@ export function checkFrom(id: string, failures: readonly string[], verified?: st
   const shown = failures.slice(0, 3);
   const more = failures.length - shown.length;
   return fail(id, more > 0 ? `${shown.join('; ')}; and ${more} more` : shown.join('; '));
+}
+
+/**
+ * Why the run stopped before the architecture had run its course, if it did:
+ * its cost or wall-clock ceiling, or a call that failed at the API, after
+ * which the phase runner starts nothing more (see `createPhaseRunner`). A
+ * phase missing for either reason is the run's failure, not the
+ * architecture's; and a run that lost a call to the API is never ranked.
+ */
+export function haltedBy(input: FidelityInput): string | undefined {
+  if (input.stoppedBy) return input.stoppedBy;
+  return input.outcome.phases.some((phase) => phase.apiError !== undefined) ? 'api_error' : undefined;
 }
 
 /** The first phase record with this name. */
@@ -57,8 +69,9 @@ export function unjudged(
   name: string,
 ): IntegrityCheck | undefined {
   if (!phase) {
-    return input.stoppedBy
-      ? pass(id, `${name} never ran: the run was stopped (${input.stoppedBy})`)
+    const halted = haltedBy(input);
+    return halted
+      ? pass(id, `${name} never ran: the run was stopped (${halted})`)
       : fail(id, `${name} never ran`);
   }
   if (cutShort(phase)) return pass(id, `${name} was cut short (${phase.subtype}), so it is not judged`);

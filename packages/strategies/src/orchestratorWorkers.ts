@@ -11,6 +11,7 @@ import {
   checkFrom,
   cutShort,
   fail,
+  haltedBy,
   metaNumber,
   metaString,
   pass,
@@ -207,13 +208,14 @@ export function fanOutCheck(input: FidelityInput): IntegrityCheck {
   const planned = metaNumber(decompose, 'workers');
   const workers = input.outcome.phases.filter((record) => record.phase.startsWith('worker-'));
 
+  const halted = haltedBy(input);
   if (planned === undefined) {
-    return input.stoppedBy || (decompose && cutShort(decompose))
+    return halted || (decompose && cutShort(decompose))
       ? pass(id, 'the run stopped before the fan-out')
       : fail(id, 'no fan-out was recorded');
   }
-  if (workers.length === 0 && input.stoppedBy) {
-    return pass(id, `the run was stopped (${input.stoppedBy}) before the workers started`);
+  if (workers.length === 0 && halted) {
+    return pass(id, `the run was stopped (${halted}) before the workers started`);
   }
 
   const failures: string[] = [];

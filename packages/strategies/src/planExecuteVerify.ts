@@ -7,7 +7,7 @@ import type {
   Strategy,
   StrategyOutcome,
 } from '@arena/core';
-import { checkFrom, cutShort, metaString, phase, phasePrefix, toolSurfaceCheck } from './fidelity';
+import { checkFrom, cutShort, haltedBy, metaString, phase, phasePrefix, toolSurfaceCheck } from './fidelity';
 import {
   ACTING_INSTRUCTIONS,
   FINAL_ANSWER_INSTRUCTION,
@@ -253,12 +253,13 @@ export function verdictsCheck(input: FidelityInput): IntegrityCheck {
  */
 export function loopCheck(input: FidelityInput): IntegrityCheck {
   const phases = input.outcome.phases.map((record) => record.phase);
+  const halted = haltedBy(input);
   const failures: string[] = [];
   for (const record of verdictPhases(input)) {
     const round = Number(/^verify-(\d+)/.exec(record.phase)?.[1]);
     const revised = phases.includes(`revise-${round}`);
     const wanted = metaString(record, 'decision') === 'revise';
-    if (wanted && !revised && !input.stoppedBy) {
+    if (wanted && !revised && !halted) {
       failures.push(`${record.phase} called for a revision that never ran`);
     }
     if (revised && !wanted) failures.push(`revise-${round} ran without a verdict calling for it`);

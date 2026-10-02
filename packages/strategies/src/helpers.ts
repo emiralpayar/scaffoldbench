@@ -147,7 +147,10 @@ export interface FinishOptions {
 export interface PhaseRunner {
   /** One record per call, in the order the calls started. */
   readonly phases: PhaseRecord[];
-  /** False once the run is out of budget or has been aborted. */
+  /**
+   * False once the run is out of budget, has been aborted, or has lost a
+   * call to the API (see `createPhaseRunner`).
+   */
   canContinue(): boolean;
   /**
    * Run one phase. `signal` additionally aborts it — for a call made on
@@ -166,11 +169,20 @@ export interface PhaseRunner {
 
 /**
  * Bookkeeping shared by every architecture: one `PhaseRecord` per model
- * call, a fallback answer, and the budget check every strategy makes before
- * it starts another phase.
+ * call, a fallback answer, and the check every strategy makes before it
+ * starts another phase.
+ *
+ * A call that fails at the API ends the run's value as a measurement: the
+ * runner records the run as `api_error`, ranks it nowhere and runs the cell
+ * again. So the phase runner halts the run there — no further phases, and
+ * the calls still in flight are aborted — instead of paying for a plan, a
+ * selection or an execution nobody will use, and making more calls to an API
+ * that is rejecting them.
  */
 export function createPhaseRunner(ctx: RunContext, deps: Partial<StrategyDeps>): PhaseRunner {
   const call = deps.runQuery ?? runQuery;
+  const halt = new AbortController();
+  const signal = AbortSignal.any([ctx.signal, halt.signal]);
   const phases: PhaseRecord[] = [];
   // Start order of each record in `phases`, kept alongside it. A phase is
   // recorded when it finishes, but listed where it started: a fan-out lists
@@ -183,9 +195,10 @@ export function createPhaseRunner(ctx: RunContext, deps: Partial<StrategyDeps>):
   // fallback however a fan-out's siblings happened to finish.
   let lastAnswer = { order: -1, text: '' };
 
-  const launch = async (spec: LabeledSpec, runCtx: RunContext): Promise<QueryOutcome> => {
+  const launch = async (spec: LabeledSpec, callSignal: AbortSignal): Promise<QueryOutcome> => {
     const order = started++;
-    const outcome = await call(runCtx, spec);
+    const outcome = await call({ ...ctx, signal: callSignal }, spec);
+    if (outcome.apiError) halt.abort();
     const record = recordPhase(outcome, spec.phase, spec.label, spec.model ?? ctx.model);
     let at = starts.length;
     while (at > 0 && (starts[at - 1] ?? 0) > order) at--;
@@ -201,13 +214,10 @@ export function createPhaseRunner(ctx: RunContext, deps: Partial<StrategyDeps>):
   return {
     phases,
 
-    canContinue: () => !ctx.budget.exceeded && !ctx.signal.aborted,
+    canContinue: () => !ctx.budget.exceeded && !signal.aborted,
 
     run(spec: LabeledSpec, options: { signal?: AbortSignal } = {}): Promise<QueryOutcome> {
-      const runCtx = options.signal
-        ? { ...ctx, signal: AbortSignal.any([ctx.signal, options.signal]) }
-        : ctx;
-      return launch(spec, runCtx);
+      return launch(spec, options.signal ? AbortSignal.any([signal, options.signal]) : signal);
     },
 
     runAll(specs: LabeledSpec[]): Promise<QueryOutcome[]> {
@@ -215,7 +225,7 @@ export function createPhaseRunner(ctx: RunContext, deps: Partial<StrategyDeps>):
       // cannot take everything and the rest cannot each be handed all of it.
       const share = specs.length > 0 ? ctx.budget.availableUsd / specs.length : 0;
       return Promise.all(
-        specs.map((spec) => launch({ ...spec, maxBudgetUsd: spec.maxBudgetUsd ?? share }, ctx)),
+        specs.map((spec) => launch({ ...spec, maxBudgetUsd: spec.maxBudgetUsd ?? share }, signal)),
       );
     },
 

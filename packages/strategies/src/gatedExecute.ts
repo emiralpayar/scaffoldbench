@@ -299,7 +299,8 @@ export function createGatedExecuteStrategy(deps: Partial<StrategyDeps> = {}): St
           decision.source !== 'none'
             ? decision.reason || 'The reviewer gave no reason.'
             : cut
-              ? 'The run is out of budget or time, so this call could not be reviewed.'
+              ? 'The review was cut short (the run ran out of budget or time, or the review ' +
+                'failed at the API), so this call could not be reviewed.'
               : 'The reviewer gave no readable decision.';
         notes.push({ tool: call.toolName, input: call.toolInput, allowed: false, reason });
         return {

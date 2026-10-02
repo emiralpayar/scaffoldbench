@@ -44,6 +44,7 @@ import {
   toolResult,
   toolUse,
   type FakeSession,
+  type ToolOutcome,
 } from '../../core/test/support/fakeClaudeCode';
 
 /**
@@ -715,5 +716,93 @@ describe('gated-execute through the real runQuery', () => {
     expect(sessions()[0]?.options.maxBudgetUsd).toBeCloseTo(0.9, 10);
     expect(sessions()[0]?.prompt).not.toContain('reviewer');
     expect(failures(strategy, ctx, outcome)).toEqual([]);
+  });
+});
+
+describe('a call that fails at the API', () => {
+  /** A session the API turns away: the CLI's stand-in message, then an error "success". */
+  async function* overloaded() {
+    const text = 'Repeated 529 Overloaded errors';
+    yield assistant(text, { model: '<synthetic>', error: 'overloaded', usage: {} });
+    yield success({ text, isError: true, costUsd: 0 });
+  }
+
+  /** Every check the run failed, the runner's and the strategy's. */
+  function failedIds(strategy: Strategy, ctx: RunContext, outcome: StrategyOutcome): string[] {
+    return failures(strategy, ctx, outcome).map((check) => check.id);
+  }
+
+  it('halts the run: the siblings in flight are aborted and nothing more is started', async () => {
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are proposer 2')) {
+        yield* overloaded();
+        return;
+      }
+      // Proposers 1 and 3 are still investigating when proposer 2 fails.
+      yield assistant('Looking at the order first.');
+      await session.untilAborted();
+    });
+    const ctx = makeCtx(makeEnv());
+    const strategy = createProposeSelectStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    // No selector and no executor were paid for a run that cannot be ranked.
+    expect(sessions()).toHaveLength(3);
+    expect(outcome.phases.map((p) => [p.phase, p.subtype])).toEqual([
+      ['propose-1', 'aborted'],
+      ['propose-2', 'success'],
+      ['propose-3', 'aborted'],
+    ]);
+    expect(outcome.phases[1]?.apiError?.kind).toBe('overloaded');
+    // The run is an API failure, and only that: the architecture is not
+    // blamed for the phases the failure kept from running.
+    expect(failedIds(strategy, ctx, outcome)).toEqual([HARNESS_CHECK.api]);
+  });
+
+  it('starts no later phase after a sequential phase fails', async () => {
+    setScript(async function* (session) {
+      if (session.prompt.includes('split the work only')) {
+        yield* overloaded();
+        return;
+      }
+      yield* useTool(session, 'mcp__shop__refund', 'O-1', 'Refunded O-1.');
+    });
+    const ctx = makeCtx(makeEnv());
+    const strategy = createOrchestratorWorkersStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(outcome.phases.map((p) => p.phase)).toEqual(['decompose']);
+    expect(sessions()).toHaveLength(1);
+    expect(failedIds(strategy, ctx, outcome)).toEqual([HARNESS_CHECK.api]);
+  });
+
+  it('stops an executor whose review failed, and denies the action unreviewed', async () => {
+    let refund: ToolOutcome | undefined;
+    setScript(async function* (session) {
+      if (session.prompt.includes('You are the action reviewer')) {
+        yield* overloaded();
+        return;
+      }
+      refund = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+      yield toolUse('mcp__shop__refund', { id: 'O-1' });
+      yield toolResult(refund);
+      // The executor would carry on here; the halt ends it instead.
+      await session.untilAborted();
+    });
+    const env = makeEnv();
+    const ctx = makeCtx(env);
+    const strategy = createGatedExecuteStrategy();
+
+    const outcome = await strategy.run(ctx);
+
+    expect(refund?.denied).toBe(true);
+    expect(env.journal).toEqual([]);
+    expect(outcome.phases.map((p) => [p.phase, p.subtype])).toEqual([
+      ['execute', 'aborted'],
+      ['review-1', 'success'],
+    ]);
+    expect(failedIds(strategy, ctx, outcome)).toEqual([HARNESS_CHECK.api]);
   });
 });

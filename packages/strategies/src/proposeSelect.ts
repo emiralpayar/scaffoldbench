@@ -10,6 +10,7 @@ import type {
 import {
   checkFrom,
   fail,
+  haltedBy,
   metaNumber,
   metaString,
   pass,
@@ -204,8 +205,9 @@ function selectionFrom(
 export function proposalsCheck(input: FidelityInput): IntegrityCheck {
   const id = 'propose-select.proposals';
   const proposals = input.outcome.phases.filter((record) => record.phase.startsWith('propose-'));
-  if (proposals.length === 0 && input.stoppedBy) {
-    return pass(id, `the run was stopped (${input.stoppedBy}) before the proposers started`);
+  const halted = haltedBy(input);
+  if (proposals.length === 0 && halted) {
+    return pass(id, `the run was stopped (${halted}) before the proposers started`);
   }
 
   const failures: string[] = [];
