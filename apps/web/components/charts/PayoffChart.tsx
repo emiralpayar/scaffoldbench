@@ -4,7 +4,7 @@ import { linearScale, linearTicks, logScale, logTicks, niceDomain, placeLabels }
 import { formatDelta, formatMultiple } from '../../lib/format';
 import { ChartSvg, DataTable, FONT, Labels, LegendItem, Marker, Whisker } from './parts';
 
-const WIDTH = 380;
+const WIDTH = 344;
 const HEIGHT = 336;
 const M = { top: 46, right: 14, bottom: 46, left: 50 };
 

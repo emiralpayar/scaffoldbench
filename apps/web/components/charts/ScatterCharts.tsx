@@ -130,8 +130,8 @@ export function ParetoPlot({ points, model }: { points: IntervalPoint[]; model: 
         <LegendItem color="var(--ink-2)" label="dominated on means" hollow />
       </div>
       <Responsive
-        wide={<ParetoSvg points={points} model={model} width={760} height={440} />}
-        narrow={<ParetoSvg points={points} model={model} width={360} height={360} />}
+        wide={<ParetoSvg points={points} model={model} width={680} height={420} />}
+        narrow={<ParetoSvg points={points} model={model} width={340} height={360} />}
       />
       <DataTable
         head={['Architecture', 'Score', 'interval', 'Cost / run', 'interval', 'Frontier']}
@@ -218,7 +218,7 @@ export function ScaffoldScaleChart({ groups }: { groups: ScaffoldScaleGroup[] })
       </div>
       <Responsive
         wide={<ScaffoldScaleSvg groups={usable} width={760} height={480} />}
-        narrow={<ScaffoldScaleSvg groups={usable} width={360} height={420} />}
+        narrow={<ScaffoldScaleSvg groups={usable} width={340} height={420} />}
       />
       <DataTable
         head={['Model', 'Architecture', 'Score', 'interval', 'Cost / run']}

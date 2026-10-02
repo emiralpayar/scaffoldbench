@@ -13,7 +13,7 @@ import { ScrollRegion } from '../ScrollRegion';
  * solid grids, text in text tokens (never in the series colour).
  */
 
-export const FONT = { tick: 11, label: 11.5, title: 15 } as const;
+export const FONT = { tick: 12, label: 12, title: 15 } as const;
 
 /**
  * Render a chart twice, at a wide and a narrow layout, and let CSS show the

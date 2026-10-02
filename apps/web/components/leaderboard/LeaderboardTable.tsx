@@ -131,7 +131,7 @@ export function LeaderboardTable({
               <RankBadge row={row} />
               <Link href={`/strategies/${row.strategyId}/`} className="flex min-w-0 flex-1 items-center gap-2.5">
                 <ArchitectureGlyph id={row.strategyId} width={34} className="shrink-0" />
-                <span className="truncate text-[1rem] font-medium text-ink">{row.label}</span>
+                <span className="text-[1rem] font-medium leading-tight text-ink">{row.label}</span>
               </Link>
               <span className="text-right">
                 <span className="num block text-[1.375rem] leading-none text-ink">{formatScore(row.score.mean)}</span>
@@ -293,7 +293,7 @@ function RunsCell({ row }: { row: LeaderRow }) {
 function Small({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="eyebrow !text-[0.625rem]">{label}</dt>
+      <dt className="eyebrow !text-[0.6875rem]">{label}</dt>
       <dd className="num mt-0.5 text-ink-2">{children}</dd>
     </div>
   );

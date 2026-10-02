@@ -311,7 +311,7 @@ function Replay({
             >
               <span className="num pt-0.5 text-[0.6875rem] text-muted">{formatDuration(item.tMs)}</span>
               <span className="min-w-0">
-                <span className="eyebrow mb-1 block !text-[0.625rem]">{call.label}</span>
+                <span className="eyebrow mb-1 block !text-[0.6875rem]">{call.label}</span>
                 <ItemSummary item={item} />
               </span>
             </li>
@@ -369,7 +369,7 @@ export function ReplayControls({ playback, spent }: { playback: Playback; spent:
         {formatDuration(t)} / {formatDuration(duration)}
       </span>
       <span className="num whitespace-nowrap text-[0.8125rem] text-ink">
-        <span className="eyebrow mr-1.5 !text-[0.625rem]">spent</span>
+        <span className="eyebrow mr-1.5 !text-[0.6875rem]">spent</span>
         {formatUsd(spent)}
       </span>
     </div>
