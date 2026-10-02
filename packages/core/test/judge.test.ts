@@ -56,6 +56,19 @@ describe('createJudge', () => {
     expect(options.env).toBeUndefined();
   });
 
+  it('grades at the effort a request names, and at its own otherwise', async () => {
+    setScript(async function* () {
+      yield success({ structured: { met: true } });
+    });
+    const judge = createJudge({ model: MODEL, effort: 'high' });
+
+    await judge(REQUEST);
+    await judge({ ...REQUEST, effort: 'low' });
+
+    expect(sessions().map((s) => s.options.effort)).toEqual(['high', 'low']);
+    expect(judge.info.effort).toBe('high');
+  });
+
   it('runs on the environment it is given, and a per-call one wins', async () => {
     setScript(async function* () {
       yield success({ structured: { met: true } });

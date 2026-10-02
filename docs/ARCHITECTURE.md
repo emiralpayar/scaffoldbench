@@ -345,9 +345,10 @@ spend is routed through a wrapper in the runner so it accrues to `judgeCostUsd` 
 strategy's `costUsd`; a grading call that fails is still billed. The wrapper also runs the judge on
 the run's own `subprocessEnv`, so a live-demo run is graded on the visitor's key. The judge itself
 ([`judge.ts`](../packages/core/src/judge.ts)) is hermetic like every agent call, offers no tools
-beyond the structured-output one, runs at a pinned effort and gives up after a timeout. A run whose
-every grading call failed is labelled `api_error` (or `harness_error` when the judge answered but
-never usably) rather than `wrong_answer`.
+beyond the structured-output one, runs at a pinned effort (its own default, or the one the task's
+request names) and gives up after a timeout. A run whose every grading call failed is labelled
+`api_error` (or `harness_error` when the judge answered but never usably) rather than
+`wrong_answer`.
 
 ## 8. Integrity and failure modes
 

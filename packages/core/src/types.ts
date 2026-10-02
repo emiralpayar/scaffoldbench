@@ -186,6 +186,12 @@ export interface JudgeRequest {
   prompt: string;
   /** JSON Schema describing the expected reply. */
   schema: Record<string, unknown>;
+  /**
+   * Effort to grade this request at, overriding the judge's default. Like
+   * the rubric and the schema it belongs to the task: a task whose grading
+   * was calibrated at one effort asks for that effort wherever it runs.
+   */
+  effort?: EffortLevel;
 }
 
 export interface JudgeResponse<T = unknown> {
@@ -610,6 +616,7 @@ export interface RetryPolicy {
 /** What a judge says about itself, so a manifest can record how grading was done. */
 export interface JudgeInfo {
   model: string;
+  /** Effort for a request that names none (see `JudgeRequest.effort`). */
   effort: EffortLevel;
 }
 
@@ -686,7 +693,12 @@ export interface RunSetManifest {
   maxWallClockMsPerRun?: number;
   totalBudgetUsd?: number;
   concurrency?: number;
-  /** Grading settings. `model` and `effort` are null for a judge that does not describe itself. */
+  /**
+   * Grading settings. `model` and `effort` are null for a judge that does not
+   * describe itself. `effort` is the judge's default: a task whose requests
+   * name their own (`JudgeRequest.effort`) is graded at that, as its code at
+   * `provenance.gitSha` says.
+   */
   judge?: { model: string | null; effort: EffortLevel | null; samples: number };
   retry?: RetryPolicy;
   /**
