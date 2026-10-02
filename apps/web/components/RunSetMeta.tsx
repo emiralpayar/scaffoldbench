@@ -28,17 +28,20 @@ export function RunSetBanner({ data }: { data: Pick<RunSetData, 'verification' |
   }
 
   if (data.verification === 'unverified') {
+    const retracted = data.runSetId === POSTMORTEM_RUN_SET_ID;
     return (
       <div role="note" className="banner banner-bad mb-8">
-        <p className="banner-title">Unverified run set — recorded before the fidelity gate</p>
-        {data.runSetId === POSTMORTEM_RUN_SET_ID ? (
+        <p className="banner-title">
+          {retracted ? 'Retracted run set' : 'Unverified run set'} — recorded before the fidelity gate
+        </p>
+        {retracted ? (
           <p className="banner-body">
-            This is the run set whose traces showed that most of its architectures never ran as
-            designed.{' '}
-            <Link href="/#act-1" className="link">
-              Read what went wrong
+            Its traces showed that most of its architectures never ran as designed, so none of its
+            comparisons mean what they say. It is kept as evidence, not as results.{' '}
+            <Link href="/postmortem/" className="link">
+              Read the post-mortem
             </Link>
-            . Its numbers are kept as evidence, not as results.
+            .
           </p>
         ) : (
           <p className="banner-body">

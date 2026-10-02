@@ -580,6 +580,12 @@ body {
   animation-delay: calc(var(--glyph-delay, 0ms) + var(--node-index, 0) * 90ms);
 }
 
+/* A diagram that is drawn in when it scrolls into view waits, hidden, until then. */
+.glyph-waiting .glyph-edge,
+.glyph-waiting .glyph-node {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glyph-animated .glyph-edge {
     stroke-dashoffset: 0;

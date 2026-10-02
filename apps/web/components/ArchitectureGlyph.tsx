@@ -66,17 +66,37 @@ export function ArchitectureGlyph({
   );
 }
 
-/** The glyph's shapes without the outer <svg>, for embedding in charts. */
+/**
+ * The glyph's shapes without the outer <svg>, for embedding in charts.
+ *
+ * `active` and `labels` are for the large diagram on a strategy page. With
+ * `active`, only those nodes are drawn at full strength, and an edge lights
+ * when it leads into one (a loop or a review link, which lead back, when it
+ * leaves one): the picture of one step of the design. `labels` puts a small
+ * numbered badge on a node. `strokeScale` thins the lines of a glyph drawn
+ * far larger than it was designed for.
+ */
 export function GlyphBody({
   geometry,
   color,
   dead,
+  active,
+  labels,
+  strokeScale = 1,
 }: {
   geometry: GlyphGeometry;
   color: string;
   dead: ReadonlySet<string>;
+  active?: ReadonlySet<string> | null;
+  labels?: ReadonlyMap<string, string>;
+  strokeScale?: number;
 }) {
   const byId = new Map(geometry.nodes.map((node) => [node.id, node]));
+  const lit = (edge: GlyphEdge): boolean => {
+    if (!active) return true;
+    if (edge.kind === 'flow') return active.has(edge.to);
+    return active.has(edge.from) || active.has(edge.to);
+  };
 
   return (
     <g>
@@ -94,6 +114,8 @@ export function GlyphBody({
             color={broken ? 'var(--muted)' : color}
             broken={broken}
             index={index}
+            strokeScale={strokeScale}
+            dim={!lit(edge)}
           />
         );
       })}
@@ -104,6 +126,8 @@ export function GlyphBody({
           color={dead.has(node.id) ? 'var(--muted)' : color}
           dead={dead.has(node.id)}
           index={index}
+          dim={!!active && !active.has(node.id)}
+          {...(labels?.has(node.id) ? { label: labels.get(node.id) as string } : {})}
         />
       ))}
     </g>
@@ -117,6 +141,8 @@ function Edge({
   color,
   broken,
   index,
+  strokeScale,
+  dim,
 }: {
   edge: GlyphEdge;
   from: GlyphNode;
@@ -124,15 +150,17 @@ function Edge({
   color: string;
   broken: boolean;
   index: number;
+  strokeScale: number;
+  dim: boolean;
 }) {
   const style = { '--edge-index': index } as CSSProperties;
   const common = {
     className: 'glyph-edge',
     stroke: color,
-    strokeWidth: 1.15,
+    strokeWidth: 1.15 * strokeScale,
     strokeLinecap: 'round' as const,
     fill: 'none',
-    opacity: broken ? 0.5 : 0.62,
+    opacity: dim ? 0.14 : broken ? 0.5 : 0.62,
     pathLength: 1,
     style,
     ...(broken || edge.kind === 'review' ? { strokeDasharray: broken ? '0.06 0.05' : '0.08 0.06' } : {}),
@@ -172,15 +200,19 @@ function Node({
   color,
   dead,
   index,
+  dim = false,
+  label,
 }: {
   node: GlyphNode;
   color: string;
   dead: boolean;
   index: number;
+  dim?: boolean;
+  label?: string;
 }) {
   const r = RADIUS[node.kind];
   const style = { '--node-index': index } as CSSProperties;
-  const opacity = dead ? 0.55 : 1;
+  const opacity = dead ? 0.55 : dim ? 0.22 : 1;
 
   let shape;
   switch (node.kind) {
@@ -223,6 +255,22 @@ function Node({
         <g stroke="var(--bad)" strokeWidth={1.25} strokeLinecap="round">
           <line x1={node.x - s} y1={node.y - s} x2={node.x + s} y2={node.y + s} />
           <line x1={node.x - s} y1={node.y + s} x2={node.x + s} y2={node.y - s} />
+        </g>
+      ) : null}
+      {label ? (
+        <g opacity={dim ? 0.4 : 1} aria-hidden>
+          <circle cx={node.x - r * 0.85} cy={node.y - r * 0.85} r={1.45} fill="var(--surface)" stroke="var(--rule-strong)" strokeWidth={0.2} />
+          <text
+            x={node.x - r * 0.85}
+            y={node.y - r * 0.85}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={1.7}
+            fontFamily="var(--font-geist-mono), ui-monospace, monospace"
+            fill="var(--ink)"
+          >
+            {label}
+          </text>
         </g>
       ) : null}
     </g>

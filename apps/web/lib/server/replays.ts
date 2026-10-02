@@ -11,6 +11,7 @@ import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { architectureColor, architectureName, compareArchitectures } from '../architectures';
 import { defaultModel } from '../derive';
 import type { Difficulty, RunRecord, TraceEvent } from '../records';
+import { pickRepresentative } from '../strategies';
 import { timelineFromTrace } from '../timeline';
 import { buildViewGroups, trimGroups } from '../traceView';
 import type { RunSetData } from './runSet';
@@ -122,4 +123,25 @@ export function toReplayEntries(race: Pick<RaceGroup, 'runs'>): ReplayEntry[] {
     score: record.score,
     passed: record.passed,
   }));
+}
+
+export interface RepresentativeRun {
+  data: RunSetData;
+  record: RunRecord;
+  /** `null` when the run's trace is not in this build. */
+  trace: TraceEvent[] | null;
+}
+
+/**
+ * One run of an architecture to show on its page, from the published set. A
+ * run with a trace is preferred over a better one without, because the point
+ * of showing a run is to watch the design work.
+ */
+export async function loadRepresentativeRun(strategyId: string): Promise<RepresentativeRun | null> {
+  const data = await loadRunSet();
+  if (!data) return null;
+  const traced = pickRepresentative(data.records, strategyId, defaultModel(data.models), (r) => hasTrace(data, r));
+  const record = traced ?? pickRepresentative(data.records, strategyId, defaultModel(data.models));
+  if (!record) return null;
+  return { data, record, trace: traced ? await loadTrace(data, record) : null };
 }

@@ -11,14 +11,20 @@ export function HealthStrip({
   health,
   verified,
   retried,
+  showLink = true,
+  scope = 'recorded on this model',
 }: {
   health: RunSetHealth;
   verified: boolean;
   /** Runs that needed more than one attempt (API errors, retried). */
   retried: number;
+  /** Point on to the health page; the health page itself leaves it out. */
+  showLink?: boolean;
+  /** What the run count counts: a model, or the whole run set. */
+  scope?: string;
 }) {
   const items: { label: string; value: string; tone?: 'bad' | 'warn'; hint: string }[] = [
-    { label: 'Runs', value: formatInt(health.total), hint: 'recorded on this model' },
+    { label: 'Runs', value: formatInt(health.total), hint: scope },
     verified
       ? { label: 'Ranked', value: formatInt(health.rankable), hint: 'design verified, no API loss' }
       : { label: 'Unverified', value: formatInt(health.withoutIntegrity), hint: 'recorded before the fidelity gate', tone: 'warn' },
@@ -60,11 +66,13 @@ export function HealthStrip({
           </div>
         ))}
       </dl>
-      <p className="mt-2.5 text-right text-[0.8125rem]">
-        <Link href="/health/" className="link">
-          Harness health, check by check →
-        </Link>
-      </p>
+      {showLink ? (
+        <p className="mt-2.5 text-right text-[0.8125rem]">
+          <Link href="/health/" className="link">
+            Harness health, check by check →
+          </Link>
+        </p>
+      ) : null}
     </section>
   );
 }
