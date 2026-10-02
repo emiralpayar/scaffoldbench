@@ -10,13 +10,9 @@
  *     added without touching the runner.
  */
 
-import type {
-  AgentDefinition,
-  EffortLevel,
-  McpServerConfig,
-} from '@anthropic-ai/claude-agent-sdk';
+import type { EffortLevel, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
-export type { AgentDefinition, EffortLevel, McpServerConfig };
+export type { EffortLevel, McpServerConfig };
 
 // ---------------------------------------------------------------------------
 // Tasks
@@ -128,7 +124,9 @@ export interface Penalty {
  * data. `buildScore` produces the first four, the runner the rest. The last
  * two are failures of the harness or of the infrastructure, never of the
  * architecture under test, and a record carrying either always has
- * `integrity.ok === false`.
+ * `integrity.ok === false`. `max_turns`, `budget_exceeded`, `timeout` and
+ * `model_stop` are the run's own limits: losing data points, ranked like any
+ * other.
  */
 export type FailureMode =
   /** The run passed. */
@@ -148,6 +146,12 @@ export type FailureMode =
   | 'budget_exceeded'
   /** The run hit its per-run wall-clock ceiling before it could finish. */
   | 'timeout'
+  /**
+   * A call ended because its model could not finish the turn — out of output
+   * tokens or context, unable to form a tool call, or refusing — and the run
+   * did not pass. `RunRecord.modelStops` says which calls and why.
+   */
+  | 'model_stop'
   /**
    * The harness failed: the environment, the strategy or the grader threw, a
    * task tool server never connected, the guard blocked a tool the harness
@@ -186,6 +190,12 @@ export interface JudgeRequest {
   prompt: string;
   /** JSON Schema describing the expected reply. */
   schema: Record<string, unknown>;
+  /**
+   * Effort to grade this request at, overriding the judge's default. Like
+   * the rubric and the schema it belongs to the task: a task whose grading
+   * was calibrated at one effort asks for that effort wherever it runs.
+   */
+  effort?: EffortLevel;
 }
 
 export interface JudgeResponse<T = unknown> {
@@ -255,6 +265,8 @@ export interface PhaseRecord {
   subtype?: string;
   /** Present when the call failed at the API rather than in the architecture. */
   apiError?: ApiError;
+  /** Present when the call ended because its model could not finish the turn; see `ModelStop`. */
+  modelStop?: ModelStop;
   /** True when `costUsd` was estimated from streamed usage; see `QueryOutcome.costEstimated`. */
   costEstimated?: boolean;
   /** True when the phase asked for structured output and none came back. */
@@ -266,6 +278,24 @@ export interface PhaseRecord {
    * architecture did not run as designed, so the run fails its integrity check.
    */
   degraded?: string;
+  /** The call behind this phase (`QueryOutcome.callId`): what ties it to its events in the trace. */
+  callId?: string;
+  /**
+   * What the strategy read from the phase's reply, in the strategy's own
+   * terms: how many steps a plan had, a verifier's verdict, which proposal a
+   * selector chose, the action a reviewer allowed or denied. Fidelity checks
+   * read it, and so can an analysis of how often a verifier approved work that
+   * went on to fail.
+   */
+  meta?: Record<string, unknown>;
+  /**
+   * Set when the phase asked for structured output, got none, and the
+   * strategy asked again: the name of the phase that did. The miss is then
+   * judged by the retry, which `harness.structured-output` checks like any
+   * other schema call — so a harness that drops every structured reply still
+   * fails, and one slip the strategy recovered from does not.
+   */
+  retriedBy?: string;
 }
 
 export interface StrategyOutcome {
@@ -370,11 +400,47 @@ export type ApiErrorKind =
 /** A call that failed at the API or in the infrastructure around it. See `apiErrors.ts`. */
 export interface ApiError {
   kind: ApiErrorKind;
-  /** True when the same call could succeed if made again later. */
+  /**
+   * True when the same call could succeed if made again after a short wait.
+   * A `rate_limit` that is not retryable is the account's usage limit, spent
+   * until `resetsAt` (see `usageLimit.ts`).
+   */
   retryable: boolean;
   message: string;
   /** HTTP status, when the SDK reported one. */
   status?: number;
+  /** When a spent usage limit lifts (ISO 8601), when the CLI said. */
+  resetsAt?: string;
+}
+
+/**
+ * A turn the model could not finish for a reason of its own, which the CLI
+ * reports in the shape of an API failure: a response past the output-token
+ * maximum (`output_limit`), a conversation that no longer fits the context
+ * window even compacted (`context_limit`), a tool call the CLI could not
+ * parse even when the model was asked again (`malformed_tool_use`), or the
+ * model's safeguards declining (`refusal`). `apiErrors.ts` recognises each.
+ *
+ * Nothing failed at the API. The run met a limit of its own, as when it runs
+ * out of turns, so it is a losing data point. Excusing it as an
+ * infrastructure failure would retry it and then drop it from the rankings,
+ * flattering whichever architecture provokes it most.
+ */
+export interface ModelStop {
+  reason: 'output_limit' | 'context_limit' | 'malformed_tool_use' | 'refusal';
+  /** The CLI's notice, without the "API Error:" it is written with. */
+  message: string;
+  /** For a refusal, the safeguard category the API named, if it named one. */
+  category?: string;
+}
+
+/** A call of a run that ended on a model stop, as `RunRecord.modelStops` lists it. */
+export interface RunModelStop {
+  phase: string;
+  callId: string;
+  reason: ModelStop['reason'];
+  /** For a refusal, the safeguard category the API named, if it named one. */
+  category?: string;
 }
 
 /** One model's share of a call, as the SDK's `modelUsage` reports it. */
@@ -506,6 +572,7 @@ export interface RunRecord {
   taskDifficulty: Task['difficulty'];
   strategyId: string;
   model: string;
+  /** The effort level every call asked for; `effectiveEffort` is what the model ran at. */
   effort: EffortLevel;
   repeat: number;
   /** When the recorded attempt started building its environment. */
@@ -559,10 +626,27 @@ export interface RunRecord {
   /** The infrastructure failure behind an `api_error` record. */
   apiError?: ApiError;
   /**
+   * Every call of the recorded attempt that ended on a model stop, in start
+   * order, whether or not the run passed: a refusal by one worker of a fan-out
+   * that still succeeded is as much a property of the architecture as one
+   * that sank it. Empty when there were none.
+   */
+  modelStops?: RunModelStop[];
+  /**
    * Whether this run measured the architecture it claims to. A record with
    * `integrity.ok === false` must not be ranked; see `Integrity`.
    */
   integrity?: Integrity;
+  /**
+   * The effort level the CLI reported applying to this run's calls, which can
+   * differ from the `effort` they asked for: `null` means no effort parameter
+   * was sent at all, as for a model without effort support (Haiku 4.5);
+   * `EFFORT_MIXED` (`'mixed'`) means the calls reported different levels,
+   * each of which its `phase_end` trace event keeps. Absent when no
+   * call reported one, because every call ended before a tool call or a
+   * finished reply; see `QueryOutcome.effectiveEffort`.
+   */
+  effectiveEffort?: string | null;
 }
 
 /** How a run set's session ended, or that it is still going. */
@@ -577,7 +661,12 @@ export type RunSetStopReason =
   /** The next run's cap no longer fit in the total budget. */
   | 'total_budget'
   /** The API rejected the credentials, so every further run would have failed. */
-  | 'auth';
+  | 'auth'
+  /**
+   * The account's usage limit was spent (a rate limit that lifts only at a
+   * set time, hours away), so every further run would have failed until then.
+   */
+  | 'usage_limit';
 
 /** Transient API failures are retried by re-running the whole cell. */
 export interface RetryPolicy {
@@ -592,6 +681,7 @@ export interface RetryPolicy {
 /** What a judge says about itself, so a manifest can record how grading was done. */
 export interface JudgeInfo {
   model: string;
+  /** Effort for a request that names none (see `JudgeRequest.effort`). */
   effort: EffortLevel;
 }
 
@@ -636,6 +726,7 @@ export interface RunSetManifest {
    * with ", ". Kept for readers that predate `models`.
    */
   model: string;
+  /** The effort level requested; `effectiveEffort` says what each model ran at. */
   effort: EffortLevel;
   repeats: number;
   fixtureMode: FixtureMode;
@@ -665,10 +756,22 @@ export interface RunSetManifest {
   startedAt?: string;
   /** Model ids, in matrix order. */
   models?: string[];
+  /**
+   * The effort level each model actually ran at, by model id, from the
+   * `effectiveEffort` of the run set's records: `null` for a model that was
+   * sent no effort parameter, whatever `effort` asked for. A model none of
+   * whose records reported a level is left out.
+   */
+  effectiveEffort?: Record<string, string | null>;
   maxWallClockMsPerRun?: number;
   totalBudgetUsd?: number;
   concurrency?: number;
-  /** Grading settings. `model` and `effort` are null for a judge that does not describe itself. */
+  /**
+   * Grading settings. `model` and `effort` are null for a judge that does not
+   * describe itself. `effort` is the judge's default: a task whose requests
+   * name their own (`JudgeRequest.effort`) is graded at that, as its code at
+   * `provenance.gitSha` says.
+   */
   judge?: { model: string | null; effort: EffortLevel | null; samples: number };
   retry?: RetryPolicy;
   /**

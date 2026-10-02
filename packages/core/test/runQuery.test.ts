@@ -267,6 +267,35 @@ describe('MCP servers', () => {
     expect(end?.meta?.mcpServers).toEqual([{ name: 'shop', status: 'connected' }]);
     expect(end?.meta?.mcpServersExpected).toEqual(['shop']);
   });
+
+  it('runs nothing as a child of the Claude Code session the benchmark may run inside', async () => {
+    // What a Claude Code session puts in the environment of what it starts.
+    vi.stubEnv('CLAUDECODE', '1');
+    vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', 'cli');
+    vi.stubEnv('CLAUDE_CODE_CHILD_SESSION', '1');
+    vi.stubEnv('CLAUDE_CODE_MESSAGING_SOCKET', '/tmp/host.sock');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-host');
+    setScript(async function* () {
+      yield success({ text: 'ok' });
+    });
+    const visitor = { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-visitor', CLAUDECODE: '1' };
+
+    try {
+      await runQuery(makeCtx(), { phase: 'host', prompt: 'go' });
+      await runQuery({ ...makeCtx(), subprocessEnv: visitor }, { phase: 'visitor', prompt: 'go' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const [host, visited] = sessions().map((s) => s.options.env ?? {});
+    for (const name of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION']) {
+      expect(host).not.toHaveProperty(name);
+    }
+    expect(host).not.toHaveProperty('CLAUDE_CODE_MESSAGING_SOCKET');
+    expect(host?.ANTHROPIC_API_KEY).toBe('sk-ant-host');
+    expect(host?.PATH).toBe(process.env.PATH);
+    expect(visited).toEqual({ PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-visitor' });
+  });
 });
 
 describe('API errors', () => {
@@ -344,6 +373,106 @@ describe('API errors', () => {
     expect(outcome.text).toBe(answer);
   });
 
+  it('does not blame the API for a turn the CLI carried on past a failed request', async () => {
+    // A response cut off mid-stream is reported, then the CLI asks the model
+    // to carry on and the turn goes on to end for a reason of its own.
+    setScript(async function* () {
+      yield assistant('API Error: Server error mid-response. The response above may be incomplete.', {
+        model: '<synthetic>',
+        error: 'server_error',
+        usage: {},
+      });
+      yield assistant('Picking up where I left off.');
+      yield errorResult('error_max_turns', { errors: ['Reached maximum number of turns (6)'] });
+    });
+
+    const outcome = await runQuery(makeCtx(), { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.subtype).toBe('error_max_turns');
+    expect(outcome.text).toBe('Picking up where I left off.');
+  });
+
+  it('counts a model that ran out of room against the run, never as an API failure', async () => {
+    // What the CLI streams once its own attempts to let the model carry on
+    // have failed: the cut-off text, then its notice dressed as an API error,
+    // then a result whose text is the notice.
+    const notice =
+      "API Error: Claude's response exceeded the 64000 output token maximum. To configure this " +
+      'behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.';
+    setScript(async function* () {
+      yield assistant('The first half of a very long answer', {
+        usage: { input_tokens: 1_000, output_tokens: 64_000 },
+      });
+      yield assistant(notice, { model: '<synthetic>', error: 'max_output_tokens', usage: {} });
+      yield success({ text: notice, isError: true, costUsd: 0.33 });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.text).toBe('The first half of a very long answer');
+    expect(outcome.error).toMatch(/^output limit: Claude's response exceeded the 64000 output token maximum/);
+    expect(outcome.costUsd).toBe(0.33);
+    const spoken = ctx.trace.events.filter((e) => e.kind === 'assistant_text').map((e) => e.text);
+    expect(spoken).toEqual(['The first half of a very long answer']);
+    expect(outcome.modelStop?.reason).toBe('output_limit');
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.modelStop).toEqual({
+      reason: 'output_limit',
+    });
+  });
+
+  it('counts a context that no longer fits against the run, as the terminal reason says', async () => {
+    setScript(async function* () {
+      yield assistant('I have read eleven pages so far.', {
+        usage: { input_tokens: 190_000, output_tokens: 50 },
+      });
+      yield assistant('Prompt is too long', { model: '<synthetic>', error: 'invalid_request', usage: {} });
+      yield success({ text: 'Prompt is too long', isError: true, terminalReason: 'prompt_too_long' });
+    });
+
+    const outcome = await runQuery(makeCtx(), { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.modelStop).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    expect(outcome.error).toBe('context limit: Prompt is too long');
+    expect(outcome.text).toBe('I have read eleven pages so far.');
+  });
+
+  it('counts a refusal against the run, never as an API failure', async () => {
+    const notice =
+      "API Error: Haiku 4.5's safeguards flagged this message (https://www.anthropic.com/legal/aup).";
+    setScript(async function* () {
+      yield {
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'invalid_request',
+        message: {
+          id: 'msg_refusal',
+          model: '<synthetic>',
+          content: [{ type: 'text', text: notice }],
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+          usage: {},
+        },
+      };
+      yield success({ text: notice, isError: true, costUsd: 0.002 });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.modelStop).toMatchObject({ reason: 'refusal', category: 'cyber' });
+    expect(outcome.text).toBe('');
+    expect(outcome.error).toMatch(/^refused: Haiku 4\.5's safeguards flagged this message/);
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.modelStop).toEqual({
+      reason: 'refusal',
+      category: 'cyber',
+    });
+  });
+
   it('does not blame the API for a call the run itself aborted', async () => {
     const parent = new AbortController();
     setScript(async function* (session) {
@@ -379,6 +508,28 @@ describe('cost of calls that never reported one', () => {
     expect(ctx.budget.spentUsd).toBeCloseTo(0.075, 10);
     expect(ctx.budget.usage.inputTokens).toBe(50_000);
     expect(outcome.turns).toBe(1);
+  });
+
+  it('cuts a call off mid-stream at the run’s limit, names the limit and charges the call', async () => {
+    let now = 0;
+    setScript(async function* (session) {
+      yield assistant('working…', { usage: { input_tokens: 10_000, output_tokens: 1_000 } });
+      now = 61_000;
+      yield assistant('still working…', { usage: { input_tokens: 10_000, output_tokens: 1_000 } });
+      await session.untilAborted();
+    });
+    const ctx: RunContext = {
+      ...makeCtx(),
+      budget: new BudgetTracker({ maxCostUsd: 1, maxWallClockMs: 60_000, now: () => now }),
+    };
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.aborted).toBe(true);
+    expect(outcome.subtype).toBe('aborted');
+    expect(outcome.error).toBe('aborted: run wallclock limit reached');
+    expect(outcome.costEstimated).toBe(true);
+    expect(outcome.costUsd).toBeCloseTo(2 * (0.01 + 0.005), 10);
   });
 
   it('charges a crashed call for the tokens it streamed', async () => {
@@ -618,5 +769,117 @@ describe('phase-scoped accounting', () => {
       expect(own.at(-1)?.kind).toBe('phase_end');
       expect(new Set(own.map((e) => e.phase)).size).toBe(1);
     }
+  });
+});
+
+describe('reviewed tool calls', () => {
+  it('holds a call for a reviewer that may make a model call of its own', async () => {
+    setScript(async function* (session) {
+      if (session.prompt === 'review') {
+        // The reviewer reads state, then answers through its schema.
+        const read = await session.callTool('mcp__shop__get_order', { id: 'O-1' });
+        yield toolUse('mcp__shop__get_order', { id: 'O-1' });
+        yield toolResult(read);
+        const verdict = { allow: false };
+        const call = await session.callTool(STRUCTURED_OUTPUT_TOOL, verdict);
+        yield toolUse(STRUCTURED_OUTPUT_TOOL, verdict);
+        yield toolResult(call);
+        yield success({ structured: verdict, costUsd: 0.02 });
+        return;
+      }
+      const refund = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+      yield toolUse('mcp__shop__refund', { id: 'O-1' });
+      yield toolResult(refund);
+      yield assistant(refund.text);
+      yield success({ text: refund.text, costUsd: 0.01 });
+    });
+    const env = makeEnv();
+    const ctx = makeCtx({ env });
+    const reviewed: string[] = [];
+
+    const outcome = await runQuery(ctx, {
+      phase: 'execute',
+      prompt: 'refund O-1',
+      maxBudgetUsd: 0.5,
+      reviewToolCall: async (call, { signal }) => {
+        reviewed.push(call.toolName);
+        const review = await runQuery(
+          { ...ctx, signal: AbortSignal.any([ctx.signal, signal]) },
+          {
+            phase: 'review-1',
+            prompt: 'review',
+            allowedTools: [...env.readOnlyTools],
+            outputSchema: { type: 'object' },
+            depth: 1,
+          },
+        );
+        return (review.structured as { allow?: boolean } | undefined)?.allow === true
+          ? { allow: true }
+          : { allow: false, reason: 'Denied by the reviewer: O-1 was already refunded.' };
+      },
+    });
+
+    // The reviewer's own read went through: it holds the read-only tools.
+    // Its read is not sent for review, because it is a separate call.
+    expect(reviewed).toEqual(['mcp__shop__refund']);
+    expect(env.journal.map((entry) => entry.name)).toEqual(['get_order']);
+    expect(outcome.text).toBe('Denied by the reviewer: O-1 was already refunded.');
+    expect(outcome.deniedToolCalls).toBe(0);
+    expect(ctx.trace.events.some((e) => e.kind === 'tool_denied')).toBe(false);
+    // Both calls are charged to the run.
+    expect(ctx.budget.spentUsd).toBeCloseTo(0.03, 10);
+  });
+});
+
+describe('effort', () => {
+  it('records the effort level the CLI applied, from a tool call or the end of the reply', async () => {
+    setScript(async function* (session) {
+      if (session.prompt === 'act') {
+        const refund = await session.callTool('mcp__shop__refund', { id: 'O-1' });
+        yield toolUse('mcp__shop__refund', { id: 'O-1' });
+        yield toolResult(refund);
+      }
+      yield assistant('Done.');
+      yield success({ text: 'Done.' });
+    });
+    const ctx = { ...makeCtx(), model: 'claude-sonnet-5-5' };
+
+    const acting = await runQuery(ctx, { phase: 'execute', prompt: 'act' });
+    const answering = await runQuery(ctx, { phase: 'answer', prompt: 'answer', allowedTools: [] });
+
+    expect(sessions()[0]!.options.effort).toBe('low');
+    expect(acting.effectiveEffort).toBe('low');
+    expect(answering.effectiveEffort).toBe('low');
+    const ends = ctx.trace.events.filter((e) => e.kind === 'phase_end');
+    expect(ends.map((e) => e.meta?.effectiveEffort)).toEqual(['low', 'low']);
+  });
+
+  it('records that a model without effort support was sent none, whatever was asked', async () => {
+    setScript(async function* () {
+      yield assistant('Done.');
+      yield success({ text: 'Done.' });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(ctx.model).toContain('haiku');
+    expect(ctx.effort).toBe('low');
+    expect(outcome.effectiveEffort).toBeNull();
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.effectiveEffort).toBeNull();
+  });
+
+  it('claims no level for a call that never got a reply to report one', async () => {
+    setScript(async function* () {
+      yield assistant('API Error: 529 Overloaded', { model: '<synthetic>', error: 'overloaded', usage: {} });
+      yield success({ text: 'API Error: 529 Overloaded', isError: true });
+    });
+    const ctx = { ...makeCtx(), model: 'claude-sonnet-5-5' };
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError?.kind).toBe('overloaded');
+    expect(outcome).not.toHaveProperty('effectiveEffort');
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta).not.toHaveProperty('effectiveEffort');
   });
 });

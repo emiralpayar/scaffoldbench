@@ -86,7 +86,7 @@ const strategies: (StrategyInfo & { baseScore: number; costMultiplier: number; s
     subagents: 0,
   },
   {
-    id: 'debate-select',
+    id: 'propose-select',
     label: 'Parallel proposals, select, execute',
     description: 'Three read-only proposers, a selector, then one executor applies the winner.',
     baseScore: 0.71,

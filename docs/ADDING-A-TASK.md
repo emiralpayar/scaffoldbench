@@ -98,7 +98,7 @@ export function createAirlineTools(world: AirlineWorld): JournaledToolSpec[] {
 Five things to get right:
 
 1. **`readOnly: true` on every tool that cannot mutate state.** This is not cosmetic. It is how
-   `debate-select` decides which tools its three parallel proposers may hold, and how
+   `propose-select` decides which tools its three parallel proposers may hold, and how
    `plan-execute-verify` restricts its verifier. Mark a mutating tool read-only and you will let
    three agents trample the same world.
 2. **Return an error reply, never throw.** `{ text: 'Error: …', isError: true }`. Errors are

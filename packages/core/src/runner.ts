@@ -11,9 +11,11 @@ import {
   describeApiError,
   harnessChecks,
   integrityOf,
+  modelStopsOf,
   tracedCalls,
 } from './integrity';
 import { JudgeError, judgeInfoOf } from './judge';
+import { isUsageLimit } from './usageLimit';
 import {
   RESULTS_DIR,
   assertValidRunSetId,
@@ -61,6 +63,9 @@ import type {
   TaskScore,
   TraceEvent,
 } from './types';
+
+/** `RunRecord.effectiveEffort` when the calls behind it reported different levels. */
+export const EFFORT_MIXED = 'mixed';
 
 /** Three attempts, 5 s then 10 s apart (each ± jitter), never more than a minute. */
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
@@ -175,6 +180,7 @@ const STOP_NOTES: Record<RunSetStopReason, string> = {
   drain: 'Stopped on request once the runs in flight had finished.',
   total_budget: 'Stopped early: total budget reached.',
   auth: 'Stopped early: the API rejected the credentials.',
+  usage_limit: "Stopped early: the account's usage limit was reached. Resume the run set once it resets.",
 };
 
 /**
@@ -346,6 +352,13 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
             `The API rejected the credentials (${describeApiError(failure)}). No further runs were ` +
               'started; fix the credentials, then resume the run set.',
           );
+        } else if (failure && isUsageLimit(failure)) {
+          stop(
+            'usage_limit',
+            `The account's usage limit was reached (${describeApiError(failure)})` +
+              `${failure.resetsAt ? `; it resets at ${failure.resetsAt}` : ''}. No further runs were ` +
+              'started; resume the run set once it has reset.',
+          );
         }
         return;
       }
@@ -397,7 +410,11 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
 
   const status: RunSetStatus =
     handedOut >= pending.length && discarded === 0 ? 'complete' : 'interrupted';
-  if (status === 'interrupted' && stoppedBy === undefined) stoppedBy = 'signal';
+  // A drain that a hard stop cut short did not let its runs finish: say what
+  // happened to them, not what was first asked for.
+  if (status === 'interrupted' && (stoppedBy === undefined || (stoppedBy === 'drain' && discarded > 0))) {
+    stoppedBy = 'signal';
+  }
 
   const manifest = manifestNow(status);
   await writeManifest(manifest);
@@ -410,21 +427,37 @@ export async function runMatrix(config: RunnerConfig): Promise<RunnerResult> {
   return { manifest, records: fresh };
 }
 
+/**
+ * Every cell, in matrix order. Refuses a matrix in which two cells would share
+ * a run id — a model, strategy or task listed twice, or two model ids that
+ * read the same once made file-safe — since the second record would silently
+ * replace the first.
+ */
 function buildMatrix(config: RunnerConfig): Cell[] {
   const cells: Cell[] = [];
+  const byRunId = new Map<string, Cell>();
   for (let repeat = 1; repeat <= config.repeats; repeat++) {
     for (const task of config.tasks) {
       for (const model of config.models) {
         for (const strategy of config.strategies) {
           const coordinates = { model, strategyId: strategy.id, taskId: task.id, repeat };
-          cells.push({
+          const cell: Cell = {
             model,
             strategy,
             task,
             repeat,
             key: cellKey(coordinates),
             runId: makeRunId(coordinates),
-          });
+          };
+          const clash = byRunId.get(cell.runId);
+          if (clash) {
+            throw new Error(
+              `Cells ${clash.key} and ${cell.key} would both be recorded as ${cell.runId}: ` +
+                'list each model, strategy and task once.',
+            );
+          }
+          byRunId.set(cell.runId, cell);
+          cells.push(cell);
         }
       }
     }
@@ -598,6 +631,10 @@ async function executeAttempt(
   // Also when the strategy threw: a run that lost a call to the API is an
   // API failure, whatever the strategy did next.
   agentApiError ??= apiErrorsOf(calls, outcome.phases)[0];
+  const modelStops = modelStopsOf(calls);
+  const effectiveEffort = commonEffort(
+    calls.flatMap((call) => (call.end?.effectiveEffort !== undefined ? [call.end.effectiveEffort] : [])),
+  );
   const judgeOutage = judgeCalls > 0 && judgeFailures >= judgeCalls;
   const apiError = agentApiError ?? (judgeOutage ? judgeApiError : undefined);
 
@@ -620,6 +657,7 @@ async function executeAttempt(
     agentApiError,
     judgeOutage,
     checks,
+    modelStop: modelStops.length > 0,
     maxTurns: env ? actingCallOutOfTurns(calls, actingTools(env)) !== undefined : false,
   });
 
@@ -661,6 +699,8 @@ async function executeAttempt(
     finalText: outcome.finalText.slice(0, 20_000),
     ...(verdict.error !== undefined ? { error: verdict.error } : {}),
     ...(apiError ? { apiError } : {}),
+    modelStops,
+    ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
   };
 
   return {
@@ -681,6 +721,8 @@ interface ClassifyInput {
   agentApiError: ApiError | undefined;
   judgeOutage: boolean;
   checks: readonly IntegrityCheck[];
+  /** True when any call ended on a model stop. */
+  modelStop: boolean;
   /** True when a phase acting on the task ran out of turns. */
   maxTurns: boolean;
 }
@@ -688,7 +730,14 @@ interface ClassifyInput {
 /**
  * Settle a run's failure mode, most fundamental cause first: the
  * infrastructure, then the harness, then how the scorer saw the answer, then
- * the run's own limits.
+ * the run's own limits — its ceilings, then a model that could not finish a
+ * turn, then an acting phase out of turns.
+ *
+ * Running out of turns names the failure only in a phase acting on the task:
+ * a planner that runs out of turns has lost its plan, which is a fidelity
+ * problem. A model stop names it wherever it happened, because that a model
+ * refused or overflowed is worth knowing in any phase: how often each
+ * architecture provokes one is part of what it costs.
  */
 function classify(input: ClassifyInput): { score: TaskScore; error?: string } {
   const unscored = (failureMode: FailureMode, metadata: Record<string, unknown> = {}): TaskScore => ({
@@ -741,6 +790,7 @@ function classify(input: ClassifyInput): { score: TaskScore; error?: string } {
 
   const runtime = runtimeFailure(input.stoppedBy);
   if (runtime) return { score: { ...score, failureMode: runtime } };
+  if (input.modelStop) return { score: { ...score, failureMode: 'model_stop' } };
   if (input.maxTurns) return { score: { ...score, failureMode: 'max_turns' } };
   return { score };
 }
@@ -759,6 +809,14 @@ function runtimeFailure(stoppedBy: BudgetStopReason | undefined): FailureMode | 
 function actingTools(env: TaskEnvironment): string[] {
   const mutating = env.allowedTools.filter((tool) => !env.readOnlyTools.includes(tool));
   return mutating.length > 0 ? mutating : env.allowedTools;
+}
+
+/**
+ * The one effort level several reports share, `EFFORT_MIXED` when they
+ * differ, or undefined when there are none.
+ */
+function commonEffort(levels: readonly (string | null)[]): string | null | undefined {
+  return levels.every((level) => level === levels[0]) ? levels[0] : EFFORT_MIXED;
 }
 
 /** A strategy's fidelity checks, with a check of its own when they throw. */
@@ -1022,6 +1080,7 @@ function buildManifest(input: ManifestInput): RunSetManifest {
     model: config.models.join(', '),
     models: [...config.models],
     effort: config.effort,
+    effectiveEffort: effortByModel(config.models, [...recorded.values()]),
     repeats: config.repeats,
     fixtureMode: config.fixtureMode,
     strategyIds: config.strategies.map((s) => s.id),
@@ -1060,6 +1119,20 @@ function sessionOf(manifest: RunSetManifest): ManifestSession {
     ...(manifest.concurrency !== undefined ? { concurrency: manifest.concurrency } : {}),
     ...(manifest.provenance ? { provenance: manifest.provenance } : {}),
   };
+}
+
+/** `RunSetManifest.effectiveEffort`: each model's level, from the records that report one. */
+function effortByModel(models: readonly string[], records: readonly RunRecord[]): Record<string, string | null> {
+  const byModel: Record<string, string | null> = {};
+  for (const model of models) {
+    const level = commonEffort(
+      records.flatMap((record) =>
+        record.model === model && record.effectiveEffort !== undefined ? [record.effectiveEffort] : [],
+      ),
+    );
+    if (level !== undefined) byModel[model] = level;
+  }
+  return byModel;
 }
 
 async function writeCatalog(config: RunnerConfig, resultsRoot: string): Promise<void> {

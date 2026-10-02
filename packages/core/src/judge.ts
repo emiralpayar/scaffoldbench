@@ -14,11 +14,12 @@ import type {
 } from './types';
 
 /**
- * Grading effort when none is given. Pinned rather than left to the SDK, whose
- * default differs by model, so the judge behaves and costs the same whatever
- * model it runs on. Medium rather than low: rubric grading is reading an
- * answer against a short list of claims, but no calibration run has yet shown
- * that a lower setting grades as well.
+ * Grading effort when neither the judge's options nor the request name one.
+ * Pinned rather than left to the SDK, whose default differs by model, so the
+ * judge behaves and costs the same whatever model it runs on. Medium rather
+ * than low: rubric grading is reading an answer against a short list of
+ * claims, but a lower setting should be shown to grade as well before it is
+ * used. A task that has shown it can ask for it (`JudgeRequest.effort`).
  */
 export const DEFAULT_JUDGE_EFFORT: EffortLevel = 'medium';
 
@@ -33,6 +34,7 @@ export interface JudgeOptions {
    */
   onCost?: (usd: number) => void;
   maxBudgetUsd?: number;
+  /** Default grading effort; a request's own `effort` takes precedence. */
   effort?: EffortLevel;
   /**
    * Environment for the judge's subprocess. A per-call `env` (which the
@@ -97,16 +99,15 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
     if (call.signal?.aborted) controller.abort();
     call.signal?.addEventListener('abort', onAbort, { once: true });
 
-    const env = call.env ?? options.env;
     const meter = new CallMeter(options.model);
 
     try {
       for await (const message of query({
         prompt: req.prompt,
         options: {
-          ...hermeticOptions(),
+          ...hermeticOptions(call.env ?? options.env),
           model: options.model,
-          effort,
+          effort: req.effort ?? effort,
           systemPrompt: req.system,
           // No built-in tools and no MCP servers: the judge reads and answers.
           // The structured-output tool is how it answers.
@@ -118,7 +119,6 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
           maxBudgetUsd: options.maxBudgetUsd ?? 0.5,
           outputFormat: { type: 'json_schema', schema: req.schema },
           abortController: controller,
-          ...(env ? { env } : {}),
         },
       }) as AsyncIterable<SDKMessage>) {
         meter.observe(message);
@@ -153,7 +153,12 @@ export function createJudge(options: JudgeOptions): DescribedJudge {
 
     const value = report.structured ?? parseLooseJson(report.text);
     if (value === undefined || value === null) {
-      throw new JudgeError('judge returned no parsable structured output', { costUsd });
+      // A grader that ran out of room or refused gave no verdict either, but
+      // say which: it is not a malformed reply, and not an API failure.
+      const why = report.modelStop
+        ? `judge could not finish (${report.modelStop.reason}): ${report.modelStop.message}`
+        : 'judge returned no parsable structured output';
+      throw new JudgeError(why, { costUsd });
     }
     return { value: value as T, costUsd };
   };

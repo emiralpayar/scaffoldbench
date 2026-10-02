@@ -130,6 +130,7 @@ function phaseOf(outcome: QueryOutcome, phase: string): PhaseRecord {
     subtype: outcome.subtype,
     ...(outcome.error ? { error: outcome.error } : {}),
     ...(outcome.apiError ? { apiError: outcome.apiError } : {}),
+    ...(outcome.modelStop ? { modelStop: outcome.modelStop } : {}),
     ...(outcome.costEstimated ? { costEstimated: true } : {}),
     ...(outcome.structuredMissing ? { structuredMissing: true } : {}),
   };
@@ -194,6 +195,25 @@ async function* answersInProse() {
   await sleep(10);
   yield assistant('Look up the order, then refund it.');
   yield success({ text: 'Look up the order, then refund it.', costUsd: 0.01 });
+}
+
+/** The model's side of a session its safeguards ended: the CLI's notice, then an error result. */
+async function* refuses() {
+  const notice = "API Error: Haiku 4.5's safeguards flagged this message.";
+  yield {
+    type: 'assistant',
+    parent_tool_use_id: null,
+    error: 'invalid_request',
+    message: {
+      id: 'msg_refusal',
+      model: '<synthetic>',
+      content: [{ type: 'text', text: notice }],
+      stop_reason: 'refusal',
+      stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+      usage: {},
+    },
+  };
+  yield success({ text: notice, isError: true, costUsd: 0.002 });
 }
 
 function apiFailure(code: string, text: string) {
@@ -359,6 +379,60 @@ describe('failure modes through the real call path', () => {
     expect(record.integrity?.ok).toBe(true);
   });
 
+  it('does not call a turn the model could not finish a harness failure, whatever the result says', async () => {
+    // The CLI can end a turn it gave up on with an execution-error result.
+    const notice = "The model's tool call could not be parsed (retry also failed).";
+    setScript(async function* () {
+      yield assistant('Let me refund it.');
+      yield assistant(notice, { model: '<synthetic>', usage: {} });
+      yield errorResult('error_during_execution', {
+        errors: [notice],
+        terminalReason: 'malformed_tool_use_exhausted',
+      });
+    });
+
+    const record = await onlyRecord();
+
+    expect(record.failureMode).toBe('model_stop');
+    expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([{ phase: 'main', callId: 'call-1', reason: 'malformed_tool_use' }]);
+  });
+
+  it('calls a run its model refused model_stop, never an API failure, and still ranks it', async () => {
+    setScript(refuses);
+
+    const record = await onlyRecord();
+
+    expect(record).toMatchObject({ failureMode: 'model_stop', attempts: 1, passed: false });
+    expect(record.apiError).toBeUndefined();
+    expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([
+      { phase: 'main', callId: 'call-1', reason: 'refusal', category: 'cyber' },
+    ]);
+    expect(record.phases[0]?.modelStop).toMatchObject({ reason: 'refusal', category: 'cyber' });
+    expect(record.phases[0]?.error).toMatch(/^refused: Haiku 4\.5's safeguards/);
+  });
+
+  it('keeps a model stop on the record of a run that passed anyway', async () => {
+    let proposals = 0;
+    setScript((session) =>
+      session.prompt !== 'PROPOSE' ? solves(session) : ++proposals === 1 ? refuses() : answersInProse(),
+    );
+
+    const record = await onlyRecord({ strategies: [proposeThenAct] });
+
+    expect(record).toMatchObject({ passed: true, failureMode: 'none' });
+    expect(record.integrity?.ok).toBe(true);
+    expect(record.modelStops).toEqual([
+      { phase: 'propose-1', callId: 'call-1', reason: 'refusal', category: 'cyber' },
+    ]);
+  });
+
+  it('records no model stops when every call finished its turn', async () => {
+    setScript(solves);
+    expect((await onlyRecord()).modelStops).toEqual([]);
+  });
+
   it('times out a run that would not finish, and charges what it streamed', async () => {
     setScript(async function* (session) {
       yield assistant('Looking into it.', { usage: { input_tokens: 50_000, output_tokens: 5_000 } });
@@ -414,5 +488,55 @@ describe('API failures through the real call path', () => {
     expect(records[0]?.apiError?.kind).toBe('auth');
     expect(events.find((e) => e.type === 'stop')).toMatchObject({ reason: 'auth' });
     expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'auth' });
+  });
+
+  it('stops the whole matrix, without retrying, when the account’s usage limit is spent', async () => {
+    const text = 'You\'ve hit your session limit · resets 6am (Europe/Istanbul)';
+    let sessionCount = 0;
+    setScript(async function* () {
+      sessionCount += 1;
+      yield {
+        type: 'rate_limit_event',
+        rate_limit_info: { status: 'rejected', resetsAt: 1790931600, rateLimitType: 'five_hour' },
+      };
+      yield assistant(text, { model: '<synthetic>', error: 'rate_limit', usage: {} });
+      yield success({ text, isError: true, apiErrorStatus: 429, costUsd: 0 });
+    });
+    const events: RunnerEvent[] = [];
+
+    const { records, manifest } = await runMatrix(
+      config({ repeats: 3, onEvent: (event) => events.push(event) }),
+    );
+
+    // One doomed call, not three attempts at each of three cells.
+    expect(sessionCount).toBe(1);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ failureMode: 'api_error', attempts: 1 });
+    expect(records[0]?.apiError).toMatchObject({
+      kind: 'rate_limit',
+      retryable: false,
+      status: 429,
+      resetsAt: '2026-10-02T09:00:00.000Z',
+    });
+    expect(events.find((e) => e.type === 'stop')).toMatchObject({ reason: 'usage_limit' });
+    expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'usage_limit' });
+    expect(manifest.notes).toMatch(/usage limit/);
+  });
+});
+
+describe('effort through the real call path', () => {
+  it('records the effort each model actually ran at, not only the one asked for', async () => {
+    setScript(solves);
+    const sonnet = 'claude-sonnet-5-5';
+
+    const { records, manifest } = await runMatrix(config({ models: [MODEL, sonnet], effort: 'low' }));
+
+    // Haiku 4.5 takes no effort parameter, so asking for 'low' sent none.
+    expect(records.map((r) => [r.model, r.effort, r.effectiveEffort])).toEqual([
+      [MODEL, 'low', null],
+      [sonnet, 'low', 'low'],
+    ]);
+    expect(manifest.effort).toBe('low');
+    expect(manifest.effectiveEffort).toEqual({ [MODEL]: null, [sonnet]: 'low' });
   });
 });

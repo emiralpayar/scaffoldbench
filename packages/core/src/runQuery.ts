@@ -1,17 +1,19 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { apiErrorOfAssistant, assistantText } from './apiErrors';
+import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { MODEL_STOP_LABELS, assistantText, isSyntheticAssistant } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
+import type { ToolCallReviewer } from './guard';
 import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
 import { CallMeter } from './meter';
-import { normalizeSdkMessage } from './trace';
+import { modelStopMeta, normalizeSdkMessage } from './trace';
 import type {
-  AgentDefinition,
   ApiError,
+  BudgetStopReason,
   McpServerConfig,
   McpServerStatus,
   ModelSpend,
+  ModelStop,
   RunContext,
   TraceSink,
   UsageTotals,
@@ -55,7 +57,6 @@ export interface QuerySpec {
    * its siblings are skipped rather than handed money the run does not have.
    */
   maxBudgetUsd?: number;
-  agents?: Record<string, AgentDefinition>;
   /**
    * JSON Schema. When set, the reply is parsed into `structured`, the
    * `StructuredOutput` tool is allowed, and the call gets at least
@@ -65,6 +66,13 @@ export interface QuerySpec {
   model?: string;
   depth?: number;
   agentLabel?: string;
+  /**
+   * Review each permitted tool call before it runs (see `ToolCallReviewer`).
+   * A denial reaches the model as the tool's result, so it can adapt. The
+   * reviewer may make model calls of its own through `runQuery`; they are
+   * separate calls, traced and charged to the run like any other.
+   */
+  reviewToolCall?: ToolCallReviewer;
 }
 
 export interface QueryOutcome {
@@ -111,6 +119,19 @@ export interface QueryOutcome {
    * a failure that is not the architecture's.
    */
   apiError?: ApiError;
+  /**
+   * Set when the turn ended because the model could not finish it: it ran
+   * out of output tokens or context, or its safeguards refused. Never with
+   * `apiError`: this is the run's own outcome, and it counts against it.
+   */
+  modelStop?: ModelStop;
+  /**
+   * The effort level the CLI reported applying to this call's turns, after
+   * any silent downgrade for the model: `null` when it sent no effort
+   * parameter (a model without effort support), absent when the call ended
+   * before a tool call or a finished reply could report it. See `watchEffort`.
+   */
+  effectiveEffort?: string | null;
   /** Names of the MCP servers this call was given. */
   mcpServersExpected: string[];
   /** MCP servers as the session reported them at start-up; empty if it never got that far. */
@@ -209,8 +230,9 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const requestedTurns = spec.maxTurns ?? ctx.task.maxTurns;
 
   let deniedToolCalls = 0;
+  const appliedEffort = watchEffort();
   const options: Options = {
-    ...hermeticOptions(),
+    ...hermeticOptions(ctx.subprocessEnv),
     model: spec.model ?? ctx.model,
     effort: ctx.effort,
     systemPrompt: spec.systemPrompt ?? ctx.systemPrompt,
@@ -219,7 +241,9 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     // are the whole toolset — so it holds only the harness's structured-output
     // tool when a schema needs it. Left unset, the session would load its
     // agent tools (Task, Skill, ToolSearch, …), which vary by host and would
-    // make two runs of the same task incomparable.
+    // make two runs of the same task incomparable. Without the Agent tool the
+    // SDK's own subagents are out too: an architecture's sub-agents are its
+    // own `runQuery` calls (`depth` > 0), each traced and charged like any other.
     tools: [...harnessTools],
     allowedTools: [...permitted],
     disallowedTools: [...SANDBOX_DENYLIST],
@@ -230,29 +254,34 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     abortController: controller,
     includePartialMessages: false,
     hooks: {
-      PreToolUse: createSandboxGuard({
-        allowedTools: permitted,
-        trace: ctx.trace,
-        phase: spec.phase,
-        depth,
-        ...(spec.agentLabel !== undefined ? { agent: spec.agentLabel } : {}),
-        callId,
-        onDenied: () => {
-          deniedToolCalls += 1;
-        },
-      }),
+      PreToolUse: [
+        ...createSandboxGuard({
+          allowedTools: permitted,
+          trace: ctx.trace,
+          phase: spec.phase,
+          depth,
+          ...(spec.agentLabel !== undefined ? { agent: spec.agentLabel } : {}),
+          callId,
+          onDenied: () => {
+            deniedToolCalls += 1;
+          },
+          ...(spec.reviewToolCall ? { review: spec.reviewToolCall } : {}),
+        }),
+        appliedEffort.matcher,
+      ],
+      Stop: [appliedEffort.matcher],
     },
-    ...(ctx.subprocessEnv ? { env: ctx.subprocessEnv } : {}),
-    ...(spec.agents ? { agents: spec.agents } : {}),
     ...(schema ? { outputFormat: { type: 'json_schema' as const, schema } } : {}),
   };
 
   const meter = new CallMeter(options.model ?? ctx.model);
   let toolCalls = 0;
   // This call's own last words, for when the turn is cut short. Tracked here
-  // rather than read back from the trace, which concurrent siblings share.
+  // rather than read back from the trace, which concurrent siblings share,
+  // and only ever the model's: never text the CLI wrote in its place.
   let lastText = '';
-  let stoppedForBudget = false;
+  // Which of the run's limits made us abort the call mid-stream, if one did.
+  let stoppedBy: BudgetStopReason | undefined;
   let crashed = false;
 
   try {
@@ -261,7 +290,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       if (
         message.type === 'assistant' &&
         message.parent_tool_use_id == null &&
-        apiErrorOfAssistant(message) === undefined
+        !isSyntheticAssistant(message)
       ) {
         const said = assistantText(message);
         if (said.trim() !== '') lastText = said;
@@ -273,7 +302,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
 
       // Stop as soon as the run-level ceiling is hit, even mid-stream.
       if (message.type !== 'result' && ctx.budget.exceeded && !controller.signal.aborted) {
-        stoppedForBudget = true;
+        stoppedBy = ctx.budget.stopReason;
         controller.abort();
       }
     }
@@ -320,14 +349,17 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const error = apiError
     ? `API error (${apiError.kind}${apiError.status !== undefined ? ` ${apiError.status}` : ''}): ${apiError.message}`
     : aborted
-      ? `aborted: ${stoppedForBudget ? 'run budget exhausted' : 'run aborted'}`
-      : report.subtype !== undefined && report.subtype !== 'success'
-        ? report.errors.join('; ') || report.subtype
-        : undefined;
+      ? `aborted: ${stoppedBy ? `run ${stoppedBy} limit reached` : 'run aborted'}`
+      : report.modelStop !== undefined
+        ? `${MODEL_STOP_LABELS[report.modelStop.reason]}: ${report.modelStop.message}`
+        : report.subtype !== undefined && report.subtype !== 'success'
+          ? report.errors.join('; ') || report.subtype
+          : undefined;
 
   lease.settle({ costUsd: report.costUsd, turns: report.turns, usage: report.usage });
 
   const structuredMissing = schema !== undefined && (structured === undefined || structured === null);
+  const effectiveEffort = appliedEffort.level();
   const mcpServersExpected = Object.keys(mcpServers);
   const durationMs = Date.now() - startedAtMs;
 
@@ -350,6 +382,8 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       ...(report.unpricedModels.length > 0 ? { unpricedModels: report.unpricedModels } : {}),
       ...(structuredMissing ? { structuredMissing: true } : {}),
       ...(apiError ? { apiError } : {}),
+      ...(report.modelStop ? { modelStop: modelStopMeta(report.modelStop) } : {}),
+      ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
       costByModel: Object.fromEntries(
         Object.entries(report.byModel).map(([model, spend]) => [model, spend.costUsd]),
       ),
@@ -374,10 +408,39 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     subtype,
     ...(error !== undefined ? { error } : {}),
     ...(apiError ? { apiError } : {}),
+    ...(report.modelStop ? { modelStop: report.modelStop } : {}),
+    ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
     mcpServersExpected,
     mcpServers: report.mcpServers,
     startedAtMs,
     durationMs,
+  };
+}
+
+/**
+ * Watches the effort level the CLI actually applies to a call.
+ *
+ * `effort` is a request. The CLI silently drops it for a model without effort
+ * support — Haiku 4.5 is sent none, whatever was asked — and caps it where the
+ * model or the account says so. Neither the init message nor the result says
+ * which level it settled on; only hooks that fire inside a turn are told:
+ * `PreToolUse` before each tool call, `Stop` when the reply ends. So these two
+ * hooks are how a record can say what effort its model really ran at.
+ */
+function watchEffort(): { matcher: HookCallbackMatcher; level(): string | null | undefined } {
+  let level: string | null | undefined;
+  return {
+    matcher: {
+      hooks: [
+        async (input: HookInput) => {
+          const applied = input.effort?.level;
+          // A hook told no level means none was sent; a level once told is the call's.
+          level = typeof applied === 'string' ? applied : (level ?? null);
+          return {};
+        },
+      ],
+    },
+    level: () => level,
   };
 }
 

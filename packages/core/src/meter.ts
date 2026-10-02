@@ -4,14 +4,18 @@ import {
   apiErrorOfAssistant,
   classifyFailureText,
   isApiErrorText,
+  isSyntheticAssistant,
   kindFromStatus,
   makeApiError,
+  modelStopOfAssistant,
+  modelStopOfResult,
   recognizeFailureText,
 } from './apiErrors';
 import { emptyUsage } from './budget';
+import { asUsageLimit, observeRateLimit, type RateLimitState } from './usageLimit';
 import { estimateCostUsd, type PricedUsage } from './pricing';
 import { usageFrom } from './trace';
-import type { ApiError, McpServerStatus, ModelSpend, UsageTotals } from './types';
+import type { ApiError, McpServerStatus, ModelSpend, ModelStop, UsageTotals } from './types';
 
 /** Everything one `query()` call said about itself, read from its own message stream. */
 export interface CallReport {
@@ -42,6 +46,12 @@ export interface CallReport {
   /** Per-model breakdown, including the SDK's own helper-model calls when it reports them. */
   byModel: Record<string, ModelSpend>;
   apiError?: ApiError;
+  /**
+   * Set when the turn ended because the model could not finish it — out of
+   * room, or a refusal. The run's own limit, so it never comes with an
+   * `apiError`, though the result looks like one.
+   */
+  modelStop?: ModelStop;
   /** MCP servers as the session's init message listed them. */
   mcpServers: McpServerStatus[];
 }
@@ -68,7 +78,10 @@ export class CallMeter {
   #anonymous = 0;
   #assistantError: ApiError | undefined;
   #thrown: ApiError | undefined;
+  /** The CLI's model-stop notice, while it is the last thing the main thread said. */
+  #modelStop: ModelStop | undefined;
   #mcpServers: McpServerStatus[] = [];
+  #rateLimit: RateLimitState = { rejected: false };
 
   constructor(defaultModel: string) {
     this.#defaultModel = defaultModel;
@@ -90,6 +103,9 @@ export class CallMeter {
       case 'result':
         this.#result = message;
         break;
+      case 'rate_limit_event':
+        this.#rateLimit = observeRateLimit(this.#rateLimit, message);
+        break;
       default:
         break;
     }
@@ -107,14 +123,27 @@ export class CallMeter {
       result?.subtype === 'success' && result.is_error !== true && !isApiErrorText(result.result);
     const cost = this.#cost(result);
 
+    // A turn the CLI ended on a model stop reports itself the way an API
+    // failure does — `is_error`, the notice as its text — but is not one.
+    // Its last notice says which and why; the terminal reason, when the
+    // notice was not recognised, says which.
+    const modelStop = success
+      ? undefined
+      : (this.#modelStop ?? (result ? modelStopOfResult(result) : undefined));
+
     let apiError: ApiError | undefined;
-    if (!success) {
+    if (modelStop !== undefined) {
+      // Only a crash after the notice is the infrastructure's.
+      apiError = this.#thrown;
+    } else if (!success) {
       const fromResult = resultApiError(result);
       apiError = this.#assistantError ?? fromResult ?? this.#thrown;
       // The assistant message names the failure; the result may add its status.
       if (apiError && apiError.status === undefined && fromResult?.status !== undefined) {
         apiError = { ...apiError, status: fromResult.status };
       }
+      // A spent usage limit will not lift within a retry's wait.
+      if (apiError) apiError = asUsageLimit(apiError, this.#rateLimit);
     }
 
     return {
@@ -126,13 +155,22 @@ export class CallMeter {
       turns: result?.num_turns ?? this.#streamedTurns(),
       ...cost,
       ...(apiError ? { apiError } : {}),
+      ...(modelStop !== undefined && apiError === undefined ? { modelStop } : {}),
       mcpServers: this.#mcpServers,
     };
   }
 
   #observeAssistant(message: Extract<SDKMessage, { type: 'assistant' }>): void {
     const apiError = apiErrorOfAssistant(message);
-    if (apiError) this.#assistantError = apiError;
+    if (apiError) {
+      this.#assistantError = apiError;
+    } else if (message.parent_tool_use_id == null && !isSyntheticAssistant(message)) {
+      // The model spoke after the failure: the CLI carried the turn on past
+      // it (it asks the model to resume a response cut off mid-stream), so
+      // the failure is not what ended the turn.
+      this.#assistantError = undefined;
+    }
+    if (message.parent_tool_use_id == null) this.#modelStop = modelStopOfAssistant(message);
 
     const body = message.message as { id?: unknown; model?: unknown; usage?: unknown } | undefined;
     const model = typeof body?.model === 'string' ? body.model : this.#defaultModel;

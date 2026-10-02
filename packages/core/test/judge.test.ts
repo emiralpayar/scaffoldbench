@@ -53,7 +53,40 @@ describe('createJudge', () => {
     expect(options.settingSources).toEqual([]);
     expect(options.effort).toBe(DEFAULT_JUDGE_EFFORT);
     expect(options.abortController).toBeInstanceOf(AbortController);
-    expect(options.env).toBeUndefined();
+    expect(options.env?.PATH).toBe(process.env.PATH);
+  });
+
+  it('grades outside any Claude Code session the benchmark may run inside', async () => {
+    vi.stubEnv('CLAUDECODE', '1');
+    vi.stubEnv('CLAUDE_CODE_MESSAGING_SOCKET', '/tmp/host.sock');
+    setScript(async function* () {
+      yield success({ structured: { met: true } });
+    });
+
+    try {
+      await createJudge({ model: MODEL })(REQUEST);
+      await createJudge({ model: MODEL })(REQUEST, { env: { PATH: '/usr/bin', CLAUDECODE: '1' } });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const [own, given] = sessions().map((s) => s.options.env ?? {});
+    expect(own).not.toHaveProperty('CLAUDECODE');
+    expect(own).not.toHaveProperty('CLAUDE_CODE_MESSAGING_SOCKET');
+    expect(given).toEqual({ PATH: '/usr/bin' });
+  });
+
+  it('grades at the effort a request names, and at its own otherwise', async () => {
+    setScript(async function* () {
+      yield success({ structured: { met: true } });
+    });
+    const judge = createJudge({ model: MODEL, effort: 'high' });
+
+    await judge(REQUEST);
+    await judge({ ...REQUEST, effort: 'low' });
+
+    expect(sessions().map((s) => s.options.effort)).toEqual(['high', 'low']);
+    expect(judge.info.effort).toBe('high');
   });
 
   it('runs on the environment it is given, and a per-call one wins', async () => {
@@ -101,6 +134,33 @@ describe('createJudge', () => {
     expect(error).toBeInstanceOf(JudgeError);
     expect(error.apiError?.kind).toBe('overloaded');
     expect(error.costUsd).toBe(0.003);
+  });
+
+  it('says when the grader refused rather than failing at the API', async () => {
+    const notice = "API Error: Haiku 4.5's safeguards flagged this message.";
+    setScript(async function* () {
+      yield {
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'invalid_request',
+        message: {
+          id: 'msg_refusal',
+          model: '<synthetic>',
+          content: [{ type: 'text', text: notice }],
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+          usage: {},
+        },
+      };
+      yield success({ text: notice, isError: true, costUsd: 0.001 });
+    });
+
+    const error = (await createJudge({ model: MODEL })(REQUEST).catch((e: unknown) => e)) as JudgeError;
+
+    expect(error).toBeInstanceOf(JudgeError);
+    expect(error.apiError).toBeUndefined();
+    expect(error.message).toMatch(/^judge could not finish \(refusal\): Haiku 4\.5's safeguards/);
+    expect(error.costUsd).toBe(0.001);
   });
 
   it('distinguishes a reply it cannot parse from an outage', async () => {

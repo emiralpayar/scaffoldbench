@@ -10,12 +10,14 @@
  *
  * The checks look for the harness failing the architecture, not for the
  * architecture failing the task. A phase that runs out of turns, budget or
- * time has failed on its own terms; the run is a valid, losing data point,
- * and excluding it would flatter exactly the architectures that fail that
- * way. A phase that crashed, lost its tool server, had a harness tool denied
- * or never got its structured reply has not been measured at all.
+ * time, or whose model could not finish its turn (a model stop: out of room,
+ * or a refusal), has failed on its own terms; the run is a valid, losing data
+ * point, and excluding it would flatter exactly the architectures that fail
+ * that way. A phase that crashed, lost its tool server, had a harness tool
+ * denied or never got its structured reply has not been measured at all.
  */
 
+import { MODEL_STOP_LABELS } from './apiErrors';
 import { matchesToolList } from './guard';
 import { STRUCTURED_OUTPUT_TOOL } from './hermetic';
 import type {
@@ -23,7 +25,9 @@ import type {
   Integrity,
   IntegrityCheck,
   McpServerStatus,
+  ModelStop,
   PhaseRecord,
+  RunModelStop,
   TraceEvent,
 } from './types';
 
@@ -33,7 +37,10 @@ export const HARNESS_CHECK = {
   runCompleted: 'harness.run-completed',
   /** No model call failed at the API. */
   api: 'harness.api',
-  /** Every call ended with a result, or was stopped by the run's own limits. */
+  /**
+   * Every call ended with a result, was stopped by the run's own limits, or
+   * ended on a model stop, whatever result subtype the CLI gave that.
+   */
   callsEnded: 'harness.calls-ended',
   /** The guard never denied a harness tool, nor a tool the session itself offered. */
   harnessTools: 'harness.harness-tools',
@@ -41,7 +48,16 @@ export const HARNESS_CHECK = {
   mcpConnected: 'harness.mcp-connected',
   /** No call loaded an MCP server the harness did not give it. */
   mcpHermetic: 'harness.mcp-hermetic',
-  /** Every call that asked for structured output and ran to the end got it. */
+  /**
+   * No call was offered one of Claude Code's own tools: a session's whole
+   * surface was its task tools and, for a schema call, the structured-output
+   * tool.
+   */
+  builtinTools: 'harness.builtin-tools',
+  /**
+   * Every call that asked for structured output and ran to the end got it, or
+   * its strategy asked again and the retry got it (`PhaseRecord.retriedBy`).
+   */
   structuredOutput: 'harness.structured-output',
   /** No phase fell back on a default instead of its output (`PhaseRecord.degraded`). */
   notDegraded: 'harness.not-degraded',
@@ -88,9 +104,13 @@ export interface TracedCall {
   end?: {
     subtype: string | undefined;
     apiError?: ApiError;
+    /** Set when the turn ended because the model could not finish it; see `QueryOutcome.modelStop`. */
+    modelStop?: Pick<ModelStop, 'reason' | 'category'>;
     structuredMissing: boolean;
     /** The MCP servers the harness gave the call. Absent in traces older than per-call servers. */
     mcpServersExpected?: string[];
+    /** The effort level the call reported running at; see `QueryOutcome.effectiveEffort`. */
+    effectiveEffort?: string | null;
   };
   /** Tools the sandbox guard refused, in order. */
   deniedTools: string[];
@@ -151,12 +171,17 @@ export function tracedCalls(
         break;
       case 'phase_end': {
         const apiError = asApiError(meta.apiError);
+        const modelStop = asModelStop(meta.modelStop);
         call.end = {
           subtype: typeof meta.subtype === 'string' ? meta.subtype : undefined,
           ...(apiError ? { apiError } : {}),
+          ...(modelStop ? { modelStop } : {}),
           structuredMissing: meta.structuredMissing === true,
           ...(Array.isArray(meta.mcpServersExpected)
             ? { mcpServersExpected: stringArray(meta.mcpServersExpected) }
+            : {}),
+          ...(typeof meta.effectiveEffort === 'string' || meta.effectiveEffort === null
+            ? { effectiveEffort: meta.effectiveEffort }
             : {}),
         };
         break;
@@ -205,7 +230,9 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
     HARNESS_CHECK.callsEnded,
     calls.flatMap((call) => {
       if (!call.end) return [`${where(call)} never finished`];
-      if (call.end.apiError) return [];
+      // The API check's business; and a model stop is the model's own ending,
+      // which the CLI reports as an error result as often as a successful one.
+      if (call.end.apiError || call.end.modelStop) return [];
       const subtype = call.end.subtype ?? 'unknown';
       return CLEAN_ENDINGS.has(subtype) ? [] : [`${where(call)} ended ${subtype}`];
     }),
@@ -255,13 +282,39 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
     ),
   );
 
+  // `runQuery` pins the built-in toolset to the harness's own tool, so an
+  // agent's tools are its task's. Were the CLI to start offering its own
+  // anyway — an Agent tool, a shell — every architecture's prompt would
+  // change and its agents could work outside the harness, unseen unless one
+  // happened to call such a tool and be denied. So the offer itself is checked.
+  add(
+    HARNESS_CHECK.builtinTools,
+    calls.flatMap((call) => {
+      const builtin = (call.init?.tools ?? []).filter(
+        (tool) => !tool.startsWith('mcp__') && tool !== STRUCTURED_OUTPUT_TOOL,
+      );
+      return builtin.length > 0 ? [`${where(call)} was offered ${builtin.join(', ')}`] : [];
+    }),
+  );
+
+  // A miss the strategy asked again about is judged by the retry, which is a
+  // schema call of its own and checked here like any other.
+  const retried = new Set(
+    input.phases.flatMap((phase) =>
+      phase.retriedBy !== undefined && phase.callId !== undefined ? [phase.callId] : [],
+    ),
+  );
   add(
     HARNESS_CHECK.structuredOutput,
     calls.flatMap((call) => {
       const end = call.end;
       if (!end?.structuredMissing || end.apiError) return [];
       if (end.subtype !== undefined && CUT_SHORT.has(end.subtype)) return [];
-      return [`${where(call)} returned no structured output (${end.subtype ?? 'no result'})`];
+      if (retried.has(call.callId)) return [];
+      // A model stop does not excuse the miss: the architecture still lacks
+      // the reply it is built on. It does say better than the subtype why.
+      const why = end.modelStop ? MODEL_STOP_LABELS[end.modelStop.reason] : (end.subtype ?? 'no result');
+      return [`${where(call)} returned no structured output (${why})`];
     }),
   );
 
@@ -302,6 +355,13 @@ export function actingCallOutOfTurns(
     (call) =>
       call.end?.subtype === 'error_max_turns' &&
       (call.init?.tools ?? []).some((tool) => matchesToolList(tool, actingTools)),
+  );
+}
+
+/** Every call that ended on a model stop, in start order: `RunRecord.modelStops`. */
+export function modelStopsOf(calls: readonly TracedCall[]): RunModelStop[] {
+  return calls.flatMap((call) =>
+    call.end?.modelStop ? [{ phase: call.phase, callId: call.callId, ...call.end.modelStop }] : [],
   );
 }
 
@@ -355,6 +415,16 @@ function serverStatuses(value: unknown): McpServerStatus[] {
   });
 }
 
+function asModelStop(value: unknown): Pick<ModelStop, 'reason' | 'category'> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { reason, category } = value as { reason?: unknown; category?: unknown };
+  if (typeof reason !== 'string' || !Object.hasOwn(MODEL_STOP_LABELS, reason)) return undefined;
+  return {
+    reason: reason as ModelStop['reason'],
+    ...(typeof category === 'string' ? { category } : {}),
+  };
+}
+
 function asApiError(value: unknown): ApiError | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const e = value as Partial<ApiError>;
@@ -364,5 +434,6 @@ function asApiError(value: unknown): ApiError | undefined {
     retryable: e.retryable === true,
     message: e.message,
     ...(typeof e.status === 'number' ? { status: e.status } : {}),
+    ...(typeof e.resetsAt === 'string' ? { resetsAt: e.resetsAt } : {}),
   };
 }

@@ -14,6 +14,11 @@
  *    connected server's tools as listed over MCP.
  *  - Tool calls go through the session's `PreToolUse` hooks first (the
  *    sandbox guard), then to the owning server's real handler.
+ *  - A reply that ends the turn (a `success` result that is not an error)
+ *    goes through the session's `Stop` hooks first.
+ *  - Hooks are told the effort level applied as the CLI tells them: the
+ *    requested `effort`, except for a Haiku model, which is sent none, so
+ *    its hook inputs carry no `effort` at all.
  *  - Aborting the session's controller ends the stream with an error.
  *
  * Install it with `vi.mock('@anthropic-ai/claude-agent-sdk', …)` and replace
@@ -113,6 +118,7 @@ async function* runSession(prompt: string, options: Options): AsyncGenerator<unk
     };
     for await (const message of script(session)) {
       if (signal.aborted) throw new AbortError();
+      if (endsTurn(message)) await runHooks(options, 'Stop', { stop_hook_active: false }, undefined, signal);
       yield message;
     }
   } finally {
@@ -223,31 +229,14 @@ async function callTool(
   name: string,
   input: Record<string, unknown>,
 ): Promise<ToolOutcome> {
-  const matchers: HookCallbackMatcher[] = options.hooks?.PreToolUse ?? [];
-  for (const matcher of matchers) {
-    for (const hook of matcher.hooks) {
-      const output = (await hook(
-        {
-          hook_event_name: 'PreToolUse',
-          tool_name: name,
-          tool_input: input,
-          tool_use_id: `toolu_${name}`,
-          session_id: 'fake-session',
-          transcript_path: '',
-          cwd: options.cwd ?? '',
-        } as never,
-        `toolu_${name}`,
-        { signal },
-      )) as { hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string } };
-      if (output.hookSpecificOutput?.permissionDecision === 'deny') {
-        return {
-          denied: true,
-          isError: true,
-          text: output.hookSpecificOutput.permissionDecisionReason ?? 'denied',
-        };
-      }
-    }
-  }
+  const denial = await runHooks(
+    options,
+    'PreToolUse',
+    { tool_name: name, tool_input: input, tool_use_id: `toolu_${name}` },
+    `toolu_${name}`,
+    signal,
+  );
+  if (denial !== undefined) return { denied: true, isError: true, text: denial };
 
   if (name === 'StructuredOutput') {
     return { denied: false, isError: false, text: 'Structured output provided successfully' };
@@ -268,6 +257,53 @@ async function callTool(
     isError: result?.isError === true || reply.error !== undefined,
     text: result?.content?.map((part) => part.text ?? '').join('\n') ?? reply.error?.message ?? '',
   };
+}
+
+/**
+ * Run the session's hooks for `event` in order, as the CLI would, and return
+ * the first denial's reason, if any hook denied.
+ */
+async function runHooks(
+  options: Options,
+  event: 'PreToolUse' | 'Stop',
+  fields: Record<string, unknown>,
+  toolUseId: string | undefined,
+  signal: AbortSignal,
+): Promise<string | undefined> {
+  const matchers: HookCallbackMatcher[] = options.hooks?.[event] ?? [];
+  const effort = appliedEffort(options);
+  for (const matcher of matchers) {
+    for (const hook of matcher.hooks) {
+      const output = (await hook(
+        {
+          hook_event_name: event,
+          ...fields,
+          session_id: 'fake-session',
+          transcript_path: '',
+          cwd: options.cwd ?? '',
+          ...(effort !== undefined ? { effort: { level: effort } } : {}),
+        } as never,
+        toolUseId,
+        { signal },
+      )) as { hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string } };
+      if (output.hookSpecificOutput?.permissionDecision === 'deny') {
+        return output.hookSpecificOutput.permissionDecisionReason ?? 'denied';
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The effort level the CLI would apply: none for a Haiku model, which takes no effort parameter. */
+function appliedEffort(options: Options): string | undefined {
+  if (typeof options.effort !== 'string') return undefined;
+  return (options.model ?? '').includes('haiku') ? undefined : options.effort;
+}
+
+/** A reply that ends the turn, as the CLI's `Stop` hook sees it. */
+function endsTurn(message: unknown): boolean {
+  const m = message as { type?: string; subtype?: string; is_error?: boolean };
+  return m.type === 'result' && m.subtype === 'success' && m.is_error !== true;
 }
 
 // ---------------------------------------------------------------------------

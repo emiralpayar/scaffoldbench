@@ -3,7 +3,7 @@
 Everyone argues about agent architectures. Should the agent plan first, or just act? Does a
 verifier pay for itself? Is fanning work out to parallel subagents worth the coordination risk?
 The arguments are made from anecdote, and almost nobody publishes a number. Agent Arena is a
-benchmark lab for exactly that question: it runs **five agent harness architectures** over the
+benchmark lab for exactly that question: it runs **six agent harness architectures** over the
 **same task set**, on the same model, through the same instrumentation, and reports score, cost
 and latency with bootstrap confidence intervals. The tasks are held constant so that a difference
 in the leaderboard is a difference in the *architecture* — not in the model, the prompt, the
@@ -82,27 +82,34 @@ have nothing to do with it. The judge is also sampled several times and reduced 
 unlucky grading cannot move a headline number.
 ([`judge.ts`](packages/core/src/judge.ts))
 
-**One choke point to the model.** All five strategies reach the model through a single function,
+**One choke point to the model.** Every strategy reaches the model through a single function,
 `runQuery`. Trace capture, cost accounting, the sandbox guard, the hermetic settings, the abort
 handling and the budget ceiling are therefore identical for every architecture. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
-## The five architectures
+## The six architectures
 
 | id | Name | What it does |
 | --- | --- | --- |
 | `single` | Single agent | One agent, one context, the full toolset, no separate planning or review step. The control condition every other row has to beat. |
 | `plan-execute` | Plan then execute | A tool-less planning call writes an ordered list of steps; a second call executes them with the full toolset. |
 | `orchestrator-workers` | Orchestrator with parallel workers | An orchestrator splits the task into up to four independent subtasks, runs them concurrently in separate contexts, then synthesizes the answer from their reports. |
-| `plan-execute-verify` | Plan, execute, verify, revise | Plan and execute, then a verifier holding only the read-only tools checks the real state rather than the executor's account of it; anything it rejects goes back for revision, at most twice. |
-| `debate-select` | Parallel proposals, select, execute | Three proposers investigate in parallel with read-only tools, a selector picks the strongest and merges in what the others got right, and a final call applies it with the full toolset. |
+| `plan-execute-verify` | Plan, execute, verify, revise | Plan and execute, then a verifier holding only the read-only tools checks the real state rather than the executor's account of it and answers through a schema; a rejection with a blocking issue goes back for revision, at most twice. An unreadable verdict is asked for once more, never assumed to be approval. |
+| `propose-select` | Parallel proposals, select, execute | Three proposers investigate in parallel with read-only tools, each starting from a different angle (policy, current state, the user's outcome); a selector picks the strongest and merges in what the others got right, and a final call applies it with the full toolset. Formerly `debate-select`: the proposers never see one another, so there was never a debate. |
+| `gated-execute` | Execute with action review | One executor with the full toolset, but every call that would change state is first put to a read-only reviewer holding the domain policy, which checks the current state and allows or denies it; a denial comes back to the executor as the tool's result, with the reason, so it can adapt. Review at the point of action instead of after the fact. |
 
 Strategies are pure orchestration: they never import the SDK, they take `runQuery` as an injected
-dependency, and every phase builds on the same base system prompt rather than replacing it. Phase
-budgets are applied identically — a tool-less phase gets exactly one turn in every architecture —
-so no design is quietly handed more room than another.
+dependency, and every phase builds on the same base system prompt rather than replacing it. Every
+acting phase gets the same instructions word for word, and every phase gets turns by one policy
+for its kind (the task's own allowance for a phase with tools, three for a tool-less schema phase,
+one for tool-less prose), so no design is quietly handed a better brief than another. Totals are
+not equalised; the per-run cost cap is the shared ceiling, as
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#turn-budgets) explains. Each architecture also
+declares its own invariants — the plan was a plan, the fan-out fanned out, the verdict was read —
+and a run in which it silently fell back on a default fails its integrity check instead of being
+ranked.
 
 ---
 
@@ -174,7 +181,7 @@ List what is available:
 
 ```bash
 npm run arena -- tasks        # every task: id, world, category, difficulty
-npm run arena -- strategies   # the five architectures and what each one does
+npm run arena -- strategies   # the six architectures and what each one does
 npm run arena -- --help
 ```
 
@@ -252,7 +259,7 @@ the interface can be reviewed. They are not results.
 
 ## Cost control
 
-A full matrix is five strategies x twelve tasks x N repeats, and several of the architectures make
+A full matrix is six strategies x twelve tasks x N repeats, and several of the architectures make
 four or more model calls per run. Left unchecked that gets expensive quickly, so there are four
 brakes:
 
@@ -289,7 +296,7 @@ extend it with `arena report --markdown`, which writes `results/<runSetId>/REPOR
 
 | Strategy | n | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
 | --- | --- | --- | --- | --- | --- | --- |
-| `debate-select` | 18 | 1.000 [1.000, 1.000] | 100% | $0.187 | 1m10s | 5.3 |
+| `debate-select` (now `propose-select`) | 18 | 1.000 [1.000, 1.000] | 100% | $0.187 | 1m10s | 5.3 |
 | `single` | 18 | 0.990 [0.970, 1.000] | 94% | $0.050 | 22s | **19.7** |
 | `plan-execute` | 18 | 0.990 [0.970, 1.000] | 94% | $0.070 | 33s | 14.1 |
 | `plan-execute-verify` | 18 | 0.990 [0.970, 1.000] | 94% | $0.109 | 52s | 9.1 |
@@ -363,7 +370,7 @@ reservation, then make two coordinated mutations with the tier bonus applied cor
 ```
 packages/core/        contracts, runQuery, budget, trace, sandbox guard, judge,
                       scoring, bootstrap statistics, the matrix runner, aggregation
-packages/strategies/  the five harness architectures, plus the shared phase runner
+packages/strategies/  the six harness architectures, plus the shared phase runner
 packages/tasks/       the task factories and the task set:
                         defineToolUseTask.ts   deterministic sandbox tasks
                         worlds/{airline,ecommerce,support}/  world, tools, tasks
@@ -420,8 +427,9 @@ This is an honest list. Read it before quoting anything from this repository.
   that wins here has won on these twelve tasks.
 - **Prompt wording inside each strategy is a confound.** Every architecture needs phase-specific
   instructions, and the wording of those instructions affects the score. The mitigation is to keep
-  the phases symmetric: all five build on the identical base system prompt, quote the user's
-  request verbatim rather than paraphrasing it, and give tool-less phases the same one-turn budget.
+  the phases symmetric: all six build on the identical base system prompt, quote the user's
+  request verbatim rather than paraphrasing it, give every acting phase the same instructions word
+  for word, and set every phase's turns by one policy.
   That narrows the confound. It does not remove it, and a determined reader should treat small
   score differences as partly attributable to prompt wording rather than to architecture.
 - **Cost is what the SDK reported, not what you were billed.** Per-call cost comes from the

@@ -1,8 +1,31 @@
-import { SCHEMA_MIN_TURNS, readStructured } from '@arena/core';
-import type { QueryOutcome, RunContext, Strategy, StrategyOutcome } from '@arena/core';
+import { SCHEMA_MIN_TURNS, parseLooseJson } from '@arena/core';
+import type {
+  FidelityInput,
+  IntegrityCheck,
+  QueryOutcome,
+  RunContext,
+  Strategy,
+  StrategyOutcome,
+} from '@arena/core';
 import {
+  checkFrom,
+  cutShort,
+  fail,
+  haltedBy,
+  metaNumber,
+  metaString,
+  pass,
+  phase,
+  phaseNamed,
+  phasePrefix,
+  toolSurfaceCheck,
+  unjudged,
+} from './fidelity';
+import {
+  ACTING_INSTRUCTIONS,
   REASONING_TURNS,
   createPhaseRunner,
+  interrupted,
   joinSections,
   tagged,
   taskBlock,
@@ -14,7 +37,9 @@ const DESCRIPTION =
   'An orchestrator splits the task into independent subtasks, fans them out to workers that run ' +
   'at the same time in separate contexts, then writes the answer from their reports. It trades ' +
   'wall-clock time for coordination risk: the workers cannot see each other, so anything the ' +
-  'split gets wrong — an overlap, a dependency, a missing piece — shows up in the score.';
+  'split gets wrong — an overlap, a dependency, a missing piece — shows up in the score. When ' +
+  'the orchestrator judges that the task cannot honestly be split, one worker is given the ' +
+  'whole task, so the architecture reduces to a single agent with an orchestrator around it.';
 
 /** Beyond four the workers start colliding and the synthesis gets thin. */
 const MAX_WORKERS = 4;
@@ -37,6 +62,7 @@ export const DECOMPOSE_SCHEMA: Record<string, unknown> = {
         required: ['id', 'goal'],
         additionalProperties: false,
       },
+      minItems: 1,
     },
   },
   required: ['subtasks'],
@@ -47,6 +73,12 @@ export interface Subtask {
   id: string;
   goal: string;
 }
+
+/** The single assignment when the work is not split: the task, whole. */
+export const WHOLE_TASK: Subtask = {
+  id: 'all',
+  goal: 'Complete the task in full, from start to finish.',
+};
 
 export function decomposePrompt(ctx: RunContext): string {
   return joinSections(
@@ -72,9 +104,12 @@ export function workerPrompt(ctx: RunContext, subtask: Subtask, total: number): 
     taskBlock(ctx),
     tagged('your_assignment', subtask.goal),
     total === 1 ? solo : parallel,
-    'Use the tools to carry out your assignment, checking state before you change it. Then ' +
-      'report what you did, what you found, and anything that still needs attention. Your report ' +
-      'is all the orchestrator will see.',
+    'Carry out your assignment.',
+    ACTING_INSTRUCTIONS,
+    // A worker answers the orchestrator, not the user: the one acting phase
+    // that is not asked for a final answer.
+    'Then report what you did, what you found, and anything that still needs attention. Your ' +
+      'report is all the orchestrator will see.',
   );
 }
 
@@ -89,15 +124,33 @@ export function synthesizePrompt(ctx: RunContext, reports: string): string {
   );
 }
 
+/** How the decomposition was read: through the schema, out of prose, or not at all. */
+export type DecompositionSource = 'schema' | 'prose' | 'none';
+
+export interface Decomposition {
+  /** Usable subtasks, slugged, deduplicated and capped; empty when none could be read. */
+  subtasks: Subtask[];
+  source: DecompositionSource;
+}
+
 /**
- * Subtasks the orchestrator can actually fan out.
+ * The orchestrator's subtasks, as far as they can be read.
  *
- * A single subtask is not a decomposition — it is the whole task with an extra
- * call in front of it — so callers treat anything under two as a fallback.
+ * One subtask is a decision, not a failure: the orchestrator was told to
+ * return one when the task cannot honestly be split. None means it could not
+ * be read at all.
  */
-export function readSubtasks(outcome: QueryOutcome): Subtask[] {
-  const parsed = readStructured<{ subtasks?: unknown }>(outcome);
-  const raw = parsed?.subtasks;
+export function readDecomposition(outcome: Pick<QueryOutcome, 'structured' | 'text'>): Decomposition {
+  const fromSchema = subtasksFrom(outcome.structured);
+  if (fromSchema.length > 0) return { subtasks: fromSchema, source: 'schema' };
+  const fromProse = subtasksFrom(parseLooseJson(outcome.text));
+  if (fromProse.length > 0) return { subtasks: fromProse, source: 'prose' };
+  return { subtasks: [], source: 'none' };
+}
+
+function subtasksFrom(value: unknown): Subtask[] {
+  if (typeof value !== 'object' || value === null) return [];
+  const raw = (value as { subtasks?: unknown }).subtasks;
   if (!Array.isArray(raw)) return [];
 
   const subtasks: Subtask[] = [];
@@ -128,11 +181,91 @@ export function readSubtasks(outcome: QueryOutcome): Subtask[] {
   return subtasks;
 }
 
+const workerPhase = (subtask: Subtask) => `worker-${subtask.id}`;
+
+/** The decomposition was read through the schema. */
+export function decompositionCheck(input: FidelityInput): IntegrityCheck {
+  const id = 'orchestrator-workers.decomposition';
+  const decompose = phaseNamed(input, 'decompose');
+  const excused = unjudged(id, input, decompose, 'the decomposition');
+  if (excused || !decompose) return excused ?? fail(id, 'the decomposition never ran');
+
+  const subtasks = metaNumber(decompose, 'subtasks') ?? 0;
+  if (metaString(decompose, 'source') === 'schema' && subtasks > 0) {
+    return pass(id, `${subtasks} subtask${subtasks === 1 ? '' : 's'}, read from the schema reply`);
+  }
+  return fail(id, decompose.degraded ?? 'the decomposition was not read from a schema reply');
+}
+
+/**
+ * When the orchestrator split the work, every subtask got a worker and every
+ * worker ran. Workers are started together on equal shares of the budget, so
+ * one of them skipped while another ran was starved, not stopped.
+ */
+export function fanOutCheck(input: FidelityInput): IntegrityCheck {
+  const id = 'orchestrator-workers.fan-out';
+  const decompose = phaseNamed(input, 'decompose');
+  const planned = metaNumber(decompose, 'workers');
+  const workers = input.outcome.phases.filter((record) => record.phase.startsWith('worker-'));
+
+  const halted = haltedBy(input);
+  if (planned === undefined) {
+    return halted || (decompose && cutShort(decompose))
+      ? pass(id, 'the run stopped before the fan-out')
+      : fail(id, 'no fan-out was recorded');
+  }
+  if (workers.length === 0 && halted) {
+    return pass(id, `the run was stopped (${halted}) before the workers started`);
+  }
+
+  const failures: string[] = [];
+  if (workers.length !== planned) failures.push(`${planned} workers planned, ${workers.length} ran`);
+  const skipped = workers.filter((worker) => worker.subtype === 'skipped');
+  if (skipped.length > 0 && skipped.length < workers.length) {
+    failures.push(`${skipped.map((worker) => worker.phase).join(', ')} never started while the others ran`);
+  }
+  if (input.outcome.subagentCount !== planned) {
+    failures.push(`subagentCount is ${input.outcome.subagentCount}, not ${planned}`);
+  }
+  // Every worker skipped is the run's budget giving out, not a starved fan-out:
+  // each was offered an equal share, and no share was enough to start a call.
+  const verified =
+    skipped.length > 0 && skipped.length === workers.length
+      ? 'no worker started: the run had too little budget left to start any'
+      : planned === 1
+        ? 'one worker on the whole task, as the orchestrator chose'
+        : `${planned} workers ran in parallel`;
+  return checkFrom(id, failures, verified);
+}
+
+/** The synthesis wrote the answer, rather than a worker's report standing in for it. */
+export function synthesisCheck(input: FidelityInput): IntegrityCheck {
+  const id = 'orchestrator-workers.synthesis';
+  const synthesize = phaseNamed(input, 'synthesize');
+  const excused = unjudged(id, input, synthesize, 'the synthesis');
+  if (excused || !synthesize) return excused ?? fail(id, 'the synthesis never ran');
+  return synthesize.degraded === undefined ? pass(id) : fail(id, synthesize.degraded);
+}
+
+export function orchestratorWorkersFidelityChecks(input: FidelityInput): IntegrityCheck[] {
+  return [
+    decompositionCheck(input),
+    fanOutCheck(input),
+    synthesisCheck(input),
+    toolSurfaceCheck('orchestrator-workers.tools', input, [
+      { role: 'orchestrator', matches: phase('decompose'), tools: [] },
+      { role: 'worker', matches: phasePrefix('worker-'), tools: input.env.allowedTools },
+      { role: 'orchestrator', matches: phase('synthesize'), tools: [] },
+    ]),
+  ];
+}
+
 export function createOrchestratorWorkersStrategy(deps: Partial<StrategyDeps> = {}): Strategy {
   return {
     id: 'orchestrator-workers',
     label: 'Orchestrator with parallel workers',
     description: DESCRIPTION,
+    fidelityChecks: orchestratorWorkersFidelityChecks,
 
     async run(ctx: RunContext): Promise<StrategyOutcome> {
       const runner = createPhaseRunner(ctx, deps);
@@ -147,11 +280,27 @@ export function createOrchestratorWorkersStrategy(deps: Partial<StrategyDeps> = 
         maxTurns: SCHEMA_MIN_TURNS,
       });
 
-      const proposed = readSubtasks(decompose);
-      const subtasks: Subtask[] =
-        proposed.length >= 2
-          ? proposed
-          : [{ id: 'all', goal: 'Complete the task in full, from start to finish.' }];
+      const decomposition = readDecomposition(decompose);
+      // A lone subtask covers the whole task by the orchestrator's own
+      // instructions, so its worker is given the task itself rather than the
+      // orchestrator's restatement of it — which is often a plan, and would
+      // turn this arm into plan-execute.
+      const subtasks = decomposition.subtasks.length >= 2 ? decomposition.subtasks : [WHOLE_TASK];
+      runner.annotate(decompose, {
+        meta: {
+          subtasks: decomposition.subtasks.length,
+          workers: subtasks.length,
+          source: decomposition.source,
+        },
+        ...(decomposition.source !== 'schema' && !interrupted(decompose)
+          ? {
+              degraded:
+                decomposition.source === 'prose'
+                  ? 'the subtasks came back as JSON in prose, not through the schema'
+                  : 'the decomposition could not be read; one worker was given the whole task',
+            }
+          : {}),
+      });
 
       if (!runner.canContinue()) return runner.finish();
 
@@ -159,11 +308,12 @@ export function createOrchestratorWorkersStrategy(deps: Partial<StrategyDeps> = 
       // `agents` option: parallel subagents are the architecture under test, so
       // their count, tools and cost have to be observable here.
       const specs: LabeledSpec[] = subtasks.map((subtask, index) => ({
-        phase: `worker-${subtask.id}`,
+        phase: workerPhase(subtask),
         label: `Worker ${index + 1}: ${subtask.id}`,
         prompt: workerPrompt(ctx, subtask, subtasks.length),
         depth: 1,
-        agentLabel: `worker-${subtask.id}`,
+        agentLabel: workerPhase(subtask),
+        answers: true,
       }));
 
       const workers = await runner.runAll(specs);
@@ -189,7 +339,13 @@ export function createOrchestratorWorkersStrategy(deps: Partial<StrategyDeps> = 
         prompt: synthesizePrompt(ctx, reports),
         allowedTools: [],
         maxTurns: REASONING_TURNS,
+        answers: true,
       });
+      if (synthesis.text.trim() === '' && !interrupted(synthesis)) {
+        runner.annotate(synthesis, {
+          degraded: 'the synthesis came back empty; the last worker report stands as the answer',
+        });
+      }
 
       return runner.finish({ finalText: synthesis.text, subagentCount });
     },

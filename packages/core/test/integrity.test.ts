@@ -34,6 +34,7 @@ interface CallShape {
   denied?: string[];
   structuredMissing?: boolean;
   apiError?: ApiError;
+  modelStop?: { reason: string; category?: string };
   noInit?: boolean;
   noEnd?: boolean;
 }
@@ -65,6 +66,7 @@ function call(shape: CallShape = {}): TraceEvent[] {
           ...(expected !== null ? { mcpServersExpected: expected } : {}),
           ...(shape.structuredMissing ? { structuredMissing: true } : {}),
           ...(shape.apiError ? { apiError: shape.apiError } : {}),
+          ...(shape.modelStop ? { modelStop: shape.modelStop } : {}),
         },
       }),
     );
@@ -104,6 +106,7 @@ describe('harnessChecks', () => {
       HARNESS_CHECK.harnessTools,
       HARNESS_CHECK.mcpConnected,
       HARNESS_CHECK.mcpHermetic,
+      HARNESS_CHECK.builtinTools,
       HARNESS_CHECK.structuredOutput,
       HARNESS_CHECK.notDegraded,
     ]);
@@ -169,6 +172,19 @@ describe('harnessChecks', () => {
     expect(check(checks, HARNESS_CHECK.mcpConnected).ok).toBe(true);
   });
 
+  it('fails a call that was offered one of the CLI’s own tools, called or not', () => {
+    const trace = [
+      ...call({ callId: 'call-1', phase: 'plan', tools: [STRUCTURED_OUTPUT_TOOL] }),
+      ...call({ callId: 'call-2', phase: 'execute', tools: ['mcp__airline__get_reservation', 'Task', 'Bash'] }),
+    ];
+
+    expect(check(harnessChecks({ trace, phases: [] }), HARNESS_CHECK.builtinTools)).toEqual({
+      id: HARNESS_CHECK.builtinTools,
+      ok: false,
+      detail: 'execute (call-2) was offered Task, Bash',
+    });
+  });
+
   it('judges only failed servers in traces that never recorded which were expected', () => {
     const unknown = call({ servers: [{ name: 'claude.ai Gmail', status: 'needs-auth' }], expected: null });
     const checks = harnessChecks({ trace: unknown, phases: [] });
@@ -193,6 +209,29 @@ describe('harnessChecks', () => {
     expect(result.detail).toContain(`select (call-1) returned no structured output (${subtype})`);
   });
 
+  it('judges a schema miss the strategy asked again about by the retry', () => {
+    const trace = [
+      ...call({ callId: 'call-1', phase: 'verify-1', structuredMissing: true }),
+      ...call({ callId: 'call-2', phase: 'verify-1-retry' }),
+    ];
+    const phases = [
+      phase({ phase: 'verify-1', callId: 'call-1', retriedBy: 'verify-1-retry' }),
+      phase({ phase: 'verify-1-retry', callId: 'call-2' }),
+    ];
+    expect(check(harnessChecks({ trace, phases }), HARNESS_CHECK.structuredOutput).ok).toBe(true);
+
+    // A retry that also came back empty fails on its own account.
+    const bothMissed = [
+      ...call({ callId: 'call-1', phase: 'verify-1', structuredMissing: true }),
+      ...call({ callId: 'call-2', phase: 'verify-1-retry', structuredMissing: true }),
+    ];
+    const result = check(harnessChecks({ trace: bothMissed, phases }), HARNESS_CHECK.structuredOutput);
+    expect(result).toMatchObject({
+      ok: false,
+      detail: 'verify-1-retry (call-2) returned no structured output (success)',
+    });
+  });
+
   it.each(['aborted', 'skipped', 'error_max_budget_usd'])(
     'does not fail a schema call the run’s own limits cut short (%s)',
     (subtype) => {
@@ -210,6 +249,29 @@ describe('harnessChecks', () => {
   ])('fails a call that ended %s', (subtype, detail) => {
     const result = check(harnessChecks({ trace: call({ subtype }), phases: [] }), HARNESS_CHECK.callsEnded);
     expect(result).toMatchObject({ ok: false, detail });
+  });
+
+  it('takes a model stop for the call’s own ending, whatever subtype the CLI gave it', () => {
+    for (const subtype of ['success', 'error_during_execution']) {
+      const trace = call({ subtype, modelStop: { reason: 'malformed_tool_use' } });
+      const checks = harnessChecks({ trace, phases: [] });
+      expect(integrityOf(checks).ok).toBe(true);
+    }
+  });
+
+  it('still fails a schema call a model stop left without its reply, and says why', () => {
+    const trace = call({
+      phase: 'plan',
+      structuredMissing: true,
+      modelStop: { reason: 'refusal', category: 'cyber' },
+    });
+    const checks = harnessChecks({ trace, phases: [] });
+
+    expect(check(checks, HARNESS_CHECK.callsEnded).ok).toBe(true);
+    expect(check(checks, HARNESS_CHECK.structuredOutput)).toMatchObject({
+      ok: false,
+      detail: 'plan (call-1) returned no structured output (refused)',
+    });
   });
 
   it('fails a call that never recorded its end', () => {
@@ -281,6 +343,36 @@ describe('tracedCalls', () => {
     expect(calls.map((c) => [c.callId, c.phase, c.end?.subtype, c.deniedTools])).toEqual([
       ['call-1', 'propose-1', 'success', []],
       ['call-2', 'propose-2', 'success', ['Bash']],
+    ]);
+  });
+
+  it('reads how a call’s model stopped, ignoring reasons it does not know', () => {
+    const trace = [
+      ...call({ callId: 'call-1', modelStop: { reason: 'refusal', category: 'cyber' } }),
+      ...call({ callId: 'call-2', modelStop: { reason: 'tired' } }),
+    ];
+    expect(tracedCalls(trace).map((c) => c.end?.modelStop)).toEqual([
+      { reason: 'refusal', category: 'cyber' },
+      undefined,
+    ]);
+  });
+
+  it('tells a call sent no effort apart from one that never reported it', () => {
+    const ending = (callId: string, meta: Record<string, unknown>) =>
+      event(callId, 'main', { kind: 'phase_end', meta: { subtype: 'success', ...meta } });
+
+    const calls = tracedCalls([
+      ending('call-1', { effectiveEffort: 'high' }),
+      ending('call-2', { effectiveEffort: null }),
+      ending('call-3', {}),
+      ending('call-4', { effectiveEffort: 7 }),
+    ]);
+
+    expect(calls.map((c) => c.end && 'effectiveEffort' in c.end ? c.end.effectiveEffort : 'absent')).toEqual([
+      'high',
+      null,
+      'absent',
+      'absent',
     ]);
   });
 });

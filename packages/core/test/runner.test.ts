@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_RETRY_POLICY,
+  EFFORT_MIXED,
   HARNESS_CHECK,
   REPO_ROOT,
   buildScore,
@@ -276,6 +277,16 @@ describe('runMatrix', () => {
     await expect(runMatrix(config({ models: [] }))).rejects.toThrow(/at least one model/);
     await expect(runMatrix(config({ runSetId: '../escape' }))).rejects.toThrow(/Invalid run set id/);
     await expect(completedCells('../escape', resultsRoot)).rejects.toThrow(/Invalid run set id/);
+  });
+
+  it('refuses a matrix in which two cells would be recorded under one run id', async () => {
+    await expect(runMatrix(config({ models: ['model-a', 'model-a'] }))).rejects.toThrow(
+      /Cells model-a\|solver\|stub-task\|1 and model-a\|solver\|stub-task\|1 would both be recorded/,
+    );
+    // Distinct ids that read the same once made file-safe.
+    await expect(runMatrix(config({ models: ['model[1m]', 'model-1m-'] }))).rejects.toThrow(
+      /would both be recorded as model-1m-__/,
+    );
   });
 
   it('gives every run a fresh world', async () => {
@@ -649,6 +660,50 @@ describe('integrity', () => {
   });
 });
 
+describe('effort', () => {
+  /** A stub whose calls reported running at these levels, as `runQuery` would trace them. */
+  function reportsEffort(id: string, levels: readonly (string | null | undefined)[]): Strategy {
+    return makeStrategy(id, (ctx) => {
+      solve(ctx);
+      levels.forEach((level, index) => {
+        ctx.trace.append({
+          phase: `call-${index + 1}`,
+          callId: `call-${index + 1}`,
+          depth: 0,
+          kind: 'phase_end',
+          meta: { subtype: 'success', ...(level !== undefined ? { effectiveEffort: level } : {}) },
+        });
+      });
+    });
+  }
+
+  it('records the level the calls reported, and says when they disagree', async () => {
+    const { records, manifest } = await runMatrix(
+      config({
+        strategies: [
+          reportsEffort('agrees', ['high', undefined, 'high']),
+          reportsEffort('disagrees', ['high', 'low']),
+        ],
+      }),
+    );
+
+    const effortOf = (id: string) => records.find((r) => r.strategyId === id)?.effectiveEffort;
+    expect(effortOf('agrees')).toBe('high');
+    expect(effortOf('disagrees')).toBe(EFFORT_MIXED);
+    expect(manifest.effort).toBe('high');
+    expect(manifest.effectiveEffort).toEqual({ 'stub-model': EFFORT_MIXED });
+  });
+
+  it('claims no level when no call reported one', async () => {
+    const { records, manifest } = await runMatrix(
+      config({ strategies: [reportsEffort('silent', [undefined])] }),
+    );
+
+    expect(records[0]).not.toHaveProperty('effectiveEffort');
+    expect(manifest.effectiveEffort).toEqual({});
+  });
+});
+
 describe('retries', () => {
   it('runs a cell again after a transient API failure and records the attempt that worked', async () => {
     let attempt = 0;
@@ -842,6 +897,32 @@ describe('stopping', () => {
     expect(records[0]?.passed).toBe(true);
     expect(events.find((e) => e.type === 'stop')).toMatchObject({ reason: 'drain' });
     expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'drain', completedRuns: 1 });
+  });
+
+  it('says the runs in flight were discarded when a hard stop cuts a drain short', async () => {
+    // The CLI's two presses of Ctrl-C: drain first, then stop hard.
+    const drain = new AbortController();
+    const hard = new AbortController();
+    let started = 0;
+
+    const { records, manifest } = await runMatrix(
+      config({
+        strategies: [waitsForAbort],
+        repeats: 3,
+        concurrency: 1,
+        drainSignal: drain.signal,
+        signal: hard.signal,
+        onEvent: (event) => {
+          if (event.type !== 'run-start' || ++started > 1) return;
+          drain.abort();
+          setTimeout(() => hard.abort(), 20);
+        },
+      }),
+    );
+
+    expect(records).toHaveLength(0);
+    expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'signal', completedRuns: 0 });
+    expect(manifest.notes).toMatch(/aborted and discarded/);
   });
 
   it('starts nothing when the signal has already fired', async () => {

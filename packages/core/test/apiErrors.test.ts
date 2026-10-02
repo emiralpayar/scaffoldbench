@@ -3,10 +3,43 @@ import {
   apiErrorOfAssistant,
   classifyFailureText,
   isApiErrorText,
+  isSyntheticAssistant,
   kindFromSdkCode,
   kindFromStatus,
+  modelStopOfAssistant,
+  modelStopOfResult,
   recognizeFailureText,
 } from '@arena/core';
+
+/** An assistant message as the SDK streams it. */
+const message = (text: string, extra: Record<string, unknown> = {}, model = 'claude-sonnet-5-5') => ({
+  type: 'assistant',
+  parent_tool_use_id: null,
+  message: { model, content: [{ type: 'text', text }] },
+  ...extra,
+});
+
+/** The CLI's notices when the model cannot finish (CLI bundled with Agent SDK 0.3.287). */
+const OUTPUT_LIMIT =
+  "API Error: Claude's response exceeded the 64000 output token maximum. To configure this " +
+  'behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.';
+const CONTEXT_LIMIT = 'API Error: The model has reached its context window limit.';
+const REFUSAL =
+  "API Error: Sonnet 5.5's safeguards flagged this message (https://www.anthropic.com/legal/aup).";
+const limitNotice = (text: string) =>
+  message(text, { error: 'max_output_tokens', is_api_error_message: true }, '<synthetic>');
+const refusalNotice = (category: string | null) => ({
+  type: 'assistant',
+  parent_tool_use_id: null,
+  error: 'invalid_request',
+  is_api_error_message: true,
+  message: {
+    model: '<synthetic>',
+    content: [{ type: 'text', text: REFUSAL }],
+    stop_reason: 'refusal',
+    stop_details: { type: 'refusal', category, explanation: null },
+  },
+});
 
 describe('kindFromStatus', () => {
   it.each([
@@ -80,13 +113,6 @@ describe('recognizeFailureText', () => {
 });
 
 describe('apiErrorOfAssistant', () => {
-  const message = (text: string, extra: Record<string, unknown> = {}, model = 'claude-sonnet-5-5') => ({
-    type: 'assistant',
-    parent_tool_use_id: null,
-    message: { model, content: [{ type: 'text', text }] },
-    ...extra,
-  });
-
   it('reads the typed error code', () => {
     expect(apiErrorOfAssistant(message('Rate limited', { error: 'rate_limit' }))).toMatchObject({
       kind: 'rate_limit',
@@ -108,5 +134,92 @@ describe('apiErrorOfAssistant', () => {
   it('leaves ordinary model output alone', () => {
     expect(apiErrorOfAssistant(message('Back off and retry on HTTP 429.'))).toBeUndefined();
     expect(apiErrorOfAssistant(message('Truncated', { error: 'max_output_tokens' }))).toBeUndefined();
+  });
+
+  it('does not take the CLI’s notice that the model could not finish for an API failure', () => {
+    expect(apiErrorOfAssistant(limitNotice(OUTPUT_LIMIT))).toBeUndefined();
+    expect(apiErrorOfAssistant(limitNotice(CONTEXT_LIMIT))).toBeUndefined();
+    expect(apiErrorOfAssistant(refusalNotice('cyber'))).toBeUndefined();
+  });
+});
+
+describe('modelStopOfAssistant', () => {
+  it('reads a model that ran out of room, without the notice’s "API Error" dress', () => {
+    expect(modelStopOfAssistant(limitNotice(OUTPUT_LIMIT))).toEqual({
+      reason: 'output_limit',
+      message: expect.stringMatching(/^Claude's response exceeded the 64000 output token maximum\./),
+    });
+  });
+
+  it('reads a context that no longer fits, and a tool call the CLI gave up parsing', () => {
+    expect(modelStopOfAssistant(limitNotice(CONTEXT_LIMIT))).toEqual({
+      reason: 'context_limit',
+      message: 'The model has reached its context window limit.',
+    });
+    const tooLong = message(
+      'Prompt is too long',
+      { error: 'invalid_request', is_api_error_message: true },
+      '<synthetic>',
+    );
+    expect(modelStopOfAssistant(tooLong)).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    const malformed = message(
+      "The model's tool call could not be parsed (retry also failed).",
+      { is_api_error_message: true },
+      '<synthetic>',
+    );
+    expect(modelStopOfAssistant(malformed)?.reason).toBe('malformed_tool_use');
+    expect(apiErrorOfAssistant(tooLong)).toBeUndefined();
+    expect(apiErrorOfAssistant(malformed)).toBeUndefined();
+  });
+
+  it('reads a refusal and the category the API gave for it', () => {
+    expect(modelStopOfAssistant(refusalNotice('reasoning_extraction'))).toEqual({
+      reason: 'refusal',
+      message: expect.stringMatching(/^Sonnet 5\.5's safeguards flagged this message/),
+      category: 'reasoning_extraction',
+    });
+    expect(modelStopOfAssistant(refusalNotice(null))).not.toHaveProperty('category');
+  });
+
+  it('is not an API failure, nor the model talking about limits', () => {
+    const overloaded = message('API Error: 529 Overloaded', { error: 'overloaded' }, '<synthetic>');
+    expect(modelStopOfAssistant(overloaded)).toBeUndefined();
+    expect(modelStopOfAssistant(message('The reply exceeded the output token maximum.'))).toBeUndefined();
+    const talk = message('Prompt is too long for this model, so I summarised it.');
+    expect(modelStopOfAssistant(talk)).toBeUndefined();
+  });
+});
+
+describe('modelStopOfResult', () => {
+  it('reads the terminal reasons that mean the model could not finish', () => {
+    const tooLong = { subtype: 'success', terminal_reason: 'prompt_too_long', result: 'Prompt is too long' };
+    expect(modelStopOfResult(tooLong)).toEqual({ reason: 'context_limit', message: 'Prompt is too long' });
+    expect(modelStopOfResult({ subtype: 'success', terminal_reason: 'blocking_limit', result: '' })).toEqual({
+      reason: 'context_limit',
+      message: 'blocking_limit',
+    });
+    const malformed = { subtype: 'error_during_execution', terminal_reason: 'malformed_tool_use_exhausted' };
+    expect(modelStopOfResult(malformed)).toMatchObject({ reason: 'malformed_tool_use' });
+  });
+
+  it('leaves API failures and ordinary endings alone', () => {
+    for (const terminal_reason of ['api_error', 'completed', undefined]) {
+      expect(modelStopOfResult({ subtype: 'success', result: 'x', terminal_reason })).toBeUndefined();
+    }
+  });
+});
+
+describe('isSyntheticAssistant', () => {
+  it('recognises everything the CLI writes in the model’s place', () => {
+    expect(isSyntheticAssistant(limitNotice(OUTPUT_LIMIT))).toBe(true);
+    expect(isSyntheticAssistant(refusalNotice('cyber'))).toBe(true);
+    expect(isSyntheticAssistant(message('Rate limited', { error: 'rate_limit' }))).toBe(true);
+    expect(isSyntheticAssistant(message('boom', { is_api_error_message: true }))).toBe(true);
+    expect(isSyntheticAssistant(message('No response requested.', {}, '<synthetic>'))).toBe(true);
+    expect(isSyntheticAssistant(message('API Error: 500 Internal server error'))).toBe(true);
+  });
+
+  it('leaves the model’s own words alone', () => {
+    expect(isSyntheticAssistant(message('Back off and retry on HTTP 429.'))).toBe(false);
   });
 });
