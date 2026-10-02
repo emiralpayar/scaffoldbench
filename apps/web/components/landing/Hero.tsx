@@ -46,7 +46,7 @@ export function Hero({ facts, note, race }: { facts: HeroFact[]; note?: string; 
                 See the results <span aria-hidden>→</span>
               </Link>
               <Link href="/postmortem/" className="btn btn-secondary">
-                What went wrong first <span aria-hidden>→</span>
+                What went wrong <span aria-hidden>→</span>
               </Link>
             </div>
           </div>
