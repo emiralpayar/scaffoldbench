@@ -281,6 +281,85 @@ export function assertionPassRates(
   });
 }
 
+export interface ArchitectureMean {
+  strategyId: string;
+  mean: number;
+  runs: number;
+}
+
+/** Mean score of each architecture on a task, highest first. Pass the runs that count. */
+export function architectureMeans(records: readonly RunRecord[], taskId: string): ArchitectureMean[] {
+  const runs = selectRunsForTask(records, taskId);
+  return [...new Set(runs.map((record) => record.strategyId))]
+    .map((strategyId) => {
+      const mine = runs.filter((record) => record.strategyId === strategyId);
+      return { strategyId, mean: mine.reduce((sum, record) => sum + record.score, 0) / mine.length, runs: mine.length };
+    })
+    .sort((a, b) => b.mean - a.mean || compareArchitectures(a.strategyId, b.strategyId));
+}
+
+export interface AnatomyRow {
+  id: string;
+  label: string;
+  /** A graded assertion, or a rule whose breach applies a penalty. */
+  kind: 'assertion' | 'rule';
+  weight?: number;
+  /** Per architecture: runs that fell short of this item, of runs that had it. */
+  cells: Record<string, { count: number; runs: number }>;
+}
+
+export interface TaskAnatomy {
+  architectures: string[];
+  rows: AnatomyRow[];
+}
+
+/**
+ * Where a task is lost, item by item and architecture by architecture: for
+ * each graded assertion, how many of an architecture's runs earned less than
+ * full credit, and for each rule, how many breached it. A mean score says an
+ * architecture lost points; this says which ones. Pass the records the
+ * caller trusts (one model, ranked runs).
+ */
+export function taskAnatomy(records: readonly RunRecord[], taskId: string): TaskAnatomy {
+  const runs = selectRunsForTask(records, taskId);
+  const architectures = [...new Set(runs.map((record) => record.strategyId))].sort(compareArchitectures);
+  const rows = new Map<string, AnatomyRow>();
+
+  const row = (id: string, label: string, kind: AnatomyRow['kind'], weight?: number): AnatomyRow => {
+    const key = `${kind}:${id}`;
+    let found = rows.get(key);
+    if (!found) {
+      found = { id, label, kind, ...(weight !== undefined ? { weight } : {}), cells: {} };
+      rows.set(key, found);
+    }
+    return found;
+  };
+  const tally = (target: AnatomyRow, architecture: string, fell: boolean) => {
+    const cell = (target.cells[architecture] ??= { count: 0, runs: 0 });
+    cell.runs += 1;
+    if (fell) cell.count += 1;
+  };
+
+  for (const record of runs) {
+    for (const item of record.breakdown) {
+      tally(row(item.id, item.label, 'assertion', item.weight), record.strategyId, clamp01(item.earned) < FULL_CREDIT);
+    }
+  }
+  // A rule only appears in a run that breached it, so a run without the
+  // penalty still counts toward the architecture's total for that rule.
+  for (const record of runs) {
+    for (const penalty of record.penalties) row(penalty.id, penalty.label, 'rule');
+  }
+  for (const target of rows.values()) {
+    if (target.kind !== 'rule') continue;
+    for (const record of runs) {
+      tally(target, record.strategyId, record.penalties.some((penalty) => penalty.id === target.id));
+    }
+  }
+
+  return { architectures, rows: [...rows.values()] };
+}
+
 export function findRun(records: readonly RunRecord[], runId: string): RunRecord | undefined {
   return records.find((record) => record.runId === runId);
 }

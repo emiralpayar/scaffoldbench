@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { StrategyInfo, TraceEvent } from '@arena/core';
 
 import {
+  architectureMeans,
   assertionPassRates,
   buildCatalog,
   buildPhaseRows,
@@ -15,6 +16,7 @@ import {
   runOutcome,
   selectRunsForTask,
   sortTasks,
+  taskAnatomy,
 } from '../lib/derive';
 import { formatDuration, formatUsd } from '../lib/format';
 import type { TaskInfo } from '../lib/records';
@@ -389,5 +391,52 @@ describe('formatting', () => {
     expect(formatDuration(840)).toBe('0.8s');
     expect(formatDuration(21_379)).toBe('21.4s');
     expect(formatDuration(125_000)).toBe('2m 5s');
+  });
+});
+
+describe('taskAnatomy', () => {
+  const item = (id: string, earned: number) => ({ id, label: `Item ${id}`, weight: 2, earned });
+  const rule = (id: string) => ({ id, label: `Rule ${id}`, kind: 'forbidden' as const, multiplier: 0 });
+  const records = [
+    run({ runId: 'a1', strategyId: 'single', breakdown: [item('state', 1), item('reply', 0.5)], penalties: [] }),
+    run({ runId: 'a2', strategyId: 'single', repeat: 2, breakdown: [item('state', 0), item('reply', 1)], penalties: [rule('policy')] }),
+    run({ runId: 'b1', strategyId: 'plan-execute', breakdown: [item('state', 1), item('reply', 1)], penalties: [] }),
+  ];
+
+  it('counts, per architecture, the runs that fell short of each graded item', () => {
+    const { architectures, rows } = taskAnatomy(records, 'alpha');
+    const state = rows.find((row) => row.id === 'state');
+    const reply = rows.find((row) => row.id === 'reply');
+
+    expect(architectures).toEqual(['single', 'plan-execute']);
+    expect(state?.cells).toEqual({ single: { count: 1, runs: 2 }, 'plan-execute': { count: 0, runs: 1 } });
+    // Half credit is credit, but it is not full credit.
+    expect(reply?.cells.single).toEqual({ count: 1, runs: 2 });
+    expect(state).toMatchObject({ kind: 'assertion', weight: 2 });
+  });
+
+  it('counts a rule against every run, not only the runs that breached it', () => {
+    const policy = taskAnatomy(records, 'alpha').rows.find((row) => row.id === 'policy');
+    expect(policy).toMatchObject({ kind: 'rule' });
+    expect(policy?.cells).toEqual({ single: { count: 1, runs: 2 }, 'plan-execute': { count: 0, runs: 1 } });
+  });
+
+  it('is empty for a task with no recorded breakdown', () => {
+    expect(taskAnatomy([run({ breakdown: [] })], 'alpha').rows).toEqual([]);
+  });
+});
+
+describe('architectureMeans', () => {
+  it('orders architectures by mean score, then reading order', () => {
+    const records = [
+      run({ strategyId: 'plan-execute', score: 0.5 }),
+      run({ strategyId: 'single', score: 0.5 }),
+      run({ strategyId: 'plan-execute', repeat: 2, score: 1 }),
+      run({ strategyId: 'single', repeat: 2, score: 0.25 }),
+    ];
+    expect(architectureMeans(records, 'alpha').map((m) => [m.strategyId, m.mean, m.runs])).toEqual([
+      ['plan-execute', 0.75, 2],
+      ['single', 0.375, 2],
+    ]);
   });
 });

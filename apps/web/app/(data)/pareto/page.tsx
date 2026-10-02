@@ -3,13 +3,15 @@ import type { Metadata } from 'next';
 import { EmptyState } from '../../../components/EmptyState';
 import { PageHeader } from '../../../components/Layout';
 import { RunSetBanner } from '../../../components/RunSetMeta';
+import { resultsSwitcher } from '../../../components/leaderboard/ModelResults';
+import { ModelSwitcher } from '../../../components/leaderboard/ModelSwitcher';
 import { ParetoPlot } from '../../../components/charts/ScatterCharts';
 import type { ModelAnalysis } from '../../../lib/analysis';
-import { analyzeForSite } from '../../../lib/analysis';
 import { architectureName } from '../../../lib/architectures';
 import { describeUnverifiedModel, paretoPoints } from '../../../lib/chartData';
 import { formatUsd, joinList } from '../../../lib/format';
 import { modelShortName } from '../../../lib/models';
+import { analysisFor } from '../../../lib/server/analysis';
 import { loadRunSet } from '../../../lib/server/runSet';
 
 export const metadata: Metadata = {
@@ -22,7 +24,7 @@ export default async function ParetoPage() {
   const data = await loadRunSet();
   if (!data || data.records.length === 0) return <EmptyState />;
 
-  const analysis = analyzeForSite(data.records);
+  const analysis = analysisFor(data);
 
   return (
     <>
@@ -37,6 +39,10 @@ export default async function ParetoPage() {
         }
         lede="Every architecture on the plane it is actually chosen on. A point is on the frontier when nothing else has a higher mean score for the same mean cost or less. The whiskers say how much that frontier can be trusted: where they overlap, the order is a statement about means only."
       />
+
+      <div className="-mt-4 mb-10">
+        <ModelSwitcher items={resultsSwitcher(data.models, 'cost')} />
+      </div>
 
       {analysis.models.map((model) => (
         <section

@@ -16,7 +16,7 @@ import { ModelSwitcher } from './ModelSwitcher';
 import { PairMatrix } from './PairMatrix';
 
 /** Where each model's results live; the scaffold-or-scale view sits beside them. */
-export function resultsSwitcher(models: readonly string[], current: string | 'scale') {
+export function resultsSwitcher(models: readonly string[], current: string | 'scale' | 'cost') {
   return [
     ...models.map((model) => ({
       href: `/results/${model}/`,
@@ -24,6 +24,7 @@ export function resultsSwitcher(models: readonly string[], current: string | 'sc
       current: current === model,
     })),
     ...(models.length > 1 ? [{ href: '/results/scale/', label: 'Scaffold or scale?', current: current === 'scale' }] : []),
+    { href: '/pareto/', label: 'Score vs cost', current: current === 'cost' },
   ];
 }
 

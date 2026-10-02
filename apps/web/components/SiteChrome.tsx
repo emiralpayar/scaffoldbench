@@ -56,8 +56,20 @@ export function SiteFooter() {
           <Link href="/matrix/" className="link">
             Matrix
           </Link>
+          <Link href="/strategies/" className="link">
+            Designs
+          </Link>
           <Link href="/pareto/" className="link">
             Score vs cost
+          </Link>
+          <Link href="/methodology/" className="link">
+            Methodology
+          </Link>
+          <Link href="/health/" className="link">
+            Harness health
+          </Link>
+          <Link href="/postmortem/" className="link">
+            Post-mortem
           </Link>
           <Link href="/live/" className="link">
             Run it yourself

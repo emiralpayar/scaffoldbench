@@ -109,7 +109,7 @@ export function RepeatMatrix({
                 </div>
                 {architectures.map((id) => (
                   <div role="cell" key={id} className="flex items-center justify-center px-1 pb-3 pt-1.5 lg:py-2.5">
-                    <Squares runs={cells[`${id}::${task.id}`] ?? []} architecture={id} task={task.title} />
+                    <RunSquares runs={cells[`${id}::${task.id}`] ?? []} architecture={id} task={task.title} />
                   </div>
                 ))}
               </div>
@@ -117,30 +117,13 @@ export function RepeatMatrix({
           </div>
         </div>
       </Readout>
-      <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[0.8125rem] text-ink-2">
-        {(Object.keys(OUTCOME) as RunOutcome[]).map((outcome) => (
-          <span key={outcome} className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="block h-3 w-3">
-              <Square outcome={outcome} />
-            </span>
-            {OUTCOME[outcome].label}
-          </span>
-        ))}
-        {flagged ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="block h-3 w-3">
-              <Square outcome="pass" cut />
-            </span>
-            corner cut: its own records show it did not run as designed
-          </span>
-        ) : null}
-        <span className="text-muted">One square per run; each opens its run.</span>
-      </figcaption>
+      <OutcomeLegend flagged={flagged} />
     </figure>
   );
 }
 
-function Squares({ runs, architecture, task }: { runs: RepeatCell[]; architecture: string; task: string }) {
+/** One architecture's runs of one task as a row of squares, each opening its run. */
+export function RunSquares({ runs, architecture, task }: { runs: RepeatCell[]; architecture: string; task: string }) {
   if (runs.length === 0) {
     return (
       <span className="text-muted">
@@ -197,4 +180,29 @@ function detailOf(run: RepeatCell): string {
     parts.push(`did not run as designed (${plural(run.legacyProblems, 'problem')} in its records)`);
   }
   return parts.join(' · ');
+}
+
+/** What each square means. Fill and pattern carry it, never colour alone. */
+export function OutcomeLegend({ flagged = false }: { flagged?: boolean }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[0.8125rem] text-ink-2">
+      {(Object.keys(OUTCOME) as RunOutcome[]).map((outcome) => (
+        <span key={outcome} className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="block h-3 w-3">
+            <Square outcome={outcome} />
+          </span>
+          {OUTCOME[outcome].label}
+        </span>
+      ))}
+      {flagged ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="block h-3 w-3">
+            <Square outcome="pass" cut />
+          </span>
+          corner cut: its own records show it did not run as designed
+        </span>
+      ) : null}
+      <span className="text-muted">One square per run; each opens its run.</span>
+    </div>
+  );
 }
