@@ -54,7 +54,7 @@ export default async function PostmortemPage() {
           <span className="chip !border-bad/50 !text-bad">retracted run set</span>
         </p>
         <h1 className="h1 mt-4 text-ink">
-          The leaderboard said five architectures tied. The traces said four of them never ran.
+          The leaderboard said five architectures tied. The traces said four of them never ran as designed.
         </h1>
         <p className="lede mt-6">
           The first run set measured {report ? formatInt(report.runs) : ACT_ONE.runs} runs of five agent

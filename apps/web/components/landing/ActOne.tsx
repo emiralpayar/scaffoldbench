@@ -26,7 +26,7 @@ export function ActOne({ postmortem, createdAt }: { postmortem: Postmortem | nul
         <div className="max-w-[46rem]">
           <p className="eyebrow">Act 1 · The harness that lied</p>
           <h2 id="act-1-title" className="h1 mt-4 text-ink">
-            The leaderboard said five architectures tied. The traces said four of them never ran.
+            The leaderboard said five architectures tied. The traces said four of them never ran as designed.
           </h2>
           {postmortem && rows.length > 0 ? (
             <p className="lede mt-6">
