@@ -325,6 +325,16 @@ function heldWithComment(world: SupportOpsWorld, requestId: string): boolean {
   );
 }
 
+/**
+ * True when an expiry falls on `day`: any instant during it, or the midnight
+ * that ends it, which is the same deadline written the other way round.
+ */
+function expiresOnDay(expiresAt: string | null, day: string): boolean {
+  const at = parseIso(expiresAt);
+  if (at === null) return false;
+  return isoDate(at) === day || at === Date.parse(`${day}T00:00:00Z`) + DAY_MS;
+}
+
 /** The level a request asked for, from the seed. */
 function requestedLevel(requestId: string): AccessLevel | undefined {
   return allAccessRequests(createAccessWorld()).requests.find((entry) => entry.id === requestId)?.level;
@@ -378,8 +388,7 @@ function perRequest(decision: AccessDecision): AssertionSpec<SupportOpsWorld>[] 
         if (grants.length !== 1) return false;
         const expires = grants[0]?.expiresAt ?? null;
         if (decision.expiresOn === null) return expires === null;
-        const at = parseIso(expires);
-        return at !== null && isoDate(at) === decision.expiresOn;
+        return expiresOnDay(expires, decision.expiresOn);
       },
       detail: (world) =>
         grantsFor(world, requestId)

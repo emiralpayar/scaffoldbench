@@ -771,6 +771,17 @@ describe('support-access-requests', () => {
     expect(missed(result)).toEqual(['granted:AR-304', 'expiry:AR-304']);
   });
 
+  it('accepts an expiry written as the midnight that ends the last day', async () => {
+    // "Expires on its last day": 23:59 on 3 April and 00:00 on 4 April are the
+    // same moment to anyone reading the grant. The check is by day, so both count.
+    const d = drive(supportAccessSpec);
+    await solve(d);
+    d.world.grants.find((grant) => grant.requestId === 'AR-302')!.expiresAt = '2026-04-04T00:00:00Z';
+    expect(missed(await score(supportAccessTask, d))).toEqual([]);
+    d.world.grants.find((grant) => grant.requestId === 'AR-302')!.expiresAt = '2026-04-04T00:00:01Z';
+    expect(missed(await score(supportAccessTask, d))).toEqual(['expiry:AR-302']);
+  });
+
   it('does not call a read grant a freeze or separation-of-duties breach', async () => {
     // Both rules are about write and admin. Read on the frozen payroll system,
     // or on the payments gateway for someone with payroll write, breaks
