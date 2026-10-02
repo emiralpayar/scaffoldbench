@@ -225,7 +225,7 @@ function Lane({
         <ArchitectureGlyph id={lane.strategyId} width={44} className="shrink-0" />
         <div className="min-w-0">
           <p className="truncate text-[0.875rem] font-medium text-ink">{lane.name}</p>
-          <p className="hidden text-[0.75rem] leading-snug text-muted sm:line-clamp-2">{lane.shape}</p>
+          <p className="hidden text-[0.75rem] leading-snug text-muted sm:line-clamp-3">{lane.shape}</p>
         </div>
       </div>
 
