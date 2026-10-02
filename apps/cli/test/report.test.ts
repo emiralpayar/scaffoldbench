@@ -12,6 +12,7 @@ import {
   formatMatrix,
   formatPairwise,
   formatReport,
+  inertMarkdown,
   publicationProblems,
   toMarkdown,
 } from '../src/report';
@@ -440,6 +441,48 @@ describe('markdown report', () => {
       const width = (table[0] ?? '').split('|').length;
       for (const row of table) expect(row.split('|').length).toBe(width);
     }
+  });
+});
+
+describe('markdown from a model', () => {
+  // What a prompt-injected model could make the harness quote: a tool name, then the failure that names it.
+  const hostile = '@octocat [free tokens](http://evil.example) <img src=x onerror=1> `rm` | * _';
+
+  it('leaves nothing in it that mentions, links, tags or formats', () => {
+    const out = inertMarkdown(hostile);
+    expect(out).not.toMatch(/@octocat/);
+    expect(out).toContain('@\u200boctocat');
+    // Every markdown-significant character is backslash-escaped, so none of it is syntax.
+    expect(out).not.toMatch(/(?<!\\)[`*_[\]<>()|]/);
+    expect(out).toContain('\\<img src=x onerror=1\\>');
+    expect(inertMarkdown('two\nlines  and\ttabs')).toBe('two lines and tabs');
+  });
+
+  it('reaches the report only in that form, in the health lines and in the tables', () => {
+    const records = [
+      makeRecord({
+        strategyId: 'alpha',
+        taskId: 'airline-easy',
+        deniedToolCalls: 1,
+        integrity: { ok: false, checks: [{ id: 'harness.no-denials', ok: false, detail: `denied ${hostile}` }] },
+      }),
+      makeRecord({
+        strategyId: 'alpha',
+        taskId: 'airline-hard',
+        phases: [{ phase: 'plan', subtype: 'success', error: hostile } as RunRecord['phases'][number]],
+      }),
+    ];
+    const first = records[0]!;
+    const out = toMarkdown(
+      buildReportView(runSetOf(records, { manifest: manifest(), deniedTools: new Map([[first.runId, [hostile]]]) })),
+    );
+
+    expect(out).toContain('denied by the sandbox guard');
+    // (An escaped `\<img` still contains `<img`, so look for the unescaped forms.)
+    expect(out).not.toMatch(/@octocat|\]\(http|(?<!\\)<img|(?<!\\)`rm/);
+    expect(out.match(/@\u200boctocat/g)?.length).toBeGreaterThanOrEqual(3);
+    // The terminal rendering is for a person at a keyboard and stays as written.
+    expect(plain(formatHealth(buildReportView(runSetOf(records, { manifest: manifest(), deniedTools: new Map([[first.runId, [hostile]]]) })).health))).toContain('@octocat');
   });
 });
 

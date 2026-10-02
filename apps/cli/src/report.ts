@@ -164,8 +164,30 @@ function stopReasonText(reason: string): string {
 // Health
 // ---------------------------------------------------------------------------
 
-/** The health verdict lines, worst first. Shared by the terminal and markdown renderings. */
-export function healthSummary(health: HealthView): { level: 'ok' | 'warn' | 'bad'; text: string }[] {
+/**
+ * Text that came from a model, such as the name of a tool it tried to call,
+ * or from a failure message that quotes one, made inert in markdown: nothing
+ * in it can mention a user, make a link, open a tag or change the formatting.
+ * REPORT.md ends up in the body of a pull request, which notifies and renders.
+ * A zero-width space after `@` is what stops a mention, which no escape does.
+ */
+export function inertMarkdown(text: string): string {
+  return text
+    .replace(/[\\`*_{}[\]<>()#+!|~]/g, '\\$&')
+    .replace(/@/g, '@\u200b')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The health verdict lines, worst first. Shared by the terminal and markdown
+ * renderings; `inert` is applied to the text of a model, and is the identity
+ * where it is only read.
+ */
+export function healthSummary(
+  health: HealthView,
+  inert: (text: string) => string = (text) => text,
+): { level: 'ok' | 'warn' | 'bad'; text: string }[] {
   const lines: { level: 'ok' | 'warn' | 'bad'; text: string }[] = [];
   if (health.runs === 0) return [{ level: 'warn', text: 'No runs recorded.' }];
 
@@ -198,7 +220,7 @@ export function healthSummary(health: HealthView): { level: 'ok' | 'warn' | 'bad
     lines.push({ level: 'ok', text: `Every run passed its integrity checks (${health.runs} of ${health.runs}).` });
   }
   if (health.denied.total > 0) {
-    const tools = [...health.denied.byTool].map(([tool, count]) => `${tool} ×${count}`).join(', ');
+    const tools = [...health.denied.byTool].map(([tool, count]) => `${inert(tool)} ×${count}`).join(', ');
     lines.push({
       level: 'warn',
       text: `${plural(health.denied.total, 'tool call')} denied by the sandbox guard${tools ? `: ${tools}` : ''}.`,
@@ -605,7 +627,7 @@ export function toMarkdown(view: ReportView): string {
 
   parts.push('## Health', '');
   const marks = { ok: '✅', warn: '⚠️', bad: '❌' } as const;
-  for (const line of healthSummary(view.health)) parts.push(`- ${marks[line.level]} ${line.text}`);
+  for (const line of healthSummary(view.health, inertMarkdown)) parts.push(`- ${marks[line.level]} ${line.text}`);
   parts.push('');
   if (view.health.failingChecks.length > 0) {
     parts.push(
@@ -615,7 +637,7 @@ export function toMarkdown(view: ReportView): string {
           `\`${check.id}\``,
           String(check.runs),
           [...check.byStrategy].map(([id, count]) => `${id} ${count}`).join(', '),
-          truncateText(check.example ?? '', 200),
+          inertMarkdown(truncateText(check.example ?? '', 200)),
         ]),
       ),
       '',
@@ -629,7 +651,7 @@ export function toMarkdown(view: ReportView): string {
           issue.strategyId,
           issue.phase,
           `${issue.runs}/${issue.of}`,
-          truncateText(issue.outcome, 120),
+          inertMarkdown(truncateText(issue.outcome, 120)),
         ]),
       ),
       '',
