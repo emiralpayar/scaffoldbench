@@ -269,7 +269,7 @@ Held identical for every architecture, on every call:
 | Hermeticity | `settingSources: []`, `strictMcpConfig: true` and `settings: { disableClaudeAiConnectors: true }` — no `~/.claude`, no repo settings, no `.mcp.json`, no claude.ai connectors |
 | Cost ceiling | a lease from `ctx.budget.reserve()` is the call's `maxBudgetUsd`, so concurrent calls can never together hold more than the run has left |
 | Cost accounting | the call's own `result` message settles its lease; a call that never gets one (aborted, crashed) is charged for the usage it streamed, priced from a list-price table and flagged `costEstimated` |
-| API failures | auth, rate-limit, overload, server and invalid-request failures come back as `apiError` and never as answer text. The CLI's notice that the model could not finish — it ran out of output tokens or context, or its safeguards refused — is dressed the same way but is the run's own outcome: it comes back as `modelStop`, never as `apiError`, so it counts against the run instead of being retried and excused, and never as answer text either |
+| API failures | auth, rate-limit, overload, server and invalid-request failures come back as `apiError` and never as answer text. The CLI's notice that the model could not finish — it ran out of output tokens or context, could not form a tool call the CLI could parse, or its safeguards refused — is dressed the same way but is the run's own outcome: it comes back as `modelStop`, never as `apiError`, so it counts against the run instead of being retried and excused, and never as answer text either |
 | Trace capture | every SDK message is normalized and appended to `ctx.trace`, tagged with the call's `callId` |
 | Effort | `ctx.effort` is requested on every call; the level the CLI actually applied, which it lowers or drops for a model that does not support it, is read from the `PreToolUse` and `Stop` hooks and recorded as `effectiveEffort` on the call, the run record and the manifest |
 | Abort | the parent `AbortSignal` is forwarded, and the stream is cut mid-flight the moment `budget.exceeded` flips |
@@ -393,10 +393,15 @@ review with no readable decision — it records that on the phase as `degraded`,
 `harness.not-degraded` and the strategy's own check fail. Nothing defaults silently: an unreadable
 verdict is never approval, and an action no reviewer could decide on is denied.
 
-Running out of turns, budget or time is not an integrity failure. Such a run is a valid, losing
-data point; excluding it would flatter exactly the architectures that fail that way. A phase the
-run's limits cut short is therefore never marked degraded, and a fidelity check about a phase that
-was cut short, or never started because the run had stopped, passes.
+Running out of budget or time is not an integrity failure, and neither is an acting phase running
+out of turns. Such a run is a valid, losing data point; excluding it would flatter exactly the
+architectures that fail that way. A phase the run's limits cut short is therefore never marked
+degraded, and a fidelity check about a phase that was cut short, or never started because the run
+had stopped, passes. (A run stopped by an API failure passes them too, but fails `harness.api` and
+is never ranked.) A planner, decomposer, selector, verifier or reviewer that uses up its turns
+without giving its structured reply is different: it ran to the end of what it was given and the
+architecture still did not get the plan, split, choice or verdict it is built on, so that run
+fails `harness.structured-output` and the strategy's own check.
 
 `failureMode` names why a run did not pass, and every member is one the pipeline produces:
 

@@ -1053,6 +1053,26 @@ describe('fan-out fidelity', () => {
     });
   });
 
+  it('says so, rather than claiming they ran, when no worker had budget enough to start', () => {
+    const skipped = { subtype: 'skipped', aborted: true } as const;
+    const workers = [
+      record('decompose', { meta: { subtasks: 2, workers: 2, source: 'schema' } }),
+      record('worker-a', skipped),
+      record('worker-b', skipped),
+    ];
+    expect(check(orchestratorWorkersFidelityChecks(input(workers, 2)), 'orchestrator-workers.fan-out')).toEqual({
+      id: 'orchestrator-workers.fan-out',
+      ok: true,
+      detail: 'no worker started: the run had too little budget left to start any',
+    });
+    const proposers = PROPOSER_LENSES.map((lens, i) => record(`propose-${i + 1}`, { ...skipped, meta: { lens: lens.id } }));
+    expect(check(proposeSelectFidelityChecks(input(proposers, 3)), 'propose-select.proposals')).toEqual({
+      id: 'propose-select.proposals',
+      ok: true,
+      detail: 'no proposer started: the run had too little budget left to start any',
+    });
+  });
+
   it('excuses a fan-out the run’s budget stopped before it began', () => {
     const phases = [record('decompose', { meta: { subtasks: 3, workers: 3, source: 'schema' } })];
     expect(check(orchestratorWorkersFidelityChecks(input(phases, 0, 'cost')), 'orchestrator-workers.fan-out')).toMatchObject({

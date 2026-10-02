@@ -227,11 +227,15 @@ export function fanOutCheck(input: FidelityInput): IntegrityCheck {
   if (input.outcome.subagentCount !== planned) {
     failures.push(`subagentCount is ${input.outcome.subagentCount}, not ${planned}`);
   }
-  return checkFrom(
-    id,
-    failures,
-    planned === 1 ? 'one worker on the whole task, as the orchestrator chose' : `${planned} workers ran in parallel`,
-  );
+  // Every worker skipped is the run's budget giving out, not a starved fan-out:
+  // each was offered an equal share, and no share was enough to start a call.
+  const verified =
+    skipped.length > 0 && skipped.length === workers.length
+      ? 'no worker started: the run had too little budget left to start any'
+      : planned === 1
+        ? 'one worker on the whole task, as the orchestrator chose'
+        : `${planned} workers ran in parallel`;
+  return checkFrom(id, failures, verified);
 }
 
 /** The synthesis wrote the answer, rather than a worker's report standing in for it. */

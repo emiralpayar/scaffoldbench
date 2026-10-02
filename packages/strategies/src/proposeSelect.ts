@@ -220,7 +220,12 @@ export function proposalsCheck(input: FidelityInput): IntegrityCheck {
   }
   const lenses = new Set(proposals.map((record) => metaString(record, 'lens')));
   if (lenses.size !== proposals.length) failures.push('the proposers did not each have their own lens');
-  return checkFrom(id, failures, `${proposals.length} proposers ran in parallel, one per lens`);
+  // Every proposer skipped is the run's budget giving out, not a starved one.
+  const verified =
+    skipped.length > 0 && skipped.length === proposals.length
+      ? 'no proposer started: the run had too little budget left to start any'
+      : `${proposals.length} proposers ran in parallel, one per lens`;
+  return checkFrom(id, failures, verified);
 }
 
 /** The selector chose a proposal by a valid number, read from the schema reply. */
