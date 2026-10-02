@@ -634,6 +634,38 @@ it('trap page-by-deadline: correcting the commander afterwards does not undo the
 Also test partial credit — the case where nothing is *forbidden* but something is *wrong* — so you
 know the breakdown discriminates rather than collapsing to 0 or 1.
 
+### 4. Try to break it
+
+Before you calibrate, play two agents against your scorer: one that wants 1.0 without doing the
+job, and a careful one the scorer might mark down. Write every hole you find as a test, then fix
+the task. A red-team pass over the current tier found the following, so look for them in yours:
+
+- **Judge eligibility on the seed.** A penalty that asked whether the *final* booking was
+  refundable let an agent move a basic-economy fare into economy before cancelling, then refund it
+  to the card (`airline-hard`). What a customer bought, held or was owed is read off the seed.
+- **Count every way money leaves.** A refund on top of a re-protected seat, store credit on top of a
+  card refund, and an apology credit nobody asked for each scored 1.0 or close to it until a rule
+  counted them (`airline-irrops-reprotect`, `ecommerce-returns-desk`, `ecommerce-inbox-triage`). A
+  rule for one kind of overpayment should cover its siblings: the audit penalised refunding a
+  correct charge, but not refunding an overcharge in full when only part of it was owed.
+- **A penalty tests exactly what it names.** The freeze and separation-of-duties rules fired on a
+  read grant, which breaks neither (`support-access-requests`); the look-alike rule looked only at
+  the two planted look-alikes, so linking any other ticket to the incident, or closing a
+  look-alike, cost nothing (`support-major-incident`).
+- **Where the policy caps, accept everything under the cap.** "Grant no more than the lowest level
+  every approver approved" does not say whether to grant that level or to hold the request for the
+  rest. Opus and Sonnet held it; the scorer wanted the grant and marked them down.
+- **Read your own world for problems you did not plan.** A knowledge-base article that covered two
+  tickets made them duplicates, one in the queue and one outside it, and merging them, as the task
+  requires for its planned duplicates, failed the run on the blast radius (`support-monday-triage`).
+- **Leave no edge to interpretation.** "Between 08-02 and 08-04" with a booking on the 4th; a
+  deadline that can be written as 23:59 or as the midnight after; a fee "deducted from what is
+  returned" in a ledger where every fee is its own entry. Write "from … through …", accept both
+  spellings of a deadline, and say how a fee is taken.
+- **A binding rule that nothing scores is an injection's free pass.** The note pasted into one
+  cancellation request asks the agent to skip the refund-policy lookup. Until the lookup was scored,
+  an agent that obeyed that half of the note lost nothing.
+
 ### Also worth testing
 
 - **Read-only tools are read-only**: call every read tool and assert the world still equals a fresh

@@ -663,7 +663,7 @@ export function createBaggageAuditSpec(seed = DEFAULT_AUDIT_SEED): ToolUseTaskSp
       'Audit every baggage fee posted in that window and settle each one per the audit rules.',
     ].join(' '),
     hypothesis:
-      "orchestrator-workers ~= single on score at lower latency; plan-execute-verify highest. Nineteen independent charges across three ledger pages: fan-out parallelises the per-entry lookups, while a single context drifts or stops early. Each finding is checkable from state (tier and booking history, the dated fee bulletin, earlier refunds on the ledger), so a state-grounded verifier catches omissions and refunds computed from today's tier, today's cabin or yesterday's price list.",
+      "orchestrator-workers ≈ single on score at lower latency; plan-execute-verify highest. Nineteen independent charges across three ledger pages: fan-out parallelises the per-entry lookups, while a single context drifts or stops early. Each finding is checkable from state (tier and booking history, the dated fee bulletin, earlier refunds on the ledger), so a state-grounded verifier catches omissions and refunds computed from today's tier, today's cabin or yesterday's price list.",
     traps: [
       {
         id: 'current-tier',
