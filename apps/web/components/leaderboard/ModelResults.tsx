@@ -109,7 +109,9 @@ export function ModelResults({
         <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted">
           Dot: mean score over tasks. Whisker: its interval. The thin vertical line is the single agent&apos;s mean.
           {domain[0] > 0 || domain[1] < 1 ? ` The axis is zoomed to ${domain[0].toFixed(2)}–${domain[1].toFixed(2)}.` : ''}{' '}
-          Runs: ranked of recorded, with the rest excluded and counted above.
+          {verified
+            ? 'Runs: ranked of recorded, with the rest excluded and counted above.'
+            : 'Runs: counted of recorded, none of them checked for fidelity.'}
         </p>
       </section>
 
@@ -129,12 +131,19 @@ export function ModelResults({
         </section>
       ) : null}
 
+      {/* The paired contrasts are a verdict on the designs, which a run set without fidelity checks cannot give. */}
       <section aria-labelledby="pay-title" className="mb-16">
         <h2 id="pay-title" className="h2 mb-8 max-w-3xl text-ink">
-          Does the structure pay for itself on {modelShortName(model)}<span className="kern-q">?</span>
+          {verified ? (
+            <>
+              Does the structure pay for itself on {modelShortName(model)}<span className="kern-q">?</span>
+            </>
+          ) : (
+            <>Score against cost, as recorded</>
+          )}
         </h2>
-        <div className="grid gap-6 xl:grid-cols-2">
-          {payoff.panels.length > 0 ? (
+        <div className={verified ? 'grid gap-6 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]' : 'max-w-3xl'}>
+          {verified && payoff.panels.length > 0 ? (
             <div className="card min-w-0 p-5 sm:p-6">
               <PayoffSmallMultiples data={payoff} method={analysis.method} single />
             </div>
@@ -146,7 +155,10 @@ export function ModelResults({
       </section>
 
       <p className="max-w-3xl text-[0.8125rem] leading-relaxed text-muted">
-        {analysis.method} Computed over {records.filter(isRankable).length} ranked runs of {records.length} on this model.
+        {analysis.method}{' '}
+        {verified
+          ? `Computed over ${records.filter(isRankable).length} ranked runs of ${records.length} on this model.`
+          : `Computed over ${records.filter(isRankable).length} counted runs of ${records.length} recorded on this model, none of them checked for fidelity.`}
       </p>
 
       <nav aria-label="More results" className="mt-10 flex flex-wrap gap-x-6 gap-y-2 border-t border-rule pt-5 text-[0.9375rem]">
