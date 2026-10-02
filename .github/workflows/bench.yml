@@ -1,163 +1,207 @@
 name: Benchmark
 
+# Runs the matrix on the maintainers' request and proposes the result as a pull
+# request. Nothing here runs on a schedule: a benchmark of unchanged code on an
+# unchanged model tells nothing new and costs real money.
 on:
   workflow_dispatch:
     inputs:
+      models:
+        description: 'Models under test, comma-separated. Each one multiplies the cost.'
+        required: true
+        default: claude-sonnet-5-5
       strategies:
-        description: 'Comma-separated strategy ids, or "all".'
-        required: false
+        description: 'Strategy ids, comma-separated, or "all".'
+        required: true
         default: all
       tasks:
-        description: 'Comma-separated task ids, or "all".'
-        required: false
+        description: 'Task ids, worlds, categories or globs, comma-separated, or "all".'
+        required: true
         default: all
       repeats:
-        description: 'Repeats per strategy x task cell.'
-        required: false
+        description: 'Repeats per model x strategy x task cell.'
+        required: true
         default: '3'
-      model:
-        description: 'Model under test. Sweep with claude-sonnet-5; publish with claude-opus-5.'
-        required: false
-        default: claude-sonnet-5
+      effort:
+        description: 'Reasoning effort of the model under test.'
+        required: true
+        type: choice
+        options: [low, medium, high, xhigh, max]
+        default: high
+      max-cost:
+        description: 'Cost ceiling in USD for ONE run.'
+        required: true
+        default: '1'
       total-budget:
-        description: 'Hard ceiling in USD for the whole matrix. The runner skips remaining cells once it is reached.'
-        required: false
+        description: 'Cost ceiling in USD for the whole session. A run starts only if its cap still fits.'
+        required: true
         default: '25'
-  schedule:
-    # Mondays, 04:17 UTC. Off the hour so it is not queued behind everybody
-    # else's midnight cron.
-    - cron: '17 4 * * 1'
+      concurrency:
+        description: 'Runs in flight at once.'
+        required: true
+        default: '4'
+      judge-model:
+        description: 'Model that grades research answers.'
+        required: true
+        default: claude-sonnet-5-5
+      judge-samples:
+        description: 'Independent grades per graded run.'
+        required: true
+        default: '3'
 
-# One benchmark at a time, ever. Two concurrent runs would race on results/ and
-# on latest.json, and the loser's commit would be silently dropped. Queued
-# rather than cancelled: a run that has already spent money should finish and
-# record what it bought.
+# One benchmark at a time. Two at once would share the account's rate limits
+# and each skew the other's latency and API errors. GitHub keeps one waiting
+# run per group and replaces an older waiting one, so a third dispatch
+# displaces the second; the running one is never cancelled, because a run that
+# has already spent money should finish and record what it bought.
 concurrency:
-  group: benchmark-results
+  group: benchmark
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   bench:
-    name: Run matrix and publish report
+    name: Run the matrix and propose the result
     runs-on: ubuntu-latest
-    timeout-minutes: 240
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      ARENA_STRATEGIES: ${{ inputs.strategies || 'all' }}
-      ARENA_TASKS: ${{ inputs.tasks || 'all' }}
-      ARENA_REPEATS: ${{ inputs.repeats || '3' }}
-      ARENA_MODEL: ${{ inputs.model || 'claude-sonnet-5' }}
-      ARENA_TOTAL_BUDGET: ${{ inputs['total-budget'] || '25' }}
+    timeout-minutes: 360
+    permissions:
+      # Pushes a branch and opens a pull request; never writes to main.
+      contents: write
+      pull-requests: write
     steps:
-      - name: Require an API key
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installed without the API key in the environment: dependency install
+      # scripts run here, and the key is for the benchmark alone.
+      - run: npm ci
+
+      - name: Check the SDK wiring (free)
+        run: npm run --silent check:wiring -- --init-only
+
+      - name: Name the run set
+        # Chosen here, not discovered afterwards, so every later step names the
+        # same run set explicitly. (An id valid for --run-set: letters, digits,
+        # dots, dashes and underscores.)
+        run: echo "BENCH_RUN_SET=$(date -u +%Y-%m-%dT%H-%M-%SZ)-gh${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+
+      - name: Run the benchmark
+        id: run
+        # The only step that sees the key. Inputs reach the shell through the
+        # environment, never by interpolation into the script.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BENCH_MODELS: ${{ inputs.models }}
+          BENCH_STRATEGIES: ${{ inputs.strategies }}
+          BENCH_TASKS: ${{ inputs.tasks }}
+          BENCH_REPEATS: ${{ inputs.repeats }}
+          BENCH_EFFORT: ${{ inputs.effort }}
+          BENCH_MAX_COST: ${{ inputs.max-cost }}
+          BENCH_TOTAL_BUDGET: ${{ inputs.total-budget }}
+          BENCH_CONCURRENCY: ${{ inputs.concurrency }}
+          BENCH_JUDGE_MODEL: ${{ inputs.judge-model }}
+          BENCH_JUDGE_SAMPLES: ${{ inputs.judge-samples }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::error::ANTHROPIC_API_KEY is not set. Add it as a repository secret before running the benchmark."
             exit 1
           fi
-
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Warn if there is nothing to replay
-        # Replay mode never reaches the network, so an unrecorded research task
-        # sees every retrieval miss and scores accordingly. That is a property of
-        # the fixtures, not of the architecture under test, and it is worth
-        # saying out loud rather than discovering in the leaderboard.
-        run: |
-          if [ ! -d fixtures ] || [ -z "$(ls -A fixtures 2>/dev/null)" ]; then
-            echo '::warning::No fixtures are committed. Research tasks will run offline with no recorded sources. Record them with `arena run --tasks research --record` and commit fixtures/.'
-          fi
-
-      - name: Run benchmark
-        # --replay: research tasks read only from committed fixtures, so the web
-        # half of the matrix costs nothing beyond the model calls and cannot
-        # drift with the live web between runs. It is already the default; it is
-        # spelled out here because a benchmark that quietly started hitting the
-        # network would be a different measurement.
-        run: |
+          # Fails before any spend if the key is malformed, the SDK cannot start,
+          # or a research task cannot build its environment from the fixtures.
+          npm run --silent arena -- doctor
+          # An empty input is an error here, not "all": the CLI refuses it.
+          # --replay: research tasks read only recorded fixtures, so the web half
+          # of the matrix costs nothing beyond the model calls and cannot drift
+          # with the live web. It is the default; it is spelled out because a
+          # benchmark that quietly started hitting the network would be a
+          # different measurement.
           npm run --silent arena -- run \
-            --strategies "$ARENA_STRATEGIES" \
-            --tasks "$ARENA_TASKS" \
-            --repeats "$ARENA_REPEATS" \
-            --model "$ARENA_MODEL" \
-            --total-budget "$ARENA_TOTAL_BUDGET" \
-            --replay
+            --run-set "$BENCH_RUN_SET" \
+            --models "$BENCH_MODELS" \
+            --strategies "$BENCH_STRATEGIES" \
+            --tasks "$BENCH_TASKS" \
+            --repeats "$BENCH_REPEATS" \
+            --effort "$BENCH_EFFORT" \
+            --max-cost "$BENCH_MAX_COST" \
+            --total-budget "$BENCH_TOTAL_BUDGET" \
+            --concurrency "$BENCH_CONCURRENCY" \
+            --judge-model "$BENCH_JUDGE_MODEL" \
+            --judge-samples "$BENCH_JUDGE_SAMPLES" \
+            --replay \
+            --update-latest
 
-      - name: Identify the run set
-        # latest.json is the pointer the site renders; the newest run-set
-        # directory is the fallback, and works because run set ids are ISO
-        # timestamps and therefore sort chronologically.
+      - name: Write the report
+        # After a failed or stopped run too: the report says what was recorded
+        # and why it cannot be published. Stdout is the terminal rendering, kept
+        # in the log; --markdown writes results/<run set>/REPORT.md.
+        if: always() && env.BENCH_RUN_SET != ''
         run: |
-          run_set=$(node -e '
-            const fs = require("node:fs");
-            const pointer = "results/latest.json";
-            if (fs.existsSync(pointer)) {
-              const { runSetId } = JSON.parse(fs.readFileSync(pointer, "utf8"));
-              if (runSetId && fs.existsSync(`results/${runSetId}/manifest.json`)) {
-                process.stdout.write(runSetId);
-                process.exit(0);
-              }
-            }
-            const dirs = fs.readdirSync("results", { withFileTypes: true })
-              .filter((e) => e.isDirectory() && fs.existsSync(`results/${e.name}/manifest.json`))
-              .map((e) => e.name)
-              .sort();
-            process.stdout.write(dirs.at(-1) ?? "");
-          ')
-          if [ -z "$run_set" ]; then
-            echo '::error::The benchmark produced no run set.'
-            exit 1
-          fi
-          echo "ARENA_RUN_SET=$run_set" >> "$GITHUB_ENV"
-
-      - name: Write report
-        # --markdown writes results/<runSetId>/REPORT.md; stdout is the
-        # fixed-width terminal rendering, which is kept in the job log.
-        run: |
-          set -o pipefail
-          npm run --silent arena -- report --markdown | tee /tmp/arena-report.txt
-
-      - name: Publish report to the job summary
-        run: |
-          {
-            echo "## Benchmark — \`$ARENA_RUN_SET\`"
-            echo
-            echo "model: \`$ARENA_MODEL\` · repeats: \`$ARENA_REPEATS\` · budget: \`\$$ARENA_TOTAL_BUDGET\` · fixtures: \`replay\`"
-            echo
-            if [ -s "results/$ARENA_RUN_SET/REPORT.md" ]; then
-              cat "results/$ARENA_RUN_SET/REPORT.md"
-            elif [ -s /tmp/arena-report.txt ]; then
-              # Fall back to the terminal rendering, fenced so its column
-              # alignment survives markdown.
-              echo '```'
-              cat /tmp/arena-report.txt
-              echo '```'
-            else
-              echo "_The report command produced no output._"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Commit results
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add results
-          if git diff --cached --quiet; then
-            echo 'No new results to commit.'
+          if [ ! -d "results/$BENCH_RUN_SET/runs" ]; then
+            echo "No run of $BENCH_RUN_SET was recorded."
             exit 0
           fi
-          git commit -m "Benchmark run $ARENA_RUN_SET ($ARENA_MODEL, $ARENA_REPEATS repeats)"
-          # The concurrency group makes us the only writer, so a rebase here can
-          # only be picking up unrelated commits pushed while the matrix ran.
-          git pull --rebase --autostash
-          git push
+          npm run --silent arena -- report "$BENCH_RUN_SET" --markdown
+          {
+            echo "## Benchmark \`$BENCH_RUN_SET\`"
+            echo
+            cat "results/$BENCH_RUN_SET/REPORT.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Results and traces are kept as an artifact whatever happened, so a run
+      # that spent money is never lost. Traces are not committed (they are
+      # large), so this is also where they are kept.
+      - name: Keep the results
+        if: always() && env.BENCH_RUN_SET != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bench-${{ env.BENCH_RUN_SET }}
+          path: results/${{ env.BENCH_RUN_SET }}
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Health gate
+        # Exit 3 unless the run set is complete and every run passed its
+        # integrity checks with no API error. A run set that fails is not
+        # published; its artifact stays for diagnosis and for --resume.
+        run: npm run --silent arena -- report "$BENCH_RUN_SET" --strict > /dev/null
+
+      - name: Open a pull request
+        # Needs "Allow GitHub Actions to create and approve pull requests" in the
+        # repository's Actions settings. A pull request opened with the workflow
+        # token does not start the CI workflow; push an empty commit to it, or
+        # close and reopen it, to get the checks.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          branch="bench/$BENCH_RUN_SET"
+          report="results/$BENCH_RUN_SET/REPORT.md"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add "results/$BENCH_RUN_SET" results/latest.json
+          git commit -m "bench: $BENCH_RUN_SET" -m "Produced by $RUN_URL"
+          git push origin "$branch"
+          {
+            echo "Run set \`$BENCH_RUN_SET\`, produced by [this workflow run]($RUN_URL)."
+            echo
+            echo "It passed the health gate: complete, every run passed its integrity checks, no API error. Merging it points \`results/latest.json\`, and so the site, at this run set. Traces are not committed; they are in the run's \`bench-$BENCH_RUN_SET\` artifact."
+            echo
+            if [ "$(wc -c < "$report")" -le 60000 ]; then
+              cat "$report"
+            else
+              echo "The report is too long for this description; it is committed as \`$report\`."
+            fi
+          } > "$RUNNER_TEMP/pr-body.md"
+          gh pr create \
+            --base "$DEFAULT_BRANCH" \
+            --head "$branch" \
+            --title "bench: $BENCH_RUN_SET" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
