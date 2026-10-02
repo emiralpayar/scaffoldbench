@@ -10,7 +10,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
   return { ...actual, query: fake.fakeQuery };
 });
 
-import { latestPointerPath, listJsonFiles, manifestPath, readJson, readJsonIfExists, runsDir } from '@arena/core';
+import { latestPointerPath, listJsonFiles, manifestPath, readJson, readJsonIfExists, runsDir, writeJson } from '@arena/core';
 import type { RunSetManifest } from '@arena/core';
 
 import { assistant, resetFake, setScript, sleep, success } from '../../../packages/core/test/support/fakeClaudeCode';
@@ -192,6 +192,24 @@ describe('arena run', () => {
     const after = fakeContext();
     expect(await runCommand(args('--resume', 'e2e-lock', '--plain'), after.ctx)).toBe(0);
     expect(after.stderrText()).toMatch(/Nothing to run: every cell of e2e-lock is recorded/);
+  });
+
+  it('will not resume a run set whose strategy was renamed, since it would run the new one into the old records', async () => {
+    setScript(async function* () {
+      yield success({ text: 'done', costUsd: 0.01 });
+    });
+    const once = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--run-set', 'e2e-renamed', '--plain'), once.ctx)).toBe(0);
+    // The first published run set recorded `debate-select`, which is called `propose-select` now.
+    const manifest = await readJson<RunSetManifest>(manifestPath('e2e-renamed', root));
+    await writeJson(manifestPath('e2e-renamed', root), { ...manifest, strategyIds: ['debate-select'] });
+
+    const again = fakeContext();
+    expect(await runCommand(args('--resume', 'e2e-renamed', '--dry-run'), again.ctx)).toBe(1);
+    expect(again.err.join('\n')).toMatch(
+      /Run set "e2e-renamed" cannot be resumed: it was measured with strategies debate-select, which are now propose-select/,
+    );
+    expect(await listJsonFiles(runsDir('e2e-renamed', root))).toHaveLength(1);
   });
 
   it('refuses to write into a run set that already holds runs unless resuming', async () => {

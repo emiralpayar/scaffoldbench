@@ -91,6 +91,7 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
   let resumeNotes: string[] = [];
   // What the run set had spent before this session, so the session's own spend can be told apart.
   let earlierUsd = 0;
+  let resumedManifest: RunSetManifest | undefined;
   if (input.resume !== undefined) {
     const id = input.resume;
     const records = await listJsonFiles(runsDir(id, resultsRoot));
@@ -114,6 +115,7 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
     }
     args = resumed.args;
     resumeNotes = resumed.notes;
+    resumedManifest = manifest;
     if (manifest) earlierUsd = runSetSpend(manifest);
   } else if (args.runSetId !== undefined && args.persist) {
     const existing = await listJsonFiles(runsDir(args.runSetId, resultsRoot));
@@ -137,6 +139,17 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
   }
   if (strategies.length === 0 || tasks.length === 0) {
     ctx.fail('The selection is empty: nothing to run.');
+    return 1;
+  }
+
+  // An id that was renamed since the run set was measured still selects, but
+  // as the new id, and the cells it would run are not the ones recorded.
+  const renamed = resumedManifest ? renamedSelections(resumedManifest, strategies, tasks) : [];
+  if (renamed.length > 0) {
+    ctx.fail(
+      `Run set "${args.resume}" cannot be resumed: ${renamed.join('; ')}. Its records show what was measured ` +
+        'under the old names; start a new run set instead.',
+    );
     return 1;
   }
 
@@ -359,6 +372,20 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
     );
   }
   return result.records.length > 0 ? 0 : 1;
+}
+
+/** How the strategies and tasks a resume selects differ from the ids its manifest recorded. */
+function renamedSelections(manifest: RunSetManifest, strategies: readonly Strategy[], tasks: readonly Task[]): string[] {
+  const differences: string[] = [];
+  for (const [what, recorded, now] of [
+    ['strategies', manifest.strategyIds, strategies.map((strategy) => strategy.id)],
+    ['tasks', manifest.taskIds, tasks.map((task) => task.id)],
+  ] as const) {
+    if (JSON.stringify(recorded) !== JSON.stringify(now)) {
+      differences.push(`it was measured with ${what} ${recorded.join(', ')}, which are now ${now.join(', ')}`);
+    }
+  }
+  return differences;
 }
 
 /** Everything a run set has spent, as its manifest adds it up. */
