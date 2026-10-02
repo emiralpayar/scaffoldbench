@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const record = data ? findRun(data.records, runId) : undefined;
   if (!record) return { title: runId };
   return pageMetadata({
-    title: `${architectureName(record.strategyId)} on ${record.taskTitle}, repeat ${record.repeat}`,
+    title: `${architectureName(record.strategyId)} on ${record.taskTitle} (${modelShortName(record.model)}), repeat ${record.repeat}`,
     description: `The trace, timeline and score of run ${runId}: ${architectureName(record.strategyId)} on "${record.taskTitle}" with ${modelShortName(record.model)}.`,
     path: `/runs/${runId}/`,
   });
