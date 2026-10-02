@@ -381,6 +381,28 @@ describe('cost of calls that never reported one', () => {
     expect(outcome.turns).toBe(1);
   });
 
+  it('cuts a call off mid-stream at the run’s limit, names the limit and charges the call', async () => {
+    let now = 0;
+    setScript(async function* (session) {
+      yield assistant('working…', { usage: { input_tokens: 10_000, output_tokens: 1_000 } });
+      now = 61_000;
+      yield assistant('still working…', { usage: { input_tokens: 10_000, output_tokens: 1_000 } });
+      await session.untilAborted();
+    });
+    const ctx: RunContext = {
+      ...makeCtx(),
+      budget: new BudgetTracker({ maxCostUsd: 1, maxWallClockMs: 60_000, now: () => now }),
+    };
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.aborted).toBe(true);
+    expect(outcome.subtype).toBe('aborted');
+    expect(outcome.error).toBe('aborted: run wallclock limit reached');
+    expect(outcome.costEstimated).toBe(true);
+    expect(outcome.costUsd).toBeCloseTo(2 * (0.01 + 0.005), 10);
+  });
+
   it('charges a crashed call for the tokens it streamed', async () => {
     setScript(async function* () {
       yield assistant('working…', { usage: { input_tokens: 10_000, output_tokens: 0 } });

@@ -10,6 +10,7 @@ import { normalizeSdkMessage } from './trace';
 import type {
   AgentDefinition,
   ApiError,
+  BudgetStopReason,
   McpServerConfig,
   McpServerStatus,
   ModelSpend,
@@ -261,7 +262,8 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   // This call's own last words, for when the turn is cut short. Tracked here
   // rather than read back from the trace, which concurrent siblings share.
   let lastText = '';
-  let stoppedForBudget = false;
+  // Which of the run's limits made us abort the call mid-stream, if one did.
+  let stoppedBy: BudgetStopReason | undefined;
   let crashed = false;
 
   try {
@@ -282,7 +284,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
 
       // Stop as soon as the run-level ceiling is hit, even mid-stream.
       if (message.type !== 'result' && ctx.budget.exceeded && !controller.signal.aborted) {
-        stoppedForBudget = true;
+        stoppedBy = ctx.budget.stopReason;
         controller.abort();
       }
     }
@@ -329,7 +331,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const error = apiError
     ? `API error (${apiError.kind}${apiError.status !== undefined ? ` ${apiError.status}` : ''}): ${apiError.message}`
     : aborted
-      ? `aborted: ${stoppedForBudget ? 'run budget exhausted' : 'run aborted'}`
+      ? `aborted: ${stoppedBy ? `run ${stoppedBy} limit reached` : 'run aborted'}`
       : report.subtype !== undefined && report.subtype !== 'success'
         ? report.errors.join('; ') || report.subtype
         : undefined;
