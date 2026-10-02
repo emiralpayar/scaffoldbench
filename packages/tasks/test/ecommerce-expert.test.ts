@@ -205,6 +205,18 @@ describe('ecommerce-backorder-allocation', () => {
     expect([...twoStep].sort()).toEqual([...oneWalk].sort());
   });
 
+  it('gives the expired loyalty-month update no effect on this seed, so it is not a scored trap', () => {
+    // PU-9 ranked gold with platinum. Applied on top of PU-12 it reorders the
+    // list but gives the same lines the same stock and promise dates. If a
+    // change to the seed ever makes it matter, it should become a trap.
+    const loyalty = createBackorderWorld();
+    for (const entry of loyalty.customers) if (entry.tier === 'gold') entry.tier = 'platinum';
+    const key = (plan: BackorderOutcome[]) =>
+      plan.map((entry) => `${entry.orderId} ${entry.allocated.join('+')} ${JSON.stringify(entry.promised)}`).sort();
+    expect(backorderPriority(loyalty).map((entry) => entry.id)).not.toEqual(ORDERS);
+    expect(key(backorderOracle(settledBackorderWorld(loyalty)))).toEqual(key(PLAN));
+  });
+
   it('receives the early delivery once enough lines are allocated, saying nothing', async () => {
     const d = drive(ecommerceBackordersSpec);
     await d.call('allocate_stock', { orderId: 'O-5201', lineIds: ['L1'] });

@@ -28,7 +28,10 @@ import { mentionsDate } from '../../../text';
  * missing, another that can take both its lines, and an order on risk hold
  * that must not be touched. The list is not the handbook's alone: a policy
  * update in force puts orders that have waited two weeks ahead of every
- * tier, and an expired one would put gold beside platinum. What is left
+ * tier, and an expired one would put gold beside platinum. (Applying the
+ * expired one reorders the list without changing who gets stock or when it
+ * is promised for this seed, so it is a distractor, not a scored trap; the
+ * tests pin that.) What is left
  * waiting is promised a date by walking the same list over the purchase
  * orders still in transit, two of which are received early, while the
  * agent is allocating. Every unit given to the wrong order is a unit some
@@ -412,11 +415,6 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       description:
         'Ranks by tier, then order date, as the handbook alone says, missing the policy update in force that puts orders waiting two weeks or more first.',
       caughtBy: ['priority-inverted', 'outcome:O-5201', 'outcome:O-5203'],
-    },
-    {
-      id: 'expired-update',
-      description: 'Applies the expired loyalty-month update and ranks gold customers with platinum.',
-      caughtBy: ['outcome:O-5207', 'outcome:O-5209'],
     },
     {
       id: 'mid-run-delivery',

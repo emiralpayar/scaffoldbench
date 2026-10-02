@@ -819,6 +819,7 @@ describe('airline-baggage-audit', () => {
   });
 
   const naiveRefund: [trap: string, kind: string, amount: (owed: number) => number][] = [
+    ['cabin-only-allowance', 'tier-ignored', () => 0],
     ['later-upgrade', 'cabin-upgraded-later', () => 4500],
     ['second-purchase', 'second-purchase', () => 2500],
     ['prior-courtesy-refund', 'partly-refunded', (owed) => owed + 2000],
