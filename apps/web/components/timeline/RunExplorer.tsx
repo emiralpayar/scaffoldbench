@@ -43,6 +43,8 @@ export function RunExplorer({
   const pairs = useMemo(() => joinGroups(timeline.calls, groups), [timeline, groups]);
   const root = useRef<HTMLDivElement>(null);
   const playback = usePlayback(timeline.durationMs, initialView === 'replay' && autoplay, root);
+  // An event picked in the replay opens in Explore, selected.
+  const [inspecting, setInspecting] = useState<Selection | null>(null);
 
   return (
     <div ref={root} className="card overflow-hidden">
@@ -55,7 +57,10 @@ export function RunExplorer({
               aria-pressed={view === id}
               onClick={() => {
                 setView(id);
-                if (id === 'explore') playback.pause();
+                if (id === 'explore') {
+                  playback.pause();
+                  setInspecting(null);
+                }
               }}
               className="segmented-item"
             >
@@ -70,9 +75,20 @@ export function RunExplorer({
       </div>
 
       {view === 'explore' ? (
-        <Explore timeline={timeline} pairs={pairs} color={color} label={label} />
+        <Explore timeline={timeline} pairs={pairs} color={color} label={label} {...(inspecting ? { initial: inspecting } : {})} />
       ) : (
-        <Replay timeline={timeline} pairs={pairs} color={color} label={label} playback={playback} />
+        <Replay
+          timeline={timeline}
+          pairs={pairs}
+          color={color}
+          label={label}
+          playback={playback}
+          onInspect={(selection) => {
+            playback.pause();
+            setInspecting(selection);
+            setView('explore');
+          }}
+        />
       )}
     </div>
   );
@@ -87,19 +103,28 @@ function Explore({
   pairs,
   color,
   label,
+  initial,
 }: {
   timeline: Timeline;
   pairs: { call: TimelineCall; group: ViewGroup }[];
   color: string;
   label: string;
+  /** What to open on: an event picked in the replay. */
+  initial?: Selection;
 }) {
-  // Open on the first thing that went wrong, if anything did.
+  // Open on what was asked for, else on the first thing that went wrong, if anything did.
   const firstProblem = pairs.find(
     ({ call }) => call.status === 'failed' || call.serversDown.length > 0 || call.degraded,
   );
   const [selection, setSelection] = useState<Selection | null>(
-    firstProblem ? { key: firstProblem.call.key } : null,
+    initial ?? (firstProblem ? { key: firstProblem.call.key } : null),
   );
+
+  useEffect(() => {
+    if (!initial) return;
+    const id = initial.seq === undefined ? `call-${initial.key}` : `event-${initial.seq}`;
+    document.getElementById(id)?.scrollIntoView({ block: 'center' });
+  }, [initial]);
   const [open, setOpen] = useState<Set<string>>(() => new Set(pairs.map(({ call }) => call.key)));
 
   const toggle = useCallback((key: string) => {
@@ -289,12 +314,15 @@ function Replay({
   color,
   label,
   playback,
+  onInspect,
 }: {
   timeline: Timeline;
   pairs: { call: TimelineCall; group: ViewGroup }[];
   color: string;
   label: string;
   playback: Playback;
+  /** Open one event in Explore. */
+  onInspect: (selection: Selection) => void;
 }) {
   const { t } = playback;
   const feed = useMemo(() => {
@@ -324,17 +352,19 @@ function Replay({
         <ol ref={box} tabIndex={0} aria-label="Events so far, scrollable" className="max-h-[22rem] overflow-y-auto">
           {shown.length === 0 ? <li className="px-4 py-3 text-[0.8125rem] text-muted">Nothing has happened yet.</li> : null}
           {shown.map(({ call, item }) => (
-            <li
-              key={item.seq}
-              className={`grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 border-b border-rule/60 px-4 py-2 last:border-0 ${
-                call.depth > 0 ? 'bg-sunken/40' : ''
-              }`}
-            >
-              <span className="num pt-0.5 text-[0.6875rem] text-muted">{formatDuration(item.tMs)}</span>
-              <span className="min-w-0">
-                <span className="eyebrow mb-1 block !text-[0.6875rem]">{call.label}</span>
-                <ItemSummary item={item} />
-              </span>
+            <li key={item.seq} className={`border-b border-rule/60 last:border-0 ${call.depth > 0 ? 'bg-sunken/40' : ''}`}>
+              <button
+                type="button"
+                onClick={() => onInspect({ key: call.key, seq: item.seq })}
+                title="Open this event in Explore"
+                className="grid w-full cursor-pointer grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 px-4 py-2 text-left hover:bg-sunken/70"
+              >
+                <span className="num pt-0.5 text-[0.6875rem] text-muted">{formatDuration(item.tMs)}</span>
+                <span className="min-w-0">
+                  <span className="eyebrow mb-1 block !text-[0.6875rem]">{call.label}</span>
+                  <ItemSummary item={item} />
+                </span>
+              </button>
             </li>
           ))}
         </ol>
