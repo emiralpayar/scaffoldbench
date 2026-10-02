@@ -1,75 +1,99 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  Judge,
-  JudgeRequest,
-  JournaledToolSpec,
-  ScoreInput,
-  TaskEnvironment,
-  ToolCall,
-  TraceEvent,
-} from '@arena/core';
+import path from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { FIXTURES_DIR, type Judge, type JudgeRequest, type ScoreInput, type Task, type TaskEnvironment } from '@arena/core';
 import {
-  FixtureStore,
+  JUDGE_EFFORT,
+  UNGROUNDED_CREDIT,
+  breadthResearchSpecs,
   createWebTools,
+  defineBreadthTask,
   defineResearchTask,
-  fixtureKey,
-  htmlToText,
-  pageFixtureKey,
+  fieldMatches,
+  judgedResearchSpecs,
+  normalizeSection,
+  researchState,
   researchTasks,
-  searchFixtureKey,
+  type BreadthTaskSpec,
+  type ResearchJudgeRequest,
+  type ResearchTaskSpec,
 } from '../src/research/index';
-import type { HttpResponse, PageRecord, ResearchTaskSpec, SearchResult } from '../src/research/index';
+import { answerWithBlock, callTool, writeCorpus } from './researchHelpers';
 
 // ---------------------------------------------------------------------------
-// helpers
+// a small web for the scoring tests
 // ---------------------------------------------------------------------------
 
-let dir = '';
+const scratch = mkdtempSync(path.join(tmpdir(), 'arena-research-'));
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'arena-fixtures-'));
-});
+const SPEC_URL = 'https://specs.test.org/widgets.html';
+const OLD_URL = 'https://specs.test.org/widgets-v1.html';
+const GUIDE_URL = 'https://guide.test.org/widgets';
 
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
+const SPEC_TEXT = [
+  'Widget Specification, version 2',
+  '',
+  '1. Blue Widgets',
+  '',
+  'A blue widget is always round and never weighs more than ten grams.',
+  'Blue widgets are cacheable by default unless a header forbids it.',
+  '',
+  '2. Red Widgets',
+  '',
+  'A red widget is square and must be painted twice before shipping.',
+  'Red widgets are never cacheable, whatever the headers say.',
+  '',
+  '3. Index',
+].join('\n');
 
-interface Reply {
-  text: string;
-  isError: boolean;
-}
+const OLD_TEXT = [
+  'Widget Specification, version 1 (obsolete)',
+  '',
+  'A blue widget is always round and never weighs more than five grams.',
+].join('\n');
 
-async function call(
-  tools: JournaledToolSpec[],
-  name: string,
-  args: Record<string, unknown>,
-): Promise<Reply> {
-  const spec = tools.find((candidate) => candidate.name === name);
-  if (!spec) throw new Error(`no tool named ${name}`);
-  const reply = await spec.handler(args);
-  return typeof reply === 'string'
-    ? { text: reply, isError: false }
-    : { text: reply.text, isError: reply.isError === true };
-}
+const fixtureDir = writeCorpus(scratch, [
+  { id: 'spec', url: SPEC_URL, title: 'Widget Specification v2', text: SPEC_TEXT },
+  { id: 'old', url: OLD_URL, title: 'Widget Specification v1', text: OLD_TEXT },
+  { id: 'guide', url: GUIDE_URL, title: 'Widget guide', text: 'A friendly guide: blue widgets are round, red widgets are square, and both are popular.' },
+]);
 
-function responding(html: string) {
-  return vi.fn(
-    async (_url: string): Promise<HttpResponse> => ({
-      ok: true,
-      status: 200,
-      text: async () => html,
-    }),
-  );
-}
+const RUBRIC: ResearchTaskSpec['rubric'] = [
+  { id: 'a', claim: 'States that blue widgets are round', weight: 1, support: [{ doc: 'spec', quote: 'A blue widget is always round' }] },
+  { id: 'b', claim: 'States that red widgets are square', weight: 3, support: [{ doc: 'spec', quote: 'A red widget is square' }] },
+];
 
-/** A fetch that must never run; the assertion is `not.toHaveBeenCalled`. */
-function forbiddenFetch() {
-  return vi.fn(async (_url: string): Promise<HttpResponse> => {
-    throw new Error('replay mode reached the network');
+function judgedTask(overrides: Partial<ResearchTaskSpec> = {}): Task {
+  return defineResearchTask({
+    id: 'research-test',
+    title: 'Widgets',
+    question: 'What shapes are blue and red widgets?',
+    difficulty: 'easy',
+    tags: ['test'],
+    maxTurns: 6,
+    corpus: { primary: ['spec'], secondary: ['guide'], superseded: ['old'] },
+    rubric: RUBRIC,
+    ...overrides,
   });
+}
+
+/** A run of `task`: its environment plus a driver for its web tools. */
+function session(task: Task) {
+  const env = task.createEnvironment({ cwd: scratch, fixtureMode: 'replay', fixtureDir }) as TaskEnvironment;
+  const tools = createWebTools({ corpus: researchState(env).corpus });
+  return {
+    env,
+    fetch: (url: string, extra: Record<string, unknown> = {}) => callTool(tools, env.journal, 'fetch_page', { url, ...extra }),
+    search: (query: string) => callTool(tools, env.journal, 'search', { query }),
+    input: (judge: Judge, finalText: string, judgeSamples = 1): ScoreInput => ({
+      env,
+      outcome: { finalText, subagentCount: 0, phases: [] },
+      trace: [],
+      deps: { judge, judgeSamples },
+    }),
+  };
 }
 
 function judgeReturning(...values: unknown[]): { judge: Judge; requests: JudgeRequest[] } {
@@ -83,531 +107,592 @@ function judgeReturning(...values: unknown[]): { judge: Judge; requests: JudgeRe
   return { judge, requests };
 }
 
-const throwingJudge: Judge = async () => {
-  throw new Error('judge unavailable');
+type Status = 'met' | 'partial' | 'missing';
+
+function verdicts(...entries: Array<[string, Status, string[]?, string?]>) {
+  return {
+    verdicts: entries.map(([id, status, support = [], answerQuote]) => ({
+      id,
+      status,
+      support,
+      answerQuote: answerQuote ?? (status === 'missing' ? '' : ANSWER_PROSE),
+    })),
+  };
+}
+
+const ANSWER_PROSE = 'Blue widgets are round and red widgets are square.';
+const GOOD_EVIDENCE = {
+  evidence: [
+    { claim: 'Blue widgets are round', quote: 'A blue widget is always round and never weighs more than ten grams.', url: SPEC_URL },
+    { claim: 'Red widgets are square', quote: 'A red widget is square and must be painted twice', url: SPEC_URL },
+  ],
 };
 
-const RUBRIC = [
-  { id: 'a', claim: 'States A', weight: 1 },
-  { id: 'b', claim: 'States B', weight: 3 },
-];
-
-function makeTask(overrides: Partial<ResearchTaskSpec> = {}) {
-  return defineResearchTask({
-    id: 'research-test',
-    title: 'Test research task',
-    question: 'What is the difference between A and B?',
-    difficulty: 'easy',
-    tags: ['test'],
-    maxTurns: 6,
-    rubric: RUBRIC,
-    ...overrides,
-  });
-}
-
-function verdicts(...pairs: Array<[string, 'met' | 'partial' | 'missing']>) {
-  return {
-    verdicts: pairs.map(([id, status]) => ({ id, status, evidence: `quote for ${id}` })),
-  };
-}
-
-function fetchEvent(url: string, seq = 0): TraceEvent {
-  return {
-    seq,
-    tMs: seq,
-    phase: 'main',
-    depth: 0,
-    kind: 'tool_call',
-    toolName: 'mcp__web__fetch_page',
-    toolInput: { url },
-  };
-}
-
-function emptyEnv(journal: ToolCall[] = []): TaskEnvironment {
-  return { createMcpServers: () => ({}), allowedTools: [], readOnlyTools: [], state: {}, journal };
-}
-
-function scoreInput(options: {
-  judge: Judge;
-  finalText: string;
-  judgeSamples?: number;
-  trace?: TraceEvent[];
-  journal?: ToolCall[];
-}): ScoreInput {
-  return {
-    env: emptyEnv(options.journal),
-    outcome: { finalText: options.finalText, subagentCount: 0, phases: [] },
-    trace: options.trace ?? [],
-    deps: { judge: options.judge, judgeSamples: options.judgeSamples ?? 1 },
-  };
-}
-
 // ---------------------------------------------------------------------------
-// fixtureKey
-// ---------------------------------------------------------------------------
-
-describe('fixtureKey', () => {
-  it('is stable across calls', () => {
-    expect(fixtureKey('search', 'rfc 7538')).toBe(fixtureKey('search', 'rfc 7538'));
-    expect(fixtureKey('search', 'rfc 7538')).toHaveLength(32);
-    expect(fixtureKey('search', 'rfc 7538')).toMatch(/^[0-9a-f]{32}$/);
-  });
-
-  it('normalizes surrounding and inner whitespace and case', () => {
-    expect(fixtureKey('search', '  RFC   7538 ')).toBe(fixtureKey('search', 'rfc 7538'));
-    expect(fixtureKey('search', 'RFC\t7538')).toBe(fixtureKey('search', 'rfc 7538'));
-  });
-
-  it('separates the two kinds', () => {
-    expect(fixtureKey('search', 'rfc 7538')).not.toBe(fixtureKey('fetch', 'rfc 7538'));
-  });
-
-  it('canonicalizes URLs before keying a page fixture', () => {
-    expect(pageFixtureKey('https://www.rfc-editor.org/rfc/rfc7538/')).toBe(
-      pageFixtureKey('https://rfc-editor.org/rfc/rfc7538'),
-    );
-    expect(pageFixtureKey('https://a.example.com/x')).not.toBe(searchFixtureKey('https://a.example.com/x'));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// FixtureStore
-// ---------------------------------------------------------------------------
-
-describe('FixtureStore', () => {
-  it('round-trips a record through disk', async () => {
-    const store = new FixtureStore(dir);
-    const key = searchFixtureKey('rfc 7538');
-
-    expect(await store.has(key)).toBe(false);
-    await store.write(key, { kind: 'search', payload: 'rfc 7538', value: [{ n: 1 }] });
-    expect(await store.has(key)).toBe(true);
-
-    const record = await store.read<Array<{ n: number }>>(key);
-    expect(record?.key).toBe(key);
-    expect(record?.kind).toBe('search');
-    expect(record?.payload).toBe('rfc 7538');
-    expect(record?.value[0]?.n).toBe(1);
-    expect(typeof record?.recordedAt).toBe('string');
-  });
-
-  it('returns undefined for a missing key instead of throwing', async () => {
-    const store = new FixtureStore(dir);
-    await expect(store.read('does-not-exist')).resolves.toBeUndefined();
-    await expect(store.has('does-not-exist')).resolves.toBe(false);
-  });
-
-  it('returns undefined for a corrupt fixture file', async () => {
-    const store = new FixtureStore(dir);
-    await store.write('corrupt', { kind: 'fetch', payload: 'x', value: 1 });
-    const { writeFile } = await import('node:fs/promises');
-    await writeFile(join(dir, 'corrupt.json'), '{ not json', 'utf8');
-    await expect(store.read('corrupt')).resolves.toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// htmlToText
-// ---------------------------------------------------------------------------
-
-describe('htmlToText', () => {
-  it('drops script and style content and collapses whitespace', () => {
-    const html = [
-      '<html><head><title>Doc</title><style>body { color: red; }</style></head>',
-      '<body><script>var x = 1; if (x < 2) { alert("hi"); }</script>',
-      '<p>Hello    <b>world</b>   &amp; friends</p></body></html>',
-    ].join('\n');
-
-    const text = htmlToText(html);
-    expect(text).toBe('Hello world & friends');
-    expect(text).not.toContain('alert');
-    expect(text).not.toContain('color');
-  });
-
-  it('turns block boundaries into line breaks and caps blank-line runs', () => {
-    expect(htmlToText('<p>one</p><p>two</p>')).toBe('one\ntwo');
-    expect(htmlToText('<p>one</p>\n\n\n\n<p>two</p>')).toBe('one\n\ntwo');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// web tools — replay
-// ---------------------------------------------------------------------------
-
-describe('createWebTools in replay mode', () => {
-  it('returns two read-only tools', () => {
-    const tools = createWebTools({ fixtureMode: 'replay', fixtureDir: dir });
-    expect(tools.map((tool) => tool.name)).toEqual(['search', 'fetch_page']);
-    expect(tools.every((tool) => tool.readOnly === true)).toBe(true);
-  });
-
-  it('reports a miss without touching the network', async () => {
-    const fetchImpl = forbiddenFetch();
-    const tools = createWebTools({ fixtureMode: 'replay', fixtureDir: dir, fetchImpl });
-
-    const search = await call(tools, 'search', { query: 'rfc 7538' });
-    const page = await call(tools, 'fetch_page', { url: 'https://rfc-editor.org/rfc/rfc7538' });
-
-    expect(search.isError).toBe(true);
-    expect(search.text).toMatch(/no recorded/i);
-    expect(page.isError).toBe(true);
-    expect(page.text).toMatch(/no recorded/i);
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it('serves a seeded search fixture and normalizes the query', async () => {
-    const fetchImpl = forbiddenFetch();
-    const store = new FixtureStore(dir);
-    const results: SearchResult[] = [
-      {
-        title: 'RFC 7538',
-        url: 'https://www.rfc-editor.org/rfc/rfc7538',
-        snippet: 'The 308 Permanent Redirect status code.',
-      },
-    ];
-    await store.write(searchFixtureKey('rfc 7538'), {
-      kind: 'search',
-      payload: 'rfc 7538',
-      value: results,
-    });
-
-    const tools = createWebTools({ fixtureMode: 'replay', fixtureDir: dir, fetchImpl });
-    const reply = await call(tools, 'search', { query: '  RFC   7538  ' });
-
-    expect(reply.isError).toBe(false);
-    expect(reply.text).toContain('https://www.rfc-editor.org/rfc/rfc7538');
-    expect(reply.text).toContain('1.');
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it('serves a seeded page fixture and truncates long text', async () => {
-    const store = new FixtureStore(dir);
-    const body = `START ${'x'.repeat(9_000)} END`;
-    await store.write(pageFixtureKey('https://example.com/doc'), {
-      kind: 'fetch',
-      payload: 'https://example.com/doc',
-      value: { url: 'https://example.com/doc', title: 'Doc', text: body },
-    });
-
-    const tools = createWebTools({ fixtureMode: 'replay', fixtureDir: dir, fetchImpl: forbiddenFetch() });
-    const reply = await call(tools, 'fetch_page', { url: 'https://example.com/doc' });
-
-    expect(reply.isError).toBe(false);
-    expect(reply.text).toContain('START');
-    expect(reply.text).not.toContain('END');
-    expect(reply.text).toMatch(/truncated/i);
-  });
-
-  it('rejects a domain outside allowedDomains before looking anything up', async () => {
-    const tools = createWebTools({
-      fixtureMode: 'replay',
-      fixtureDir: dir,
-      allowedDomains: ['rfc-editor.org'],
-      fetchImpl: forbiddenFetch(),
-    });
-
-    const blocked = await call(tools, 'fetch_page', { url: 'https://evil.example.com/x' });
-    expect(blocked.isError).toBe(true);
-    expect(blocked.text).toMatch(/not on the allowed/i);
-
-    // A listed domain gets past the policy check and fails only on the fixture miss.
-    const allowed = await call(tools, 'fetch_page', { url: 'https://www.rfc-editor.org/rfc/rfc7538' });
-    expect(allowed.isError).toBe(true);
-    expect(allowed.text).toMatch(/no recorded/i);
-  });
-
-  it('rejects a malformed url', async () => {
-    const tools = createWebTools({ fixtureMode: 'replay', fixtureDir: dir, fetchImpl: forbiddenFetch() });
-    const reply = await call(tools, 'fetch_page', { url: 'not-a-url' });
-    expect(reply.isError).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// web tools — record
-// ---------------------------------------------------------------------------
-
-describe('createWebTools in record mode', () => {
-  it('fetches once, writes a fixture, then replays it', async () => {
-    const fetchImpl = responding(
-      '<html><head><title>Doc</title></head><body><p>Recorded body text</p></body></html>',
-    );
-    const tools = createWebTools({ fixtureMode: 'record', fixtureDir: dir, fetchImpl });
-
-    const first = await call(tools, 'fetch_page', { url: 'https://example.com/doc' });
-    expect(first.isError).toBe(false);
-    expect(first.text).toContain('Recorded body text');
-    expect(first.text).toContain('Doc');
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl.mock.calls[0]?.[0]).toBe('https://example.com/doc');
-
-    const record = await new FixtureStore(dir).read<PageRecord>(pageFixtureKey('https://example.com/doc'));
-    expect(record?.kind).toBe('fetch');
-    expect(record?.value.text).toContain('Recorded body text');
-    expect(await readdir(dir)).toHaveLength(1);
-
-    const second = await call(tools, 'fetch_page', { url: 'https://example.com/doc' });
-    expect(second.text).toContain('Recorded body text');
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-  });
-
-  it('parses DuckDuckGo result links and records them', async () => {
-    const html = `
-      <div class="result results_links">
-        <h2 class="result__title">
-          <a rel="nofollow" class="result__a"
-             href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.rfc-editor.org%2Frfc%2Frfc7538&amp;rut=deadbeef">RFC 7538 - Permanent Redirect</a>
-        </h2>
-        <a class="result__snippet" href="//duckduckgo.com/l/?uddg=x">The <b>308</b>    status code.</a>
-      </div>`;
-    const fetchImpl = responding(html);
-    const tools = createWebTools({ fixtureMode: 'record', fixtureDir: dir, fetchImpl });
-
-    const reply = await call(tools, 'search', { query: 'rfc 7538' });
-    expect(reply.isError).toBe(false);
-    expect(reply.text).toContain('https://www.rfc-editor.org/rfc/rfc7538');
-    expect(reply.text).toContain('RFC 7538 - Permanent Redirect');
-    expect(reply.text).toContain('The 308 status code.');
-    expect(fetchImpl.mock.calls[0]?.[0]).toContain('html.duckduckgo.com');
-
-    const record = await new FixtureStore(dir).read<SearchResult[]>(searchFixtureKey('rfc 7538'));
-    expect(record?.value[0]?.url).toBe('https://www.rfc-editor.org/rfc/rfc7538');
-  });
-
-  it('reports an error rather than inventing results when parsing yields nothing', async () => {
-    const fetchImpl = responding('<html><body>no results here</body></html>');
-    const tools = createWebTools({ fixtureMode: 'record', fixtureDir: dir, fetchImpl });
-
-    const reply = await call(tools, 'search', { query: 'rfc 7538' });
-    expect(reply.isError).toBe(true);
-    expect(await readdir(dir)).toHaveLength(0);
-  });
-
-  it('turns a transport failure into an error reply instead of throwing', async () => {
-    const fetchImpl = vi.fn(async (_url: string): Promise<HttpResponse> => {
-      throw new Error('ECONNREFUSED');
-    });
-    const tools = createWebTools({ fixtureMode: 'record', fixtureDir: dir, fetchImpl });
-
-    const reply = await call(tools, 'fetch_page', { url: 'https://example.com/doc' });
-    expect(reply.isError).toBe(true);
-    expect(reply.text).toContain('ECONNREFUSED');
-  });
-
-  it('turns a non-2xx response into an error reply', async () => {
-    const fetchImpl = vi.fn(
-      async (_url: string): Promise<HttpResponse> => ({ ok: false, status: 503, text: async () => '' }),
-    );
-    const tools = createWebTools({ fixtureMode: 'record', fixtureDir: dir, fetchImpl });
-
-    const reply = await call(tools, 'fetch_page', { url: 'https://example.com/doc' });
-    expect(reply.isError).toBe(true);
-    expect(reply.text).toContain('503');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// defineResearchTask — environment
+// judged tasks
 // ---------------------------------------------------------------------------
 
 describe('defineResearchTask environment', () => {
-  it('exposes web tools with readOnlyTools equal to allowedTools', async () => {
-    const env = await makeTask().createEnvironment({
-      cwd: dir,
-      fixtureMode: 'replay',
-      fixtureDir: dir,
-    });
-
+  it('exposes the two read-only web tools over the task corpus', () => {
+    const task = judgedTask();
+    const { env } = session(task);
     expect(env.allowedTools).toEqual(['mcp__web__search', 'mcp__web__fetch_page']);
     expect(env.readOnlyTools).toEqual(env.allowedTools);
     expect(Object.keys(env.createMcpServers())).toEqual(['web']);
-    expect(env.journal).toEqual([]);
+    expect(researchState(env).corpus.documents.map((document) => document.id)).toEqual(['spec', 'guide', 'old']);
   });
 
-  it('carries research metadata onto the task', () => {
-    const task = makeTask();
+  it('asks for quote-backed evidence in a fixed format, identically for every strategy', () => {
+    const task = judgedTask();
+    expect(task.prompt).toContain('What shapes are blue and red widgets?');
+    expect(task.prompt).toContain('{"evidence": [{"claim"');
+    expect(task.policy).toMatch(/word for word/);
+    expect(task.policy).toMatch(/offset/);
     expect(task.category).toBe('research');
-    expect(task.world).toBe('web');
-    expect(task.prompt).toContain('What is the difference between A and B?');
-    expect(task.policy).toMatch(/cite/i);
+  });
+
+  it('rejects a rubric with duplicate ids', () => {
+    expect(() => judgedTask({ rubric: [RUBRIC[0]!, RUBRIC[0]!] })).toThrow(/duplicate/);
   });
 });
 
-// ---------------------------------------------------------------------------
-// defineResearchTask — rubric scoring
-// ---------------------------------------------------------------------------
-
-describe('defineResearchTask rubric scoring', () => {
-  it('scores 1.0 when every rubric item is met', async () => {
-    const { judge, requests } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
-    const score = await makeTask().score(scoreInput({ judge, finalText: 'A differs from B.' }));
+describe('defineResearchTask scoring', () => {
+  it('gives full credit to claims the judge links to verified quotes', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge } = judgeReturning(verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]));
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
 
     expect(score.score).toBe(1);
     expect(score.passed).toBe(true);
-    expect(score.failureMode).toBe('none');
-    expect(requests[0]?.prompt).toContain('States A');
-    expect(requests[0]?.prompt).toContain('A differs from B.');
-    expect(requests[0]?.system).toMatch(/only what the answer/i);
+    expect(score.metadata).toMatchObject({ verifiedQuoteCount: 2, verifiedQuoteRate: 1, groundedWeightShare: 1 });
+    expect(score.breakdown.find((item) => item.id === 'b')?.detail).toMatch(/verified evidence E2/);
   });
 
-  it('weights a mixed verdict set', async () => {
-    const { judge } = judgeReturning(verdicts(['a', 'met'], ['b', 'partial']));
-    const score = await makeTask().score(scoreInput({ judge, finalText: 'Partly right.' }));
+  it('discounts a correct claim that no verified quote backs', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const tampered = {
+      evidence: [
+        GOOD_EVIDENCE.evidence[0],
+        { claim: 'Red widgets are square', quote: 'A red widget is square and comes in three sizes.', url: SPEC_URL },
+      ],
+    };
+    const { judge } = judgeReturning(verdicts(['a', 'met', []], ['b', 'met', ['E2']]));
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, tampered)));
 
-    // (1 * 1 + 3 * 0.5) / 4
-    expect(score.score).toBeCloseTo(0.625, 6);
-    expect(score.breakdown.find((item) => item.id === 'b')?.earned).toBe(0.5);
+    expect(score.breakdown.map((item) => item.earned)).toEqual([UNGROUNDED_CREDIT, UNGROUNDED_CREDIT]);
+    expect(score.breakdown[1]?.detail).toMatch(/did not verify/);
+    expect(score.metadata).toMatchObject({ verifiedQuoteRate: 0.5, groundedWeightShare: 0 });
+    expect(score.metadata?.evidence).toMatchObject([{ verified: true }, { verified: false, failure: 'the quote does not occur in the page' }]);
   });
 
-  it('takes the median across samples so one outlier cannot move the score', async () => {
+  it('does not let evidence from an unopened page count, and penalises citing it', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    const { judge } = judgeReturning(verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]));
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+
+    expect(score.breakdown.every((item) => item.earned === UNGROUNDED_CREDIT)).toBe(true);
+    expect(score.penalties[0]).toMatchObject({ id: 'citation-integrity', multiplier: 0.5 });
+    expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT * 0.5, 6);
+  });
+
+  it('does not let evidence count from a page that was opened but never shown', async () => {
+    // A `find` that matches nothing opens the page and displays none of it.
+    const task = judgedTask();
+    const run = session(task);
+    expect((await run.fetch(SPEC_URL, { find: 'zebra crossing' })).text).toContain('No occurrences');
+    const { judge } = judgeReturning(verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]));
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+
+    expect(score.penalties).toEqual([]);
+    expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+    expect(score.metadata?.evidence).toMatchObject([
+      { verified: false, failure: 'no tool ever showed the run this passage' },
+      { verified: false, failure: 'no tool ever showed the run this passage' },
+    ]);
+  });
+
+  it('downgrades a verdict whose quote is not actually in the answer', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
     const { judge } = judgeReturning(
-      verdicts(['a', 'met'], ['b', 'met']),
-      verdicts(['a', 'met'], ['b', 'met']),
-      verdicts(['a', 'missing'], ['b', 'missing']),
+      verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2'], 'red widgets are square and also triangular']),
     );
-    const score = await makeTask().score(
-      scoreInput({ judge, finalText: 'A differs from B.', judgeSamples: 3 }),
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+
+    expect(score.breakdown.find((item) => item.id === 'b')?.earned).toBe(0.5);
+    expect(score.metadata?.judgeUnverifiedQuotes).toBe(1);
+  });
+
+  it('accepts a judge quote that elides part of the answer', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge } = judgeReturning(
+      verdicts(['a', 'met', ['E1'], 'Blue widgets are round …'], ['b', 'met', ['E2'], 'Blue widgets ... red widgets are square']),
     );
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
 
     expect(score.score).toBe(1);
+    expect(score.metadata?.judgeUnverifiedQuotes).toBe(0);
   });
 
-  it('scores an item no judge returned as zero', async () => {
-    const { judge } = judgeReturning(verdicts(['a', 'met']));
-    const score = await makeTask().score(scoreInput({ judge, finalText: 'Only A.' }));
-
-    expect(score.breakdown.find((item) => item.id === 'b')?.earned).toBe(0);
-    expect(score.score).toBeCloseTo(0.25, 6);
-  });
-
-  it('survives a judge that always throws', async () => {
-    const score = await makeTask().score(
-      scoreInput({ judge: throwingJudge, finalText: 'Something.', judgeSamples: 3 }),
+  it('takes the median of judge samples', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge, requests } = judgeReturning(
+      verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]),
+      verdicts(['a', 'met', ['E1']], ['b', 'met', ['E2']]),
+      verdicts(['a', 'missing'], ['b', 'missing']),
     );
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE), 3));
 
-    expect(score.score).toBe(0);
-    expect(score.metadata?.judgeFailed).toBe(true);
-    expect(score.metadata?.judgeFailures).toBe(3);
-    expect(score.failureMode).toBe('wrong_answer');
+    expect(requests).toHaveLength(3);
+    expect(score.score).toBe(1);
+    expect(score.metadata?.judgeVerdicts).toHaveLength(3);
   });
 
-  it('skips the judge entirely for an empty answer', async () => {
+  it('pins the judge to this rubric and this evidence, at low effort', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
     const { judge, requests } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
-    const score = await makeTask().score(scoreInput({ judge, finalText: '   ' }));
+    await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
 
+    const request = requests[0] as ResearchJudgeRequest;
+    expect(request.effort).toBe(JUDGE_EFFORT);
+    const verdictsSchema = (request.schema.properties as Record<string, Record<string, unknown>>).verdicts!;
+    expect(verdictsSchema.minItems).toBe(2);
+    expect(verdictsSchema.maxItems).toBe(2);
+    const item = verdictsSchema.items as { properties: Record<string, { enum?: string[]; items?: { enum?: string[] } }> };
+    expect(item.properties.id?.enum).toEqual(['a', 'b']);
+    expect(item.properties.support?.items?.enum).toEqual(['E1', 'E2']);
+
+    expect(request.prompt).toContain('E1. claim: Blue widgets are round');
+    const marker = /<<<(ANSWER-[0-9a-f]+)/.exec(request.prompt)?.[1];
+    expect(marker).toBeDefined();
+    expect(request.prompt.trimEnd().endsWith(`${marker}>>>`)).toBe(true);
+    // The evidence block is listed above the answer, not repeated inside it.
+    expect(request.prompt.split(`<<<${marker}`)[1]).not.toContain('"evidence"');
+  });
+
+  it('ignores verdicts for unknown ids, duplicates and support ids that do not exist', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge } = judgeReturning({
+      verdicts: [
+        { id: 'zzz', status: 'met', support: ['E1'], answerQuote: ANSWER_PROSE },
+        { id: 'a', status: 'MET', support: ['E9', 'E1'], answerQuote: ANSWER_PROSE },
+        { id: 'a', status: 'missing', support: [], answerQuote: '' },
+      ],
+    });
+    const score = await task.score(run.input(judge, answerWithBlock(ANSWER_PROSE, GOOD_EVIDENCE)));
+    expect(score.breakdown.map((item) => item.earned)).toEqual([1, 0]);
+  });
+
+  it('flags a judge outage as a harness failure, not a wrong answer', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    const failing: Judge = async () => {
+      throw new Error('judge unavailable');
+    };
+    const score = await task.score(run.input(failing, 'Some answer.', 3));
+    expect(score.failureMode).toBe('harness_error');
+    expect(score.metadata).toMatchObject({ judgeFailed: true, judgeFailures: 3 });
+  });
+
+  it('scores an empty answer zero without paying the judge', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    const { judge, requests } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
+    const score = await task.score(run.input(judge, '   '));
     expect(score.score).toBe(0);
     expect(requests).toHaveLength(0);
     expect(score.metadata?.emptyAnswer).toBe(true);
   });
-});
 
-// ---------------------------------------------------------------------------
-// defineResearchTask — citation integrity
-// ---------------------------------------------------------------------------
-
-describe('defineResearchTask citation integrity', () => {
-  const allMet = verdicts(['a', 'met'], ['b', 'met']);
-
-  it('applies a 0.75 multiplier when half the cited URLs were never fetched', async () => {
-    const { judge } = judgeReturning(allMet);
-    const score = await makeTask().score(
-      scoreInput({
-        judge,
-        finalText: 'See https://a.example.com/one and https://b.example.com/two for details.',
-        trace: [fetchEvent('https://a.example.com/one')],
-      }),
-    );
-
-    expect(score.metadata?.citationIntegrity).toBeCloseTo(0.5, 6);
-    expect(score.score).toBeCloseTo(0.75, 6);
-    expect(score.penalties[0]?.kind).toBe('hallucinated_citation');
-    expect(score.penalties[0]?.multiplier).toBeCloseTo(0.75, 6);
-    expect(score.metadata?.citedCount).toBe(2);
-    expect(score.metadata?.verifiedCount).toBe(1);
-    expect(score.metadata?.hallucinatedCount).toBe(1);
-  });
-
-  it('does not penalise an answer that cites nothing', async () => {
-    const { judge } = judgeReturning(allMet);
-    const score = await makeTask().score(scoreInput({ judge, finalText: 'No links at all here.' }));
-
-    expect(score.penalties).toHaveLength(0);
-    expect(score.metadata?.citationIntegrity).toBe(1);
-    expect(score.score).toBe(1);
-  });
-
-  it('accepts a URL recorded only in the tool journal', async () => {
-    const { judge } = judgeReturning(allMet);
-    const journal: ToolCall[] = [
-      { name: 'fetch_page', args: { url: 'https://a.example.com/one' }, tMs: 1, ok: true, result: '' },
-    ];
-    const score = await makeTask().score(
-      scoreInput({ judge, finalText: 'Per https://a.example.com/one it holds.', journal }),
-    );
-
-    expect(score.score).toBe(1);
-    expect(score.penalties).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// defineResearchTask — source coverage
-// ---------------------------------------------------------------------------
-
-describe('defineResearchTask source coverage', () => {
-  it('reports the fraction of required domains that were fetched', async () => {
+  it('keeps a closed-book answer low even when every claim is right', async () => {
+    const task = judgedTask();
+    const run = session(task);
     const { judge } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
-    const task = makeTask({ requiredSources: ['a.example.com', 'b.example.com'] });
-    const score = await task.score(
-      scoreInput({
-        judge,
-        finalText: 'An answer without links.',
-        trace: [fetchEvent('https://sub.a.example.com/one'), fetchEvent('https://other.test/x', 1)],
-      }),
-    );
-
-    const coverage = score.breakdown.find((item) => item.id === 'source-coverage');
-    expect(coverage?.earned).toBeCloseTo(0.5, 6);
-    expect(score.metadata?.missingSources).toEqual(['b.example.com']);
-    expect(score.score).toBeLessThan(1);
+    const score = await task.score(run.input(judge, ANSWER_PROSE));
+    expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+    expect(score.metadata?.evidenceBlock).toBe(false);
   });
 
-  it('omits the coverage item when no sources are required', async () => {
+  it('counts a failed fetch as unopened, and ignores example URLs', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch('https://specs.test.org/widgets-v3.html');
     const { judge } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
-    const score = await makeTask().score(scoreInput({ judge, finalText: 'x' }));
-    expect(score.breakdown.map((item) => item.id)).toEqual(['a', 'b']);
+    const prose = `${ANSWER_PROSE} See https://specs.test.org/widgets-v3.html. Example: Location: https://www.example.com/x`;
+    const score = await task.score(run.input(judge, prose));
+    expect(score.metadata?.hallucinatedUrls).toEqual(['https://specs.test.org/widgets-v3.html']);
+    expect(score.metadata?.citedCount).toBe(1);
+    expect(score.penalties[0]?.multiplier).toBe(0.5);
+  });
+
+  it('records corpus provenance and what was read', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.search('blue widget');
+    await run.fetch(SPEC_URL);
+    await run.fetch(OLD_URL);
+    const { judge } = judgeReturning(verdicts(['a', 'met'], ['b', 'met']));
+    const score = await task.score(run.input(judge, ANSWER_PROSE));
+    expect(score.metadata?.corpus).toMatchObject({ version: 1, snapshot: '2026-10-01', documents: 3 });
+    expect(score.metadata?.openedByRole).toEqual({ primary: ['spec'], superseded: ['old'] });
+    // Both pages fit one window; the search also showed the guide's snippet, which is its whole text.
+    expect(score.metadata?.displayedShare).toEqual({ spec: 1, old: 1, guide: 1 });
+  });
+
+  it('records how much of a page the run was shown, not just that it opened it', async () => {
+    const task = judgedTask();
+    const run = session(task);
+    await run.fetch(SPEC_URL, { find: 'red widget is square' });
+    const { judge } = judgeReturning(verdicts(['a', 'missing'], ['b', 'missing']));
+    const score = await task.score(run.input(judge, ANSWER_PROSE));
+    const share = (score.metadata?.displayedShare as Record<string, number>).spec ?? 0;
+    expect(share).toBeGreaterThan(0.2);
+    expect(share).toBeLessThan(1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// the shipped task set
+// breadth tasks
 // ---------------------------------------------------------------------------
+
+const BREADTH: BreadthTaskSpec = {
+  id: 'research-breadth-test',
+  title: 'Widget facts',
+  question: 'For each widget colour, give its shape, the section defining it and whether it is cacheable.',
+  difficulty: 'medium',
+  tags: ['test'],
+  maxTurns: 10,
+  corpus: { primary: ['spec'], superseded: ['old'], secondary: ['guide'] },
+  key: { name: 'colour', label: 'widget colour' },
+  quoteFrom: 'the section of the specification that defines that colour',
+  fields: [
+    { name: 'shape', kind: 'text', description: 'its shape' },
+    { name: 'section', kind: 'section', description: 'the defining section' },
+    { name: 'cacheable', kind: 'boolean', description: 'whether it is cacheable by default' },
+  ],
+  items: [
+    {
+      key: 'blue',
+      expected: { shape: 'round', section: '1', cacheable: true },
+      source: { doc: 'spec', from: '1. Blue Widgets', to: '2. Red Widgets' },
+      goldQuote: 'Blue widgets are cacheable by default unless a header forbids it.',
+    },
+    {
+      key: 'red',
+      expected: { shape: 'square', section: '2', cacheable: false },
+      alsoAccept: { shape: ['a square'] },
+      source: { doc: 'spec', from: '2. Red Widgets', to: '3. Index' },
+      goldQuote: 'Red widgets are never cacheable, whatever the headers say.',
+    },
+  ],
+};
+
+const breadthTask = defineBreadthTask(BREADTH);
+const noJudge: Judge = async () => {
+  throw new Error('breadth tasks must not call the judge');
+};
+
+function breadthAnswer(...entries: Array<Record<string, unknown>>): string {
+  return answerWithBlock('Here is what the specification says.', { answers: entries });
+}
+
+const BLUE = { colour: 'blue', shape: 'Round', section: 'Section 1.', cacheable: true, quote: 'Blue widgets are cacheable by default', url: SPEC_URL };
+const RED = { colour: 'Red widgets', shape: 'a square', section: '§2', cacheable: 'no', quote: 'A red widget is square and must be painted twice before shipping.', url: SPEC_URL };
+
+describe('defineBreadthTask', () => {
+  it('lists every item and the exact answer shape in the prompt', () => {
+    expect(breadthTask.prompt).toContain('- blue\n- red');
+    expect(breadthTask.prompt).toContain('"answers":[{"colour":"blue"');
+    expect(breadthTask.prompt).toContain(
+      '- quote: a sentence from the section of the specification that defines that colour, copied word for word',
+    );
+  });
+
+  it('refuses an item without a gold value for every field', () => {
+    const broken = { ...BREADTH, items: [{ ...BREADTH.items[0]!, expected: { shape: 'round' } }] };
+    expect(() => defineBreadthTask(broken)).toThrow(/no gold value for section/);
+  });
+
+  it('scores a correct, grounded answer 1 without a judge', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, RED)));
+    expect(score.score).toBe(1);
+    expect(score.passed).toBe(true);
+    expect(score.metadata).toMatchObject({ itemsAnswered: 2, fieldAccuracy: 1, groundedItems: 2 });
+  });
+
+  it('gives partial credit field by field and says what was expected', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer({ ...BLUE, section: '2' }, RED)));
+    const blue = score.breakdown.find((item) => item.id === 'blue');
+    expect(blue?.earned).toBeCloseTo(2 / 3, 6);
+    expect(blue?.detail).toContain('section: answered "2", expected "1"');
+    expect(score.metadata?.fieldMisses).toEqual({ section: 1 });
+  });
+
+  it('only accepts a quote from the defining section of the right document', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    await run.fetch(OLD_URL);
+    const fromOld = { ...BLUE, quote: 'A blue widget is always round and never weighs more than five grams.', url: OLD_URL };
+    const wrongSection = { ...RED, quote: 'Blue widgets are cacheable by default unless a header forbids it.' };
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(fromOld, wrongSection)));
+    expect(score.breakdown.map((item) => item.earned)).toEqual([UNGROUNDED_CREDIT, UNGROUNDED_CREDIT]);
+    expect(score.breakdown[0]?.detail).toContain('quote is from old, expected spec');
+    expect(score.breakdown[1]?.detail).toContain('outside the part that defines this item');
+  });
+
+  it('needs six of the quote\'s own words inside the defining section, not just a toe across the heading', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    // Mostly section 1, running three words into section 2.
+    const straddling = { ...RED, quote: 'Blue widgets are cacheable by default unless a header forbids it. 2. Red Widgets A red widget' };
+    const elided = { ...RED, quote: 'Blue widgets are cacheable by default … A red widget' };
+    for (const red of [straddling, elided]) {
+      const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, red)));
+      expect(score.breakdown[1]?.detail, red.quote).toContain('outside the part that defines this item');
+    }
+  });
+
+  it('also grounds a quote from another place that states the item', async () => {
+    const elsewhere = 'blue widgets are round, red widgets are square, and both are popular';
+    const task = defineBreadthTask({
+      ...BREADTH,
+      items: BREADTH.items.map((item) => (item.key === 'blue' ? { ...item, alsoSource: [{ doc: 'guide', from: elsewhere }] } : item)),
+    });
+    const run = session(task);
+    await run.fetch(SPEC_URL);
+    await run.fetch(GUIDE_URL);
+    const answer = breadthAnswer({ ...BLUE, quote: elsewhere, url: GUIDE_URL }, RED);
+    expect((await task.score(run.input(noJudge, answer))).score).toBe(1);
+    const without = await breadthTask.score(run.input(noJudge, answer));
+    expect(without.breakdown[0]?.detail).toContain('quote is from guide, expected spec');
+  });
+
+  it('does not ground a quote from a page the run never opened, and penalises the citation', async () => {
+    const run = session(breadthTask);
+    const score = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE, RED)));
+    expect(score.breakdown.every((item) => item.earned === UNGROUNDED_CREDIT)).toBe(true);
+    expect(score.breakdown[0]?.detail).toContain('the page was never opened');
+    expect(score.penalties[0]?.multiplier).toBe(0.5);
+  });
+
+  it('reads a block whose quote kept the page’s quotation marks unescaped', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    // Valid JSON would be \"cacheable\"; models often re-type a page's “…” as bare quotes.
+    const answer = breadthAnswer(BLUE, RED).replace('"Blue widgets are cacheable by default"', '"Blue widgets are "cacheable" by default"');
+    expect(answer).toContain('are "cacheable" by');
+    const score = await breadthTask.score(run.input(noJudge, answer));
+    expect(score.score).toBe(1);
+    expect(score.metadata).toMatchObject({ answerBlock: true, answerBlockRepaired: true });
+  });
+
+  it('scores an unanswered item, or an answer without the block, zero', async () => {
+    const run = session(breadthTask);
+    await run.fetch(SPEC_URL);
+    const partial = await breadthTask.score(run.input(noJudge, breadthAnswer(BLUE)));
+    expect(partial.breakdown.find((item) => item.id === 'red')).toMatchObject({ earned: 0, detail: 'Not answered.' });
+    expect(partial.score).toBeCloseTo(0.5, 6);
+
+    const prose = await breadthTask.score(run.input(noJudge, 'Blue is round, red is square.'));
+    expect(prose.score).toBe(0);
+    expect(prose.metadata?.answerBlock).toBe(false);
+  });
+});
+
+describe('fieldMatches', () => {
+  const text = { name: 'reason', kind: 'text' as const, description: '' };
+  const section = { name: 'section', kind: 'section' as const, description: '' };
+  const integer = { name: 'rfc', kind: 'integer' as const, description: '' };
+  const keyword = { name: 'keyword', kind: 'keyword' as const, description: '' };
+  const flag = { name: 'flag', kind: 'boolean' as const, description: '' };
+
+  it('compares each kind by meaning, not formatting', () => {
+    expect(fieldMatches(text, 'non-authoritative  information', 'Non-Authoritative Information')).toBe(true);
+    expect(fieldMatches(text, 'Payload Too Large', 'Content Too Large')).toBe(false);
+    expect(normalizeSection('Section 15.4.9.')).toBe('15.4.9');
+    expect(fieldMatches(section, '§ 15.4.9', '15.4.9')).toBe(true);
+    expect(fieldMatches(section, '15.4.9.1', '15.4.9')).toBe(false);
+    expect(fieldMatches(integer, 'RFC 9,111', 9111)).toBe(true);
+    expect(fieldMatches(integer, 9111.5, 9111)).toBe(false);
+    expect(fieldMatches(keyword, 'shall  not', 'SHALL NOT')).toBe(true);
+    expect(fieldMatches(keyword, 'SHOULD NOT', 'SHALL NOT')).toBe(false);
+    expect(fieldMatches(flag, 'Yes', true)).toBe(true);
+    expect(fieldMatches(flag, 'maybe', false)).toBe(false);
+  });
+
+  it('expects nothing where the gold value is null', () => {
+    expect(fieldMatches(integer, null, null)).toBe(true);
+    expect(fieldMatches(integer, undefined, null)).toBe(true);
+    expect(fieldMatches(integer, 64, null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// the shipped task set, end to end against the shipped corpus
+// ---------------------------------------------------------------------------
+
+function shippedSession(task: Task) {
+  const env = task.createEnvironment({ cwd: scratch, fixtureMode: 'replay', fixtureDir: FIXTURES_DIR }) as TaskEnvironment;
+  const corpus = researchState(env).corpus;
+  const tools = createWebTools({ corpus });
+  const urlOf = (id: string): string => {
+    const document = corpus.documents.find((candidate) => candidate.id === id);
+    if (!document) throw new Error(`${id} is not in ${task.id}'s corpus`);
+    return document.url;
+  };
+  return {
+    env,
+    corpus,
+    /** Open a page and nothing more: its first window. */
+    fetchDoc: async (id: string) => {
+      const reply = await callTool(tools, env.journal, 'fetch_page', { url: urlOf(id) });
+      expect(reply.isError).toBe(false);
+      return urlOf(id);
+    },
+    /**
+     * Read a passage the way an agent does: `find` a few of its words (the
+     * first four that `find` can match: it does not skip an RFC's `|` margin),
+     * then read a window from each place they occur.
+     */
+    readPassage: async (id: string, quote: string) => {
+      const url = urlOf(id);
+      const words = quote.split(/\s+/);
+      for (let first = 0; first + 4 <= words.length; first++) {
+        const found = await callTool(tools, env.journal, 'fetch_page', { url, find: words.slice(first, first + 4).join(' ') });
+        const offsets = [...found.text.matchAll(/^- offset (\d+):/gm)].map((match) => Number(match[1]));
+        for (const offset of offsets) await callTool(tools, env.journal, 'fetch_page', { url, offset: Math.max(0, offset - 300) });
+        if (offsets.length > 0) return url;
+      }
+      throw new Error(`${id}: no four consecutive words of "${quote}" can be found`);
+    },
+    input: (judge: Judge, finalText: string): ScoreInput => ({
+      env,
+      outcome: { finalText, subagentCount: 0, phases: [] },
+      trace: [],
+      deps: { judge, judgeSamples: 1 },
+    }),
+  };
+}
 
 describe('researchTasks', () => {
-  it('ships three tasks with unique ids across all difficulties', () => {
-    expect(researchTasks).toHaveLength(3);
-    expect(new Set(researchTasks.map((task) => task.id)).size).toBe(3);
-    expect(researchTasks.map((task) => task.difficulty).sort()).toEqual(['easy', 'hard', 'medium']);
-    expect(researchTasks.every((task) => task.category === 'research')).toBe(true);
-    expect(researchTasks.every((task) => task.world === 'web')).toBe(true);
-  });
-
-  it('gives every task 4 to 6 positively weighted rubric items', async () => {
+  it('ships three judged and three gold-key tasks, each with a hypothesis and traps', () => {
+    expect(researchTasks.map((task) => task.id)).toEqual([
+      'research-http-redirects',
+      'research-script-loading',
+      'research-password-hashing',
+      'research-status-codes',
+      'research-header-fields',
+      'research-nist-password-rules',
+    ]);
     for (const task of researchTasks) {
-      const { judge } = judgeReturning({ verdicts: [] });
-      const score = await task.score(scoreInput({ judge, finalText: 'placeholder' }));
-      const rubricItems = score.breakdown.filter((item) => item.id !== 'source-coverage');
-      expect(rubricItems.length).toBeGreaterThanOrEqual(4);
-      expect(rubricItems.length).toBeLessThanOrEqual(6);
-      expect(rubricItems.every((item) => item.weight > 0)).toBe(true);
+      expect(task.category).toBe('research');
+      expect(task.world).toBe('web');
+      expect(task.hypothesis, task.id).toBeTruthy();
+      expect(task.traps?.length, task.id).toBeGreaterThan(0);
+      expect(task.prompt, task.id).toContain('```json');
     }
   });
 
-  it('builds a usable environment for every task', async () => {
-    for (const task of researchTasks) {
-      const env = await task.createEnvironment({ cwd: dir, fixtureMode: 'replay', fixtureDir: dir });
-      expect(env.readOnlyTools).toEqual(env.allowedTools);
-      expect(env.allowedTools).toHaveLength(2);
+  it('keeps rubrics small and positive, and breadth tasks broad', () => {
+    for (const spec of judgedResearchSpecs) {
+      expect(spec.rubric.length).toBeGreaterThanOrEqual(4);
+      expect(spec.rubric.length).toBeLessThanOrEqual(6);
+      expect(spec.rubric.every((item) => item.weight > 0)).toBe(true);
     }
+    for (const spec of breadthResearchSpecs) expect(spec.items.length).toBeGreaterThanOrEqual(8);
   });
+
+  for (const spec of breadthResearchSpecs) {
+    const task = researchTasks.find((candidate) => candidate.id === spec.id)!;
+
+    it(`${spec.id}: the gold key, quoted from the passages the run read, scores 1`, async () => {
+      const run = shippedSession(task);
+      const answers = [];
+      for (const item of spec.items) {
+        const url = await run.readPassage(item.source.doc, item.goldQuote);
+        answers.push({ [spec.key.name]: item.key, ...item.expected, quote: item.goldQuote, url });
+      }
+      const score = await task.score(run.input(noJudge, answerWithBlock('Answer.', { answers })));
+      expect(score.score).toBe(1);
+    });
+
+    it(`${spec.id}: opening each page but quoting from memory earns no grounding`, async () => {
+      // The page is opened, so no citation is a fabrication, and every quote
+      // is in it word for word; but the run was only shown each page's first
+      // window, and a model can recite a specification it has memorized.
+      const run = shippedSession(task);
+      const answers = [];
+      for (const item of spec.items) {
+        const url = await run.fetchDoc(item.source.doc);
+        answers.push({ [spec.key.name]: item.key, ...item.expected, quote: item.goldQuote, url });
+      }
+      const score = await task.score(run.input(noJudge, answerWithBlock('Answer.', { answers })));
+      expect(score.penalties).toEqual([]);
+      expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+      expect(score.breakdown[0]?.detail).toContain('no tool ever showed the run this passage');
+    });
+
+    it(`${spec.id}: a perfect closed-book answer stays low`, async () => {
+      const run = shippedSession(task);
+      const answers = spec.items.map((item) => ({
+        [spec.key.name]: item.key,
+        ...item.expected,
+        quote: item.goldQuote,
+        url: run.corpus.documents.find((document) => document.id === item.source.doc)?.url,
+      }));
+      const score = await task.score(run.input(noJudge, answerWithBlock('From memory.', { answers })));
+      expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT * 0.5, 6);
+    });
+  }
+
+  for (const spec of judgedResearchSpecs) {
+    const task = researchTasks.find((candidate) => candidate.id === spec.id)!;
+
+    it(`${spec.id}: an answer quoting the documented support scores 1`, async () => {
+      const run = shippedSession(task);
+      const evidence: Array<{ claim: string; quote: string; url: string }> = [];
+      const support: Record<string, string[]> = {};
+      for (const item of spec.rubric) {
+        for (const passage of item.support) {
+          evidence.push({ claim: item.claim, quote: passage.quote, url: await run.readPassage(passage.doc, passage.quote) });
+          (support[item.id] ??= []).push(`E${evidence.length}`);
+        }
+      }
+      const prose = spec.rubric.map((item) => item.claim).join(' ');
+      const { judge } = judgeReturning({
+        verdicts: spec.rubric.map((item) => ({ id: item.id, status: 'met', support: support[item.id], answerQuote: item.claim })),
+      });
+      const score = await task.score(run.input(judge, answerWithBlock(prose, { evidence })));
+      expect(score.score).toBe(1);
+    });
+
+    it(`${spec.id}: a perfect closed-book answer stays low`, async () => {
+      const run = shippedSession(task);
+      const prose = spec.rubric.map((item) => item.claim).join(' ');
+      const { judge } = judgeReturning({
+        verdicts: spec.rubric.map((item) => ({ id: item.id, status: 'met', support: [], answerQuote: item.claim })),
+      });
+      const score = await task.score(run.input(judge, prose));
+      expect(score.score).toBeCloseTo(UNGROUNDED_CREDIT, 6);
+    });
+  }
 });

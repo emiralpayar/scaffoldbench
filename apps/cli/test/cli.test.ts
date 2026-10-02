@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { summarizeRuns } from '@arena/core';
+import { FIXTURES_DIR, summarizeRuns } from '@arena/core';
 import type { Judge, ReportSummary, RunRecord, StrategyInfo, TaskInfo } from '@arena/core';
 import { getStrategies } from '@arena/strategies';
 import { ALL_TASKS, getTasks } from '@arena/tasks';
@@ -306,7 +306,8 @@ describe('ALL_TASKS', () => {
     const options = {
       cwd: '/tmp/arena-cli-test',
       fixtureMode: 'replay' as const,
-      fixtureDir: '/tmp/arena-cli-test/fixtures',
+      // Research environments load the shipped corpus, so this must be real.
+      fixtureDir: FIXTURES_DIR,
     };
     // Tool-use scoring is deterministic; a judge call here would be a bug.
     const judge: Judge = async () => {
