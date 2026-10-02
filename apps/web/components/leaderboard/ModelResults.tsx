@@ -1,4 +1,3 @@
-import Link from 'next/link';
 
 import type { SiteAnalysis } from '../../lib/analysis';
 import { describeModel, describeUnverifiedModel, paretoPoints, payoffData } from '../../lib/chartData';
@@ -7,6 +6,7 @@ import { modelLabel, modelShortName } from '../../lib/models';
 import { isRankable } from '../../lib/records';
 import type { RunSetData } from '../../lib/server/runSet';
 import { PageHeader } from '../Layout';
+import Link from '../Link';
 import { RunSetBanner } from '../RunSetMeta';
 import { PayoffSmallMultiples } from '../charts/PayoffChart';
 import { ParetoPlot } from '../charts/ScatterCharts';

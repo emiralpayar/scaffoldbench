@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import Link from '../Link';
 import type { RaceLane } from './TraceRace';
 import { TraceRace } from './TraceRace';
 

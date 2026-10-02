@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { ArchitectureGlyph } from '../../../components/ArchitectureGlyph';
 import { EmptyState } from '../../../components/EmptyState';
 import { PageHeader } from '../../../components/Layout';
+import Link from '../../../components/Link';
 import { RunSetBanner } from '../../../components/RunSetMeta';
 import { CheckRateList } from '../../../components/health/CheckRateList';
 import { HealthStrip } from '../../../components/leaderboard/HealthStrip';

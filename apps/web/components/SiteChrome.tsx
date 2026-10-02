@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
 import { REPO_URL, SITE_NAME, TAGLINE } from '../lib/site';
+import Link from './Link';
 import { LogoMark, Wordmark } from './Logo';
 import { SiteNav } from './SiteNav';
 import { ThemeToggle } from './ThemeToggle';

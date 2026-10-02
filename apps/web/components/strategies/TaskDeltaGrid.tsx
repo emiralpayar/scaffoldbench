@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
 import { formatDelta } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
 import type { TaskDelta } from '../../lib/strategies';
+import Link from '../Link';
 
 export interface ModelDeltas {
   model: string;

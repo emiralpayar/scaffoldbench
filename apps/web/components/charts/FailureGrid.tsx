@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 
+import Link from '../Link';
 import { ArchitectureColumnHeader, architectureGridClass } from './ArchitectureColumns';
 
 export interface FailureCell {

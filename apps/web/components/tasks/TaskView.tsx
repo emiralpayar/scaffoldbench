@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { architectureName, compareArchitectures } from '../../lib/architectures';
@@ -18,6 +17,7 @@ import { isRankable } from '../../lib/records';
 import type { RunSetData } from '../../lib/server/runSet';
 import { trapTable } from '../../lib/traps';
 import { Field, PageHeader, Tag } from '../Layout';
+import Link from '../Link';
 import { RunSetBanner } from '../RunSetMeta';
 import { ArchitectureKey } from '../charts/ArchitectureColumns';
 import { FailureGrid } from '../charts/FailureGrid';

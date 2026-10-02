@@ -1,4 +1,3 @@
-import Link from 'next/link';
 
 import { compareArchitectures } from '../../lib/architectures';
 import type { RepeatCell } from '../../lib/derive';
@@ -10,6 +9,7 @@ import { isRankable } from '../../lib/records';
 import type { RunSetData } from '../../lib/server/runSet';
 import { trapTable } from '../../lib/traps';
 import { PageHeader } from '../Layout';
+import Link from '../Link';
 import { RunSetBanner } from '../RunSetMeta';
 import { ArchitectureKey } from '../charts/ArchitectureColumns';
 import { RepeatMatrix } from '../charts/RepeatMatrix';

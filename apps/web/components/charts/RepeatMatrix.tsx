@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
 import { architectureName } from '../../lib/architectures';
 import type { RepeatCell, RunOutcome } from '../../lib/derive';
 import { formatDuration, formatFailureMode, formatScore, formatUsd, plural } from '../../lib/format';
 import type { Difficulty } from '../../lib/records';
+import Link from '../Link';
 import { ArchitectureColumnHeader, ArchitectureKey, architectureGridClass } from './ArchitectureColumns';
 import { Readout } from './Readout';
 

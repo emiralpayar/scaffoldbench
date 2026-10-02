@@ -1,9 +1,9 @@
-import Link from 'next/link';
 
 import type { SiteAnalysis } from '../../lib/analysis';
 import { payoffData, payoffHeadline, scaffoldScaleGroups, scaleHeadline } from '../../lib/chartData';
 import { PayoffSmallMultiples } from '../charts/PayoffChart';
 import { ScaffoldScaleChart } from '../charts/ScatterCharts';
+import Link from '../Link';
 
 /**
  * Act 2: the answer, once there is one to give. With no verified run set the

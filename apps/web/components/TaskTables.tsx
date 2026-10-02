@@ -1,4 +1,3 @@
-import Link from 'next/link';
 
 import type { CellSummary } from '@arena/core';
 
@@ -11,6 +10,7 @@ import {
   formatScore,
   formatUsd,
 } from '../lib/format';
+import Link from './Link';
 import { MiniBar } from './MiniBar';
 import { Verdict } from './Layout';
 import { ScrollRegion } from './ScrollRegion';

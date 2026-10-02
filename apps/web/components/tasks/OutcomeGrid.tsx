@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
 import { architectureName } from '../../lib/architectures';
@@ -10,6 +9,7 @@ import { isRankable } from '../../lib/records';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
 import { OutcomeLegend, RunSquares } from '../charts/RepeatMatrix';
 import { Readout } from '../charts/Readout';
+import Link from '../Link';
 
 /**
  * One task, every architecture on every model: a square per repeat, and the

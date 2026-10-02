@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { ArchitectureGlyph } from '../components/ArchitectureGlyph';
+import Link from '../components/Link';
 
 export const metadata: Metadata = {
   title: 'Page not found',

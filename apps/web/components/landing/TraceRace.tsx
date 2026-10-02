@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -9,6 +8,7 @@ import { formatDuration, formatScore, formatUsd } from '../../lib/format';
 import type { Timeline } from '../../lib/timeline';
 import { costAt, packLanes } from '../../lib/timeline';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import Link from '../Link';
 import { useReducedMotion } from '../timeline/useReducedMotion';
 
 export interface RaceLane {

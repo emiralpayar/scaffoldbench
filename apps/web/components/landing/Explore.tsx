@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import Link from '../Link';
 
 interface Destination {
   href: string;

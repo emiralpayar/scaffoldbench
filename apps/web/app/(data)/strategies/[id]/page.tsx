@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ArchitectureGlyph } from '../../../../components/ArchitectureGlyph';
 import { CheckRateList } from '../../../../components/health/CheckRateList';
 import { PageHeader } from '../../../../components/Layout';
+import Link from '../../../../components/Link';
 import { RunSetBanner } from '../../../../components/RunSetMeta';
 import { ModelSwitcher } from '../../../../components/leaderboard/ModelSwitcher';
 import { StageCostBars } from '../../../../components/strategies/StageCostBars';

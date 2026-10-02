@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
+import Link from '../../components/Link';
 import { ScrollRegion } from '../../components/ScrollRegion';
 import { Cause, Evidence } from '../../components/postmortem/Cause';
 import { DesignedVsRan } from '../../components/postmortem/DesignedVsRan';

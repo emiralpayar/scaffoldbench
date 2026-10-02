@@ -1,9 +1,9 @@
-import Link from 'next/link';
 
 import { formatScore } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
 import type { Postmortem } from '../../lib/postmortem';
 import { treeUrl } from '../../lib/site';
+import Link from '../Link';
 import { DesignedVsRan } from '../postmortem/DesignedVsRan';
 
 /**

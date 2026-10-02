@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { STRATEGIES } from '@arena/strategies';
 import { ALL_TASKS } from '@arena/tasks';
 
 import { ArchitectureGlyph } from '../../components/ArchitectureGlyph';
+import Link from '../../components/Link';
 import { LiveRunner, type LiveOption } from '../../components/LiveRunner';
 import { ScrollRegion } from '../../components/ScrollRegion';
 import type { ReplayEntry } from '../../components/timeline/ReplayGallery';

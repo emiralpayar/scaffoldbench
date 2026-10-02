@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 
 import { formatScore } from '../../lib/format';
 import type { Timeline } from '../../lib/timeline';
 import type { ViewGroup } from '../../lib/traceView';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import Link from '../Link';
 import { RunExplorer } from './RunExplorer';
 
 export interface ReplayEntry {

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { ArchitectureGlyph } from '../../../components/ArchitectureGlyph';
 import { PageHeader } from '../../../components/Layout';
+import Link from '../../../components/Link';
 import { GlyphLegend } from '../../../components/strategies/GlyphLegend';
 import { ARCHITECTURES } from '../../../lib/architectures';
 import { DESIGNS, TOOL_EXPOSURE } from '../../../lib/designs';

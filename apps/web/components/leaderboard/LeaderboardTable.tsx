@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import type { Estimate, PairedVerdict } from '../../lib/analysis';
@@ -8,6 +7,7 @@ import { formatDelta, formatDuration, formatMultiple, formatScore, formatUsd, jo
 import type { LeaderRow } from '../../lib/leaderboard';
 import { rankLabel } from '../../lib/leaderboard';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import Link from '../Link';
 
 const VERDICT: Record<PairedVerdict | 'control', { text: string; className: string }> = {
   better: { text: 'better', className: 'chip-good' },

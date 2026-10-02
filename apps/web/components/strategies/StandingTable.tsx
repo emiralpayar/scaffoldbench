@@ -1,10 +1,10 @@
-import Link from 'next/link';
 
 import type { PairedVerdict } from '../../lib/analysis';
 import { formatDelta, formatMultiple, formatPercent, formatScore, formatUsd } from '../../lib/format';
 import type { LeaderRow } from '../../lib/leaderboard';
 import { rankLabel } from '../../lib/leaderboard';
 import { modelShortName } from '../../lib/models';
+import Link from '../Link';
 import { ScrollRegion } from '../ScrollRegion';
 
 const VERDICT: Record<PairedVerdict | 'control', { text: string; className: string }> = {

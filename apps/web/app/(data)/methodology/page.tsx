@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { PageHeader } from '../../../components/Layout';
+import Link from '../../../components/Link';
 import { RunSetBanner } from '../../../components/RunSetMeta';
 import { ScrollRegion } from '../../../components/ScrollRegion';
 import { VerdictDiagram } from '../../../components/methodology/VerdictDiagram';

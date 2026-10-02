@@ -1,9 +1,9 @@
-import Link from 'next/link';
 
 import { formatDuration, formatUsd } from '../lib/format';
 import { modelShortName } from '../lib/models';
 import type { RunSetData } from '../lib/server/runSet';
 import { POSTMORTEM_RUN_SET_ID, loadRunSet } from '../lib/server/runSet';
+import Link from './Link';
 
 /**
  * What kind of numbers the page is showing, said before any of them.

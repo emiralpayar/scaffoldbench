@@ -1,7 +1,7 @@
-import Link from 'next/link';
 
 import type { RunSetHealth } from '../../lib/analysis';
 import { formatInt } from '../../lib/format';
+import Link from '../Link';
 
 /**
  * What the numbers below are computed over, said first: how many runs there

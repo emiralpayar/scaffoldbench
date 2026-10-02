@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+import Link from './Link';
 
 const LINKS = [
   { href: '/results/', label: 'Results', match: ['/results', '/runs', '/pareto'] },

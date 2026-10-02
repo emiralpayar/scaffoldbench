@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ArchitectureGlyph } from '../../../../components/ArchitectureGlyph';
 import { EmptyState } from '../../../../components/EmptyState';
 import { Panel, Tag, Verdict } from '../../../../components/Layout';
+import Link from '../../../../components/Link';
 import { Markdown } from '../../../../components/Markdown';
 import { PenaltyList, PhaseTable, ScoreBreakdown, ScoreMetadata } from '../../../../components/RunDetail';
 import { IntegrityList, RunReceipts } from '../../../../components/RunIntegrity';
