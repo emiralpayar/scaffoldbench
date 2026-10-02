@@ -1,12 +1,12 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { assistantText, isSyntheticAssistant } from './apiErrors';
+import { assistantText, isSyntheticAssistant, type ModelStop } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
 import type { ToolCallReviewer } from './guard';
 import { STRUCTURED_OUTPUT_TOOL, hermeticOptions } from './hermetic';
 import { CallMeter } from './meter';
-import { normalizeSdkMessage } from './trace';
+import { modelStopMeta, normalizeSdkMessage } from './trace';
 import type {
   ApiError,
   BudgetStopReason,
@@ -17,6 +17,12 @@ import type {
   TraceSink,
   UsageTotals,
 } from './types';
+
+/** How `QueryOutcome.error` names a model stop. */
+const MODEL_STOP_LABEL: Record<ModelStop['reason'], string> = {
+  output_limit: 'output limit',
+  refusal: 'refused',
+};
 
 /** Smallest budget worth attempting a call with. */
 const MIN_CALL_BUDGET_USD = 0.02;
@@ -118,6 +124,12 @@ export interface QueryOutcome {
    * a failure that is not the architecture's.
    */
   apiError?: ApiError;
+  /**
+   * Set when the turn ended because the model could not finish it: it ran
+   * out of output tokens or context, or its safeguards refused. Never with
+   * `apiError`: this is the run's own outcome, and it counts against it.
+   */
+  modelStop?: ModelStop;
   /**
    * The effort level the CLI reported applying to this call's turns, after
    * any silent downgrade for the model: `null` when it sent no effort
@@ -344,8 +356,8 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     ? `API error (${apiError.kind}${apiError.status !== undefined ? ` ${apiError.status}` : ''}): ${apiError.message}`
     : aborted
       ? `aborted: ${stoppedBy ? `run ${stoppedBy} limit reached` : 'run aborted'}`
-      : report.outputLimit !== undefined
-        ? `output limit: ${report.outputLimit}`
+      : report.modelStop !== undefined
+        ? `${MODEL_STOP_LABEL[report.modelStop.reason]}: ${report.modelStop.message}`
         : report.subtype !== undefined && report.subtype !== 'success'
           ? report.errors.join('; ') || report.subtype
           : undefined;
@@ -376,7 +388,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       ...(report.unpricedModels.length > 0 ? { unpricedModels: report.unpricedModels } : {}),
       ...(structuredMissing ? { structuredMissing: true } : {}),
       ...(apiError ? { apiError } : {}),
-      ...(report.outputLimit !== undefined ? { outputLimit: true } : {}),
+      ...(report.modelStop ? { modelStop: modelStopMeta(report.modelStop) } : {}),
       ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
       costByModel: Object.fromEntries(
         Object.entries(report.byModel).map(([model, spend]) => [model, spend.costUsd]),
@@ -402,6 +414,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     subtype,
     ...(error !== undefined ? { error } : {}),
     ...(apiError ? { apiError } : {}),
+    ...(report.modelStop ? { modelStop: report.modelStop } : {}),
     ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
     mcpServersExpected,
     mcpServers: report.mcpServers,

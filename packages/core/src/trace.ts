@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { apiErrorOfAssistant, outputLimitOfAssistant } from './apiErrors';
+import { apiErrorOfAssistant, modelStopOfAssistant, type ModelStop } from './apiErrors';
 import type { TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
 
 const MAX_TEXT = 8_000;
@@ -147,17 +147,17 @@ export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext):
         });
         break;
       }
-      // So is the CLI's notice that the model ran out of room, though it is
-      // the run's own limit rather than the API's failure.
-      const outputLimit = outputLimitOfAssistant(message);
-      if (outputLimit !== undefined) {
+      // So is the CLI's notice that the model could not finish (out of room,
+      // a refusal), though that is the run's own limit, not the API's failure.
+      const modelStop = modelStopOfAssistant(message);
+      if (modelStop) {
         out.push({
           ...base,
           depth,
           kind: 'error',
           isError: true,
-          text: truncate(outputLimit, 2_000),
-          meta: { outputLimit: true },
+          text: truncate(modelStop.message, 2_000),
+          meta: { modelStop: modelStopMeta(modelStop) },
         });
         break;
       }
@@ -256,4 +256,9 @@ function stringifyToolResult(content: unknown): string {
       .join('\n');
   }
   return JSON.stringify(content ?? '');
+}
+
+/** A model stop as trace and phase metadata: why, and for a refusal, the category. */
+export function modelStopMeta(stop: ModelStop): { reason: ModelStop['reason']; category?: string } {
+  return { reason: stop.reason, ...(stop.category !== undefined ? { category: stop.category } : {}) };
 }

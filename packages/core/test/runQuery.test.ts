@@ -368,7 +368,43 @@ describe('API errors', () => {
     expect(outcome.costUsd).toBe(0.33);
     const spoken = ctx.trace.events.filter((e) => e.kind === 'assistant_text').map((e) => e.text);
     expect(spoken).toEqual(['The first half of a very long answer']);
-    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.outputLimit).toBe(true);
+    expect(outcome.modelStop?.reason).toBe('output_limit');
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.modelStop).toEqual({
+      reason: 'output_limit',
+    });
+  });
+
+  it('counts a refusal against the run, never as an API failure', async () => {
+    const notice =
+      "API Error: Haiku 4.5's safeguards flagged this message (https://www.anthropic.com/legal/aup).";
+    setScript(async function* () {
+      yield {
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'invalid_request',
+        message: {
+          id: 'msg_refusal',
+          model: '<synthetic>',
+          content: [{ type: 'text', text: notice }],
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: null },
+          usage: {},
+        },
+      };
+      yield success({ text: notice, isError: true, costUsd: 0.002 });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.modelStop).toMatchObject({ reason: 'refusal', category: 'cyber' });
+    expect(outcome.text).toBe('');
+    expect(outcome.error).toMatch(/^refused: Haiku 4\.5's safeguards flagged this message/);
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.modelStop).toEqual({
+      reason: 'refusal',
+      category: 'cyber',
+    });
   });
 
   it('does not blame the API for a call the run itself aborted', async () => {

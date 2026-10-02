@@ -252,7 +252,7 @@ describe('normalizeSdkMessage', () => {
       kind: 'error',
       isError: true,
       text: 'The model has reached its context window limit.',
-      meta: { outputLimit: true },
+      meta: { modelStop: { reason: 'output_limit' } },
     });
     expect(events[0]?.meta?.apiError).toBeUndefined();
   });

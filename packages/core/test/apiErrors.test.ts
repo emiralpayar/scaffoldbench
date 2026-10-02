@@ -6,7 +6,7 @@ import {
   isSyntheticAssistant,
   kindFromSdkCode,
   kindFromStatus,
-  outputLimitOfAssistant,
+  modelStopOfAssistant,
   recognizeFailureText,
 } from '@arena/core';
 
@@ -18,13 +18,27 @@ const message = (text: string, extra: Record<string, unknown> = {}, model = 'cla
   ...extra,
 });
 
-/** The CLI's notices when the model runs out of room (CLI bundled with Agent SDK 0.3.287). */
+/** The CLI's notices when the model cannot finish (CLI bundled with Agent SDK 0.3.287). */
 const OUTPUT_LIMIT =
   "API Error: Claude's response exceeded the 64000 output token maximum. To configure this " +
   'behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.';
 const CONTEXT_LIMIT = 'API Error: The model has reached its context window limit.';
+const REFUSAL =
+  "API Error: Sonnet 5.5's safeguards flagged this message (https://www.anthropic.com/legal/aup).";
 const limitNotice = (text: string) =>
   message(text, { error: 'max_output_tokens', is_api_error_message: true }, '<synthetic>');
+const refusalNotice = (category: string | null) => ({
+  type: 'assistant',
+  parent_tool_use_id: null,
+  error: 'invalid_request',
+  is_api_error_message: true,
+  message: {
+    model: '<synthetic>',
+    content: [{ type: 'text', text: REFUSAL }],
+    stop_reason: 'refusal',
+    stop_details: { type: 'refusal', category, explanation: null },
+  },
+});
 
 describe('kindFromStatus', () => {
   it.each([
@@ -121,32 +135,45 @@ describe('apiErrorOfAssistant', () => {
     expect(apiErrorOfAssistant(message('Truncated', { error: 'max_output_tokens' }))).toBeUndefined();
   });
 
-  it('does not take the CLI’s notice that the model ran out of room for an API failure', () => {
+  it('does not take the CLI’s notice that the model could not finish for an API failure', () => {
     expect(apiErrorOfAssistant(limitNotice(OUTPUT_LIMIT))).toBeUndefined();
     expect(apiErrorOfAssistant(limitNotice(CONTEXT_LIMIT))).toBeUndefined();
+    expect(apiErrorOfAssistant(refusalNotice('cyber'))).toBeUndefined();
   });
 });
 
-describe('outputLimitOfAssistant', () => {
-  it('reads the notice that the model ran out of room, without its "API Error" dress', () => {
-    expect(outputLimitOfAssistant(limitNotice(OUTPUT_LIMIT))).toMatch(
-      /^Claude's response exceeded the 64000 output token maximum\./,
-    );
-    expect(outputLimitOfAssistant(limitNotice(CONTEXT_LIMIT))).toBe(
-      'The model has reached its context window limit.',
-    );
+describe('modelStopOfAssistant', () => {
+  it('reads a model that ran out of room, without the notice’s "API Error" dress', () => {
+    expect(modelStopOfAssistant(limitNotice(OUTPUT_LIMIT))).toEqual({
+      reason: 'output_limit',
+      message: expect.stringMatching(/^Claude's response exceeded the 64000 output token maximum\./),
+    });
+    expect(modelStopOfAssistant(limitNotice(CONTEXT_LIMIT))).toEqual({
+      reason: 'output_limit',
+      message: 'The model has reached its context window limit.',
+    });
+  });
+
+  it('reads a refusal and the category the API gave for it', () => {
+    expect(modelStopOfAssistant(refusalNotice('reasoning_extraction'))).toEqual({
+      reason: 'refusal',
+      message: expect.stringMatching(/^Sonnet 5\.5's safeguards flagged this message/),
+      category: 'reasoning_extraction',
+    });
+    expect(modelStopOfAssistant(refusalNotice(null))).not.toHaveProperty('category');
   });
 
   it('is not an API failure, nor the model talking about limits', () => {
     const overloaded = message('API Error: 529 Overloaded', { error: 'overloaded' }, '<synthetic>');
-    expect(outputLimitOfAssistant(overloaded)).toBeUndefined();
-    expect(outputLimitOfAssistant(message('The reply exceeded the output token maximum.'))).toBeUndefined();
+    expect(modelStopOfAssistant(overloaded)).toBeUndefined();
+    expect(modelStopOfAssistant(message('The reply exceeded the output token maximum.'))).toBeUndefined();
   });
 });
 
 describe('isSyntheticAssistant', () => {
   it('recognises everything the CLI writes in the model’s place', () => {
     expect(isSyntheticAssistant(limitNotice(OUTPUT_LIMIT))).toBe(true);
+    expect(isSyntheticAssistant(refusalNotice('cyber'))).toBe(true);
     expect(isSyntheticAssistant(message('Rate limited', { error: 'rate_limit' }))).toBe(true);
     expect(isSyntheticAssistant(message('boom', { is_api_error_message: true }))).toBe(true);
     expect(isSyntheticAssistant(message('No response requested.', {}, '<synthetic>'))).toBe(true);

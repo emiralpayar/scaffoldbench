@@ -6,8 +6,9 @@ import {
   isApiErrorText,
   kindFromStatus,
   makeApiError,
-  outputLimitOfAssistant,
+  modelStopOfAssistant,
   recognizeFailureText,
+  type ModelStop,
 } from './apiErrors';
 import { emptyUsage } from './budget';
 import { estimateCostUsd, type PricedUsage } from './pricing';
@@ -44,11 +45,11 @@ export interface CallReport {
   byModel: Record<string, ModelSpend>;
   apiError?: ApiError;
   /**
-   * The CLI's notice when the turn ended because the model ran out of room
-   * (the output-token maximum or the context window). A limit of the run's
-   * own, so it never comes with an `apiError`, though the result looks like one.
+   * Set when the turn ended because the model could not finish it — out of
+   * room, or a refusal. The run's own limit, so it never comes with an
+   * `apiError`, though the result looks like one.
    */
-  outputLimit?: string;
+  modelStop?: ModelStop;
   /** MCP servers as the session's init message listed them. */
   mcpServers: McpServerStatus[];
 }
@@ -75,8 +76,8 @@ export class CallMeter {
   #anonymous = 0;
   #assistantError: ApiError | undefined;
   #thrown: ApiError | undefined;
-  /** The CLI's limit notice, while it is the last thing the main thread said. */
-  #outputLimit: string | undefined;
+  /** The CLI's model-stop notice, while it is the last thing the main thread said. */
+  #modelStop: ModelStop | undefined;
   #mcpServers: McpServerStatus[] = [];
 
   constructor(defaultModel: string) {
@@ -116,12 +117,12 @@ export class CallMeter {
       result?.subtype === 'success' && result.is_error !== true && !isApiErrorText(result.result);
     const cost = this.#cost(result);
 
-    // A turn the CLI ended with its limit notice reports itself the way an
+    // A turn the CLI ended with a model-stop notice reports itself the way an
     // API failure does — `is_error`, the notice as its text — but is not one.
-    const outputLimit = success ? undefined : this.#outputLimit;
+    const modelStop = success ? undefined : this.#modelStop;
 
     let apiError: ApiError | undefined;
-    if (outputLimit !== undefined) {
+    if (modelStop !== undefined) {
       // Only a crash after the notice is the infrastructure's.
       apiError = this.#thrown;
     } else if (!success) {
@@ -142,7 +143,7 @@ export class CallMeter {
       turns: result?.num_turns ?? this.#streamedTurns(),
       ...cost,
       ...(apiError ? { apiError } : {}),
-      ...(outputLimit !== undefined && apiError === undefined ? { outputLimit } : {}),
+      ...(modelStop !== undefined && apiError === undefined ? { modelStop } : {}),
       mcpServers: this.#mcpServers,
     };
   }
@@ -150,7 +151,7 @@ export class CallMeter {
   #observeAssistant(message: Extract<SDKMessage, { type: 'assistant' }>): void {
     const apiError = apiErrorOfAssistant(message);
     if (apiError) this.#assistantError = apiError;
-    if (message.parent_tool_use_id == null) this.#outputLimit = outputLimitOfAssistant(message);
+    if (message.parent_tool_use_id == null) this.#modelStop = modelStopOfAssistant(message);
 
     const body = message.message as { id?: unknown; model?: unknown; usage?: unknown } | undefined;
     const model = typeof body?.model === 'string' ? body.model : this.#defaultModel;
