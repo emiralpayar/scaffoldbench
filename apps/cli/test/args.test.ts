@@ -184,6 +184,25 @@ describe('parseArgs: run', () => {
     expect(expectRun(parseArgs(['run', '--max-cost', '.5'], {})).maxCostUsd).toBe(0.5);
   });
 
+  it('refuses numbers no run could mean: a huge matrix, an endless timer, an infinite budget', () => {
+    // 100000 repeats of the default matrix is 21.6 million cells before a single call.
+    expect(expectRun(parseArgs(['run', '--repeats', '100'], {})).repeats).toBe(100);
+    expect(expectError(parseArgs(['run', '--repeats', '101'], {}))).toMatch(/--repeats expects a whole number from 1 to 100/);
+    expect(expectError(parseArgs(['run', '--repeats', '1000000000'], {}))).toMatch(/--repeats/);
+
+    // A timer past 2^31 ms fires after 1 ms, which would time every run out at once.
+    expect(expectRun(parseArgs(['run', '--max-seconds', '86400'], {})).maxSeconds).toBe(86_400);
+    expect(expectError(parseArgs(['run', '--max-seconds', '86401'], {}))).toMatch(/--max-seconds expects at most 86400/);
+    expect(expectError(parseArgs(['run', '--max-seconds', '3000000'], {}))).toMatch(/--max-seconds/);
+
+    // 400 digits parse to Infinity.
+    const huge = '9'.repeat(400);
+    for (const flag of ['--max-cost', '--total-budget', '--max-seconds']) {
+      expect(expectError(parseArgs(['run', flag, huge], {})), flag).toMatch(new RegExp(`${flag} expects a number greater than zero`));
+    }
+    expect(expectError(parseArgs(['run'], { ARENA_MAX_COST_USD: huge }))).toMatch(/ARENA_MAX_COST_USD must be a positive number/);
+  });
+
   it('bounds concurrency', () => {
     expect(expectRun(parseArgs(['run', '--concurrency', '32'], {})).concurrency).toBe(32);
     expect(expectError(parseArgs(['run', '--concurrency', '33'], {}))).toMatch(/from 1 to 32/);

@@ -28,11 +28,23 @@ export const DEFAULT_JUDGE_MODEL = 'claude-sonnet-5-5';
 export const DEFAULT_JUDGE_EFFORT: EffortLevel = 'medium';
 
 export const DEFAULT_REPEATS = 3;
+/**
+ * Far above any sensible study (a pre-registered one uses a handful) and far
+ * below what the cell list would need gigabytes to hold: a typo such as
+ * `--repeats 100000` is refused instead of being planned.
+ */
+export const MAX_REPEATS = 100;
 export const DEFAULT_EFFORT: EffortLevel = 'high';
 export const DEFAULT_CONCURRENCY = 4;
 export const MAX_CONCURRENCY = 32;
 export const DEFAULT_MAX_COST_USD = 1.0;
 export const DEFAULT_MAX_SECONDS = 600;
+/**
+ * A day. The runner arms one timer per run, and Node fires a timer set beyond
+ * 2^31 ms (24.8 days) after 1 ms instead, which would time out every run at
+ * once: "no limit" has to be a big number, not an enormous one.
+ */
+export const MAX_SECONDS = 86_400;
 export const DEFAULT_TOTAL_BUDGET_USD = 25;
 export const DEFAULT_JUDGE_SAMPLES = 3;
 export const DEFAULT_FIXTURE_MODE: FixtureMode = 'replay';
@@ -158,7 +170,13 @@ const RUN_FLAGS: FlagSpec[] = [
     fallback: DEFAULT_MODEL,
   },
   { name: 'model', kind: 'value', value: '<id>', help: 'Same as --models', aliasOf: 'models' },
-  { name: 'repeats', kind: 'value', value: '<n>', help: 'Runs per model x strategy x task cell', fallback: String(DEFAULT_REPEATS) },
+  {
+    name: 'repeats',
+    kind: 'value',
+    value: '<n>',
+    help: `Runs per model x strategy x task cell, at most ${MAX_REPEATS}`,
+    fallback: String(DEFAULT_REPEATS),
+  },
   { name: 'effort', kind: 'value', value: '<level>', help: EFFORT_LEVELS.join(' | '), fallback: DEFAULT_EFFORT },
   { name: 'concurrency', kind: 'value', value: '<n>', help: `Runs in flight at once, at most ${MAX_CONCURRENCY}`, fallback: String(DEFAULT_CONCURRENCY) },
   {
@@ -168,7 +186,13 @@ const RUN_FLAGS: FlagSpec[] = [
     help: 'Cost ceiling for ONE run, or $ARENA_MAX_COST_USD',
     fallback: money(DEFAULT_MAX_COST_USD),
   },
-  { name: 'max-seconds', kind: 'value', value: '<s>', help: 'Wall-clock ceiling for ONE run', fallback: String(DEFAULT_MAX_SECONDS) },
+  {
+    name: 'max-seconds',
+    kind: 'value',
+    value: '<s>',
+    help: `Wall-clock ceiling for ONE run, at most ${MAX_SECONDS}`,
+    fallback: String(DEFAULT_MAX_SECONDS),
+  },
   {
     name: 'total-budget',
     kind: 'value',
@@ -543,11 +567,11 @@ function parseRun(collected: Collected, env: NodeJS.ProcessEnv): ParsedCommand {
     strategies: list(flags, 'strategies', ['all'], errors),
     tasks: list(flags, 'tasks', ['all'], errors),
     models: unique(list(flags, 'models', envModels.length > 0 ? envModels : [DEFAULT_MODEL], errors)),
-    repeats: integer(flags, 'repeats', DEFAULT_REPEATS, 1, Number.MAX_SAFE_INTEGER, errors),
+    repeats: integer(flags, 'repeats', DEFAULT_REPEATS, 1, MAX_REPEATS, errors),
     effort: level(flags, 'effort', DEFAULT_EFFORT, errors),
     concurrency: integer(flags, 'concurrency', DEFAULT_CONCURRENCY, 1, MAX_CONCURRENCY, errors),
     maxCostUsd: positive(flags, 'max-cost', envMaxCost ?? DEFAULT_MAX_COST_USD, errors),
-    maxSeconds: positive(flags, 'max-seconds', DEFAULT_MAX_SECONDS, errors),
+    maxSeconds: positive(flags, 'max-seconds', DEFAULT_MAX_SECONDS, errors, MAX_SECONDS),
     totalBudgetUsd: positive(flags, 'total-budget', DEFAULT_TOTAL_BUDGET_USD, errors),
     judgeModel: nonEmpty(flags, 'judge-model', envJudge || DEFAULT_JUDGE_MODEL, errors),
     judgeEffort: level(flags, 'judge-effort', DEFAULT_JUDGE_EFFORT, errors),
@@ -641,13 +665,27 @@ function integer(
   return value;
 }
 
-function positive(flags: Map<string, string[]>, name: string, fallback: number, errors: string[]): number {
+/**
+ * A decimal greater than zero. `Infinity` is what a 400-digit number parses
+ * to, and a budget of infinity is not a budget.
+ */
+function positive(
+  flags: Map<string, string[]>,
+  name: string,
+  fallback: number,
+  errors: string[],
+  max = Number.POSITIVE_INFINITY,
+): number {
   const raw = last(flags, name);
   if (raw === undefined) return fallback;
   const text = raw.trim().replace(/^\$/, '');
   const value = Number(text);
-  if (!DECIMAL.test(text) || !(value > 0)) {
-    errors.push(`--${name} expects a number greater than zero, but got: ${raw}`);
+  if (!DECIMAL.test(text) || !(value > 0) || !Number.isFinite(value)) {
+    errors.push(`--${name} expects a number greater than zero, but got: ${raw.length > 40 ? `${raw.slice(0, 37)}...` : raw}`);
+    return fallback;
+  }
+  if (value > max) {
+    errors.push(`--${name} expects at most ${max}, but got: ${raw}`);
     return fallback;
   }
   return value;
@@ -674,8 +712,8 @@ function moneyFromEnv(env: NodeJS.ProcessEnv, name: string, errors: string[]): n
   if (raw === undefined || raw.trim() === '') return undefined;
   const text = raw.trim().replace(/^\$/, '');
   const value = Number(text);
-  if (!DECIMAL.test(text) || !(value > 0)) {
-    errors.push(`${name} must be a positive number, but is: ${raw}`);
+  if (!DECIMAL.test(text) || !(value > 0) || !Number.isFinite(value)) {
+    errors.push(`${name} must be a positive number, but is: ${raw.length > 40 ? `${raw.slice(0, 37)}...` : raw}`);
     return undefined;
   }
   return value;
