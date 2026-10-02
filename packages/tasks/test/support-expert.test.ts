@@ -739,6 +739,43 @@ describe('support-access-requests', () => {
     expect(firedTraps(supportAccessTask, result)).toEqual(['superseded-policy', 'earliest-expiry']);
   });
 
+  it('accepts holding the cut-down request for the approval it lacks, as well as granting the lower level', async () => {
+    // "Grant no more than the lowest level every approver approved" caps a
+    // grant; it does not say whether to grant read or wait for the owner's
+    // admin approval, and U-904 already holds read on crm-prod.
+    const d = drive(supportAccessSpec);
+    await solve(d, replace({ 'AR-304': { requestId: 'AR-304', grant: false, reason: 'owner approved read only' } }));
+    const result = await score(supportAccessTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual([]);
+    expect(result.score).toBe(1);
+  });
+
+  it('still wants a comment when the cut-down request is held', async () => {
+    const d = drive(supportAccessSpec);
+    await solve(d, replace({ 'AR-304': { requestId: 'AR-304', grant: false, reason: 'owner approved read only' } }));
+    d.world.accessRequests.find((entry) => entry.id === 'AR-304')!.comments = [];
+    const result = await score(supportAccessTask, d);
+    expect(missed(result)).toEqual(['granted:AR-304', 'expiry:AR-304']);
+  });
+
+  it('does not call a read grant a freeze or separation-of-duties breach', async () => {
+    // Both rules are about write and admin. Read on the frozen payroll system,
+    // or on the payments gateway for someone with payroll write, breaks
+    // neither; it is just not what the request was held for.
+    const d = drive(supportAccessSpec);
+    await solve(
+      d,
+      replace({
+        'AR-303': { requestId: 'AR-303', grant: true, level: 'read', expiresOn: null },
+        'AR-311': { requestId: 'AR-311', grant: true, level: 'read', expiresOn: null },
+      }),
+    );
+    const result = await score(supportAccessTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['held:AR-303', 'held:AR-311']);
+  });
+
   it('gives no credit for holding a request without saying why', async () => {
     const d = drive(supportAccessSpec);
     await solve(d);
