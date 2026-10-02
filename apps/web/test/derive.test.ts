@@ -142,6 +142,15 @@ describe('runOutcome', () => {
       ['r2', 'fail'],
     ]);
   });
+
+  it('carries what the readout says about each run', () => {
+    const [cell] = repeatCells(
+      [run({ passed: false, score: 0.5, costUsd: 0.25, latencyMs: 4_200, failureMode: 'wrong_answer' })],
+      'single',
+      'alpha',
+    );
+    expect(cell).toMatchObject({ outcome: 'partial', score: 0.5, costUsd: 0.25, latencyMs: 4_200, failureMode: 'wrong_answer' });
+  });
 });
 
 // ---------------------------------------------------------------------------

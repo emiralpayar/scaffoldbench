@@ -29,6 +29,7 @@ export function ArchitectureGlyph({
   animated = false,
   delayMs = 0,
   title,
+  decorative = false,
   className,
 }: {
   id: string;
@@ -38,6 +39,8 @@ export function ArchitectureGlyph({
   delayMs?: number;
   /** Accessible name; defaults to the architecture's shape in words. */
   title?: string;
+  /** Hidden from assistive technology, for a glyph drawn beside the name it stands for. */
+  decorative?: boolean;
   className?: string;
 }) {
   const geometry = glyphFor(id);
@@ -54,8 +57,7 @@ export function ArchitectureGlyph({
       viewBox={`0 0 ${GLYPH_WIDTH} ${GLYPH_HEIGHT}`}
       width={width}
       height={height}
-      role="img"
-      aria-label={label}
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': label })}
       className={`${animated ? 'glyph-animated' : ''} ${className ?? ''}`}
       style={{ '--glyph-delay': `${delayMs}ms`, overflow: 'visible' } as CSSProperties}
     >

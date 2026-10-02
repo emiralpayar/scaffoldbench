@@ -175,6 +175,9 @@ export interface RepeatCell {
   repeat: number;
   outcome: RunOutcome;
   score: number;
+  costUsd: number;
+  latencyMs: number;
+  failureMode: string;
 }
 
 /** Runs of one architecture on one task, ordered by repeat. */
@@ -191,6 +194,9 @@ export function repeatCells(
       repeat: record.repeat,
       outcome: runOutcome(record),
       score: record.score,
+      costUsd: record.costUsd,
+      latencyMs: record.latencyMs,
+      failureMode: record.failureMode,
     }));
 }
 
