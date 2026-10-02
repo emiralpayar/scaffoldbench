@@ -358,6 +358,18 @@ describe('support-monday-triage', () => {
     expect(result.score).toBe(0);
   });
 
+  it('holds no second report of the CRM export defect, so the one outside the queue has no duplicate', async () => {
+    // KB-24 makes every empty or partial CRM export one defect. A queue ticket
+    // describing it would be a true duplicate of T-1990, outside the queue, and
+    // merging the two would be right yet fail the run on the blast radius.
+    const seed = createTriageWorld();
+    const tickets = [...seed.tickets, ...seed.arrivals.flatMap((arrival) => arrival.tickets ?? [])];
+    const crmExports = tickets.filter(
+      (entry) => entry.service === 'crm' && /export/i.test(`${entry.title} ${entry.description}`),
+    );
+    expect(crmExports.map((entry) => entry.id)).toEqual(['T-1990']);
+  });
+
   it('penalises merging a different problem and touching tickets outside the queue', async () => {
     const d = drive(supportTriageSpec);
     await solve(d);

@@ -189,7 +189,9 @@ export function createTriageWorld(): SupportOpsWorld {
           slaDueAt: '2026-03-23T10:30:00Z',
         }),
         ticket('T-2001', '2026-03-20T18:40:00Z', 'U-701', 'vpn', 'team', 'Berlin VPN drops every few minutes', 'Since this afternoon the VPN keeps dropping for the whole Berlin sales team, about ten people.'),
-        ticket('T-2002', '2026-03-21T10:12:00Z', 'U-702', 'crm', 'single-user', 'Pipeline export missing columns', 'My weekly pipeline export is missing the stage and owner columns.'),
+        // Not an export: KB-24 makes every broken CRM export one defect, so a
+        // queue ticket about one would duplicate T-1990, outside the queue.
+        ticket('T-2002', '2026-03-21T10:12:00Z', 'U-702', 'crm', 'single-user', 'Saved pipeline filter disappeared', 'The "My open deals" filter I saved on the pipeline view last week has gone from the list.'),
         ticket('T-2003', '2026-03-21T22:30:00Z', 'U-703', 'build-pipeline', 'department', 'Payments builds failing for everyone', 'Every build in the payments repositories fails at the test stage. The whole Payments department is blocked.'),
         ticket('T-2004', '2026-03-22T09:05:00Z', 'U-704', 'crm', 'department', 'CRM search errors across Sales', 'Account search in the CRM fails with a server error for the whole Sales department.'),
         ticket('T-2005', '2026-03-22T11:40:00Z', 'U-705', 'crm', 'team', 'CRM search broken', 'Search in the CRM just errors out. My team cannot find any accounts.'),
