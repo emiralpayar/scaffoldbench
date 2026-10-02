@@ -18,7 +18,7 @@ export const TRUST_CLAIMS: readonly TrustClaim[] = [
   {
     title: 'Proof the design ran',
     body: 'Each architecture declares what running as designed looks like: a non-empty plan, a real fan-out, a parsed verdict. A run that fails a check is excluded from rankings and counted, never scored.',
-    source: 'apps/web/lib/records.ts',
+    source: 'packages/core/src/integrity.ts',
     icon: 'check',
   },
   {
@@ -42,13 +42,13 @@ export const TRUST_CLAIMS: readonly TrustClaim[] = [
   {
     title: 'Paired, task-clustered statistics',
     body: 'Architectures are compared on the same task and repeat, bootstrapped over tasks so repeats are not mistaken for independent evidence.',
-    source: 'apps/web/lib/analysis.ts',
+    source: 'packages/core/src/analysis.ts',
     icon: 'pair',
   },
   {
     title: 'Outages are not failures',
     body: 'A run lost to the API is never scored as the architecture failing. It is excluded from every ranking and reported in the health count.',
-    source: 'apps/web/lib/records.ts',
+    source: 'packages/core/src/runner.ts',
     icon: 'pulse',
   },
 ];
