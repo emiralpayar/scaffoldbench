@@ -213,7 +213,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         publishedOn: '2026-04-20',
         effectiveFrom: PEAK_FEE.from,
         effectiveTo: PEAK_FEE.to,
-        body: `Change-of-mind returns requested between ${PEAK_FEE.from} and ${PEAK_FEE.to} carry a restocking fee of ${PEAK_FEE.percent}% instead of the usual fee. Returns of defective or damaged goods are unaffected.`,
+        body: `Change-of-mind returns requested from ${PEAK_FEE.from} through ${PEAK_FEE.to} carry a restocking fee of ${PEAK_FEE.percent}% instead of the usual fee. Returns of defective or damaged goods are unaffected.`,
       },
       {
         id: 'PU-18',
@@ -229,7 +229,7 @@ export function createReturnsWorld(): EcommerceOpsWorld {
         publishedOn: '2026-07-08',
         effectiveFrom: SUMMER_AMNESTY.from,
         effectiveTo: SUMMER_AMNESTY.to,
-        body: `Change-of-mind returns requested between ${SUMMER_AMNESTY.from} and ${SUMMER_AMNESTY.to} carry no restocking fee, whenever the goods arrive back.`,
+        body: `Change-of-mind returns requested from ${SUMMER_AMNESTY.from} through ${SUMMER_AMNESTY.to} carry no restocking fee, whenever the goods arrive back.`,
       },
     ],
     returns: [
@@ -520,24 +520,37 @@ function stockAssertions(): AssertionSpec<EcommerceOpsWorld>[] {
     }));
 }
 
-/** True when the refunds added for a return exceed what the goods received for it are worth. */
+/**
+ * What the run paid out for a return: card refunds on its order, plus store
+ * credit. A store-credit refund is recorded on the order and added to the
+ * balance, one payment written down twice, so credit counts once, as the
+ * larger of the two. Crediting a balance with no refund recorded, or on top
+ * of a card refund, is money paid all the same. Every open return here
+ * belongs to a different customer, so a balance speaks for one return.
+ */
+export function paidOutFor(world: EcommerceOpsWorld, expected: ReturnSettlement): number {
+  const seed = createReturnsWorld();
+  const added = addedRefunds(seed, world, expected.orderId);
+  const sum = (method: RefundMethod) =>
+    added.filter((entry) => entry.method === method).reduce((total, entry) => total + entry.amountCents, 0);
+  const balance = (target: EcommerceOpsWorld) => findCustomer(target, expected.customerId)?.storeCreditCents ?? 0;
+  return sum('card') + Math.max(sum('store_credit'), balance(world) - balance(seed));
+}
+
+/** True when what was paid out for a return exceeds what the goods received for it are worth. */
 export function refundedBeyondReceipts(world: EcommerceOpsWorld, expected: ReturnSettlement): boolean {
-  const total = addedRefunds(createReturnsWorld(), world, expected.orderId).reduce(
-    (sum, entry) => sum + entry.amountCents,
-    0,
-  );
-  return total > expected.ceilingCents;
+  return paidOutFor(world, expected) > expected.ceilingCents;
 }
 
 /**
  * Money sent for goods the store does not have, one rule per return so a
  * report can say which case it was. Refunds cannot be recalled, so this is
- * read off the ledger whatever happened afterwards.
+ * read off the ledger and the balances whatever happened afterwards.
  */
 function overRefundRule(expected: ReturnSettlement): ForbiddenSpec<EcommerceOpsWorld> {
   return {
     id: `over-refunded:${expected.rmaId}`,
-    label: `${expected.rmaId}: refunded more than the goods received are worth`,
+    label: `${expected.rmaId}: paid out more than the goods received are worth`,
     multiplier: 0.5,
     violated: (world) => refundedBeyondReceipts(world, expected),
     detail: `At most ${expected.ceilingCents} cents was owed for what the warehouse received.`,

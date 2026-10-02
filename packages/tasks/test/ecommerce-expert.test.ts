@@ -483,6 +483,8 @@ describe('ecommerce-returns-desk', () => {
       'RMA-815 10965 card s1 d0 closed',
       'RMA-816 4165 card s1 d0 closed',
     ]);
+    // The over-refund rule reads a customer's balance as one return's credit.
+    expect(new Set(PLAN.map((entry) => entry.customerId)).size).toBe(PLAN.length);
   });
 
   /** Reference solution: read every case and every rule, then settle each by its receipts. */
@@ -656,6 +658,35 @@ describe('ecommerce-returns-desk', () => {
     await solve(d, replace({ 'RMA-804': { refund: { method: 'card', amountCents: 27_965 } } }));
     const result = await score(ecommerceReturnsTask, d);
     expect(missed(result)).toEqual(['settled:RMA-804', 'credit-balances']);
+  });
+
+  it('counts store credit added to the balance as money paid out, so paying twice is over-refunding', async () => {
+    const d = drive(ecommerceReturnsSpec);
+    await solve(d);
+    // RMA-801 was refunded to the card; crediting the account as well pays for one keyboard twice.
+    await d.call('apply_store_credit', { customerId: 'C-801', amountCents: 10_965, reason: 'RMA-801 refund' });
+    const result = await score(ecommerceReturnsTask, d);
+    expect(missed(result)).toEqual(['credit-balances']);
+    expect(penaltyIds(result)).toEqual(['over-refunded:RMA-801']);
+  });
+
+  it('does not count a store-credit refund twice when it is recorded and applied', async () => {
+    const d = drive(ecommerceReturnsSpec);
+    await solve(d);
+    const result = await score(ecommerceReturnsTask, d);
+    expect(result.penalties).toEqual([]);
+    // RMA-803 is paid as store credit: a ledger entry and a balance increase for the same money.
+    expect(d.world.customers.find((entry) => entry.id === 'C-803')?.storeCreditCents).toBe(27_965);
+  });
+
+  it('states the dated fee windows with both ends included, and frees the last amnesty day', () => {
+    const seed = createReturnsWorld();
+    const body = (id: string) => seed.policyUpdates.find((update) => update.id === id)?.body ?? '';
+    // "between" would leave the end days open to argument; RMA-807 was requested on the last one.
+    expect(body('PU-21')).toContain('requested from 2026-07-10 through 2026-07-20');
+    expect(body('PU-15')).toContain('requested from 2026-05-01 through 2026-06-30');
+    expect(seed.returns.find((entry) => entry.id === 'RMA-807')?.requestedOn).toBe('2026-07-20');
+    expect(PLAN.find((entry) => entry.rmaId === 'RMA-807')?.refund).toEqual({ method: 'card', amountCents: 15_900 });
   });
 
   it('gives no credit for leaving the wrong-item return alone without opening an investigation', async () => {
