@@ -52,7 +52,7 @@ export default async function PostmortemPage() {
 
   return (
     <div className="container-page pb-24 pt-10 sm:pt-14">
-      <header className="max-w-[50rem] border-b border-rule pb-10">
+      <header className="max-w-[54rem] border-b border-rule pb-10">
         <p className="eyebrow flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span>Post-mortem · Act 1</span>
           <span className="chip !border-bad/50 !text-bad">retracted run set</span>
@@ -60,7 +60,7 @@ export default async function PostmortemPage() {
         <h1 className="h1 mt-4 text-ink">
           The leaderboard said five architectures tied. The traces said four of them never ran as designed.
         </h1>
-        <p className="lede mt-6">
+        <p className="lede mt-6 max-w-[50rem]">
           The first run set measured {report ? formatInt(report.runs) : ACT_ONE.runs} runs of five agent
           architectures on {report ? report.models.map(modelShortName).join(', ') : 'Claude Sonnet 5'}.
           {report

@@ -23,13 +23,13 @@ export function ActOne({ postmortem, createdAt }: { postmortem: Postmortem | nul
   return (
     <section id="act-1" aria-labelledby="act-1-title" className="section">
       <div className="container-page">
-        <div className="max-w-[46rem]">
+        <div className="max-w-[54rem]">
           <p className="eyebrow">Act 1 · The harness that lied</p>
           <h2 id="act-1-title" className="h1 mt-4 text-ink">
             The leaderboard said five architectures tied. The traces said four of them never ran as designed.
           </h2>
           {postmortem && rows.length > 0 ? (
-            <p className="lede mt-6">
+            <p className="lede mt-6 max-w-[46rem]">
               The first published run set, {postmortem.runs} runs on{' '}
               {postmortem.models.map(modelShortName).join(', ')}
               {when ? ` in ${when}` : ''}, scored every architecture between{' '}
@@ -40,7 +40,7 @@ export function ActOne({ postmortem, createdAt }: { postmortem: Postmortem | nul
               dead steps around it. No run crashed, and every score looked plausible.
             </p>
           ) : (
-            <p className="lede mt-6">
+            <p className="lede mt-6 max-w-[46rem]">
               The first published run set scored every architecture within a hair of each other.
               Reading the traces showed why: most of the designs never executed as designed, so what
               was measured was mostly a single agent with dead steps around it.
