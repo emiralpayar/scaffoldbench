@@ -578,7 +578,7 @@ it('scores 1 on the reference solution', async () => {
   expect(result.penalties).toEqual([]);
   expect(missed(result)).toEqual([]);
   expect(result.score).toBe(1);
-  expect(findProduct(d.world, 'P-MOU')).toMatchObject({ stock: 21, damagedStock: 2 });
+  expect(findProduct(d.world, 'P-MOU')).toMatchObject({ stock: 22, damagedStock: 2 });
 });
 ```
 
