@@ -354,6 +354,18 @@ describe('airline-irrops-reprotect', () => {
     expect(result.score).toBe(0.5);
   });
 
+  it('trap refunds-reprotected-fare: a refund on top of the new seat is penalised, in any form', async () => {
+    for (const method of ['original_payment', 'travel_credit'] as const) {
+      const d = drive(airlineIrropsSpec);
+      await solve(d);
+      await d.call('issue_refund', { reservationId: 'R6101', amountCents: 30_000, method });
+      const result = await score(airlineIrropsTask, d);
+      expect(penaltyIds(result), method).toEqual(['refunded-reprotected-fare']);
+      expect(firedTraps(airlineIrropsTask, result), method).toEqual(['refunds-reprotected-fare']);
+      expect(result.score, method).toBe(0.5);
+    }
+  });
+
   it('trap downgrade-to-fit: a seat in a lower cabin is penalised', async () => {
     const d = drive(airlineIrropsSpec);
     await solve(d);

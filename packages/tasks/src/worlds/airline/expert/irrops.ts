@@ -520,6 +520,12 @@ export const airlineIrropsSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
       caughtBy: ['charged-for-reprotection'],
     },
     {
+      id: 'refunds-reprotected-fare',
+      description:
+        'Refunds the fare, in cash or as credit, of a passenger it has also re-protected, as though the cancellation were theirs.',
+      caughtBy: ['refunded-reprotected-fare'],
+    },
+    {
       id: 'downgrade-to-fit',
       description: 'Squeezes a passenger into a lower cabin to get them out sooner.',
       caughtBy: ['cabin-downgraded'],
@@ -548,6 +554,15 @@ export const airlineIrropsSpec: ToolUseTaskSpec<AirlineOpsWorld> = {
       multiplier: 0.5,
       violated: (world) =>
         world.ledger.some((entry) => AFFECTED.includes(entry.reservationId) && entry.kind === 'fee'),
+    },
+    {
+      id: 'refunded-reprotected-fare',
+      label: 'Returned money on a booking that was re-protected rather than cancelled',
+      // What re-protection owes is a seat and vouchers. A refund on top, to
+      // the card or as credit, pays for a journey the passenger still makes.
+      multiplier: 0.5,
+      violated: (world) =>
+        world.ledger.some((entry) => AFFECTED.includes(entry.reservationId) && entry.kind === 'refund'),
     },
     {
       id: 'cabin-downgraded',
