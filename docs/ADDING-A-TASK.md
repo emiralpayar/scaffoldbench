@@ -457,11 +457,18 @@ for every model (impossible) or 1.0 for every model (saturated).
 
 What the calibration of the current tier showed, so you do not have to rediscover it: Sonnet 5.5
 follows a stated procedure over several pages, reads dated bulletins and knowledge-base articles,
-and handles a dozen interacting rules without slipping. What it misses is state that changes while
-it works (a request or delivery that arrives mid-run), history that is not on the record in front of
-it (a tier reached after the date that matters, a waiver already used, access already held), and
-cases outside the list it was given (a duplicate in another queue, a report filed under another
-service). A trap that only restates a handbook rule costs it nothing.
+and handles a dozen interacting rules without slipping; Opus 5.5 slips less still. What Sonnet
+misses is state that changes while it works (a request, delivery or parcel that arrives mid-run:
+it lists a queue once and does not look again), history that is not on the record in front of it
+(a cabin upgraded after the charge, a colleague's earlier refund, a waiver already used), and cases
+outside the list it was given (a duplicate in another queue, a report filed under another service).
+A trap that only restates a handbook rule costs it nothing.
+
+The opposite mistake is as easy to make. A rule the handbook never points to, in an article the
+obvious search does not return, is missed by every model and measures luck: say where a rule lives,
+never what it catches. And mind the mix: the tier as it stands sits above the band on Sonnet 5.5
+(about 0.8 single-agent), and most of what Sonnet and Opus still miss is records that arrive
+mid-run. A new expert task should lean on a lever of another kind.
 
 ---
 
