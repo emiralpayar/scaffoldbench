@@ -104,6 +104,7 @@ describe('harnessChecks', () => {
       HARNESS_CHECK.harnessTools,
       HARNESS_CHECK.mcpConnected,
       HARNESS_CHECK.mcpHermetic,
+      HARNESS_CHECK.builtinTools,
       HARNESS_CHECK.structuredOutput,
       HARNESS_CHECK.notDegraded,
     ]);
@@ -167,6 +168,19 @@ describe('harnessChecks', () => {
       detail: 'main (call-1) also loaded claude.ai Gmail',
     });
     expect(check(checks, HARNESS_CHECK.mcpConnected).ok).toBe(true);
+  });
+
+  it('fails a call that was offered one of the CLI’s own tools, called or not', () => {
+    const trace = [
+      ...call({ callId: 'call-1', phase: 'plan', tools: [STRUCTURED_OUTPUT_TOOL] }),
+      ...call({ callId: 'call-2', phase: 'execute', tools: ['mcp__airline__get_reservation', 'Task', 'Bash'] }),
+    ];
+
+    expect(check(harnessChecks({ trace, phases: [] }), HARNESS_CHECK.builtinTools)).toEqual({
+      id: HARNESS_CHECK.builtinTools,
+      ok: false,
+      detail: 'execute (call-2) was offered Task, Bash',
+    });
   });
 
   it('judges only failed servers in traces that never recorded which were expected', () => {

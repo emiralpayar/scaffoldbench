@@ -42,6 +42,12 @@ export const HARNESS_CHECK = {
   /** No call loaded an MCP server the harness did not give it. */
   mcpHermetic: 'harness.mcp-hermetic',
   /**
+   * No call was offered one of Claude Code's own tools: a session's whole
+   * surface was its task tools and, for a schema call, the structured-output
+   * tool.
+   */
+  builtinTools: 'harness.builtin-tools',
+  /**
    * Every call that asked for structured output and ran to the end got it, or
    * its strategy asked again and the retry got it (`PhaseRecord.retriedBy`).
    */
@@ -261,6 +267,21 @@ export function harnessChecks(input: HarnessCheckInput): IntegrityCheck[] {
     connection.flatMap(({ call, unexpected }) =>
       unexpected.length > 0 ? [`${where(call)} also loaded ${unexpected.join(', ')}`] : [],
     ),
+  );
+
+  // `runQuery` pins the built-in toolset to the harness's own tool, so an
+  // agent's tools are its task's. Were the CLI to start offering its own
+  // anyway — an Agent tool, a shell — every architecture's prompt would
+  // change and its agents could work outside the harness, unseen unless one
+  // happened to call such a tool and be denied. So the offer itself is checked.
+  add(
+    HARNESS_CHECK.builtinTools,
+    calls.flatMap((call) => {
+      const builtin = (call.init?.tools ?? []).filter(
+        (tool) => !tool.startsWith('mcp__') && tool !== STRUCTURED_OUTPUT_TOOL,
+      );
+      return builtin.length > 0 ? [`${where(call)} was offered ${builtin.join(', ')}`] : [];
+    }),
   );
 
   // A miss the strategy asked again about is judged by the retry, which is a

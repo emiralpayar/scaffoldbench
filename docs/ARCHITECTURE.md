@@ -368,7 +368,8 @@ designed, and every sign of it was in the traces. So every record now carries
 
 The runner's own checks (`harness.*`) read the trace call by call: no call failed at the API or
 ended without a result; the guard never denied `StructuredOutput` or any tool the session itself
-offered; every MCP server a call was given reported `connected`, and no other server loaded; every
+offered; every MCP server a call was given reported `connected`, and no other server loaded; no
+call was offered one of Claude Code's own tools, only its task's and the structured-output tool; every
 schema call that ran to the end got its structured output; no phase was marked `degraded` by its
 strategy; and, for graded runs, at least one grading call returned a usable verdict. A schema
 call whose strategy asked for its reply again (`PhaseRecord.retriedBy`) is judged by the retry,
