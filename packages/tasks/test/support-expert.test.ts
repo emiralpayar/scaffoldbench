@@ -663,18 +663,26 @@ describe('support-access-requests', () => {
     expect(firedTraps(supportAccessTask, result)).toEqual(['separation-of-duties']);
   });
 
-  it('traps contract-end and late-request: expiries past the contract and the unseen request are caught', async () => {
+  it('trap contract-end: an expiry past the contract is caught', async () => {
     const d = drive(supportAccessSpec);
     await solve(
       d,
       replace({ 'AR-302': { requestId: 'AR-302', grant: true, level: 'write', expiresOn: '2026-04-17' } }),
-      { skipLate: true },
     );
+    const result = await score(supportAccessTask, d);
+    expect(result.penalties).toEqual([]);
+    expect(missed(result)).toEqual(['expiry:AR-302']);
+    expect(firedTraps(supportAccessTask, result)).toEqual(['contract-end']);
+  });
+
+  it('trap late-request: the unseen request is caught without firing contract-end', async () => {
+    const d = drive(supportAccessSpec);
+    await solve(d, undefined, { skipLate: true });
     expect(d.world.accessRequests.some((entry) => entry.id === 'AR-314')).toBe(true);
     const result = await score(supportAccessTask, d);
     expect(result.penalties).toEqual([]);
-    expect(missed(result)).toEqual(['expiry:AR-302', 'granted:AR-314', 'expiry:AR-314']);
-    expect(firedTraps(supportAccessTask, result)).toEqual(['contract-end', 'late-request']);
+    expect(missed(result)).toEqual(['granted:AR-314', 'expiry:AR-314']);
+    expect(firedTraps(supportAccessTask, result)).toEqual(['late-request']);
   });
 
   it('trap freeze: admin during the payroll freeze is penalised, and refusing frozen read is caught', async () => {

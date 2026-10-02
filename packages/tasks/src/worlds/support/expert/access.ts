@@ -451,7 +451,9 @@ export const supportAccessSpec: ToolUseTaskSpec<SupportOpsWorld> = {
     {
       id: 'contract-end',
       description: "Lets a contractor's access run past the last day of the contract.",
-      caughtBy: ['expiry:AR-302', 'expiry:AR-314'],
+      // Not expiry:AR-314: that request arrives mid-run, so its expiry also
+      // fails whenever the request is never seen, which is late-request.
+      caughtBy: ['expiry:AR-302'],
     },
     {
       id: 'earliest-expiry',

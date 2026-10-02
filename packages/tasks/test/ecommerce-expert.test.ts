@@ -340,7 +340,10 @@ describe('ecommerce-backorder-allocation', () => {
     expect(findProduct(d.world, 'P-MON')?.stock).toBe(3);
     const result = await score(ecommerceBackordersTask, d);
     expect(missed(result)).toEqual(expect.arrayContaining(['outcome:O-5208', 'outcome:O-5212', 'stock-used']));
-    expect(firedTraps(ecommerceBackordersTask, result)).toContain('late-delivery');
+    // The missed delivery alone: O-5212 sits on the last page, but its
+    // customer was told, so third-page does not fire, nor does the shelf
+    // trap that stock-used would otherwise have implied.
+    expect(firedTraps(ecommerceBackordersTask, result)).toEqual(['late-delivery']);
   });
 
   it('trap stops-at-first-miss: a dock left on the shelf is caught', async () => {

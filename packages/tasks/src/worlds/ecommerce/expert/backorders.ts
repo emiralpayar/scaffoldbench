@@ -432,7 +432,11 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       id: 'stops-at-first-miss',
       description:
         'Stops allocating when the next order needs more docks than are left, leaving a dock on the shelf that a smaller order further down should have had.',
-      caughtBy: ['outcome:O-5215', 'stock-used'],
+      // Not stock-used: every unallocated delivery fails that, so it would
+      // fire this trap whenever a delivery was missed. O-5215's dock comes
+      // from the early delivery, so this still fires alongside
+      // mid-run-delivery when that delivery is never allocated.
+      caughtBy: ['outcome:O-5215'],
     },
     {
       id: 'ship-complete',
@@ -454,8 +458,12 @@ export const ecommerceBackordersSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
     },
     {
       id: 'third-page',
-      description: 'Reads only the first pages of the backorder list and never works the orders on the last one.',
-      caughtBy: ['outcome:O-5211', 'outcome:O-5212'],
+      description:
+        'Reads only the first pages of the backorder list and never works the orders on the last one, whose customers are never told where they stand.',
+      // The notices, not the outcomes: those two orders are also served by
+      // the deliveries that arrive mid-run, so their outcomes fail whenever a
+      // delivery is missed, while a notice is sent whatever the allocation.
+      caughtBy: ['notified:O-5211', 'notified:O-5212'],
     },
     {
       id: 'risk-hold',
