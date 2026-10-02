@@ -106,7 +106,7 @@ export function OutcomeGrid({
                       <div
                         role="cell"
                         key={model}
-                        className={`flex flex-col items-center justify-center gap-1.5 px-1 pb-3 pt-1.5 lg:py-3 ${
+                        className={`flex flex-col items-center justify-center gap-0.5 px-1 pb-2.5 pt-0.5 lg:py-2 ${
                           model === current && models.length > 1 ? 'bg-sunken' : ''
                         }`}
                       >

@@ -46,7 +46,7 @@ export interface RepeatMatrixTask {
 }
 
 /** The task heading gets a column of its own only from `lg`. */
-const ROW = architectureGridClass('lg:grid-cols-[minmax(13rem,19rem)_repeat(var(--arch-count),minmax(0,1fr))]');
+const ROW = architectureGridClass('lg:grid-cols-[minmax(13rem,25rem)_repeat(var(--arch-count),minmax(0,1fr))]');
 
 /**
  * Every run as a square, per task and architecture: pass, partial, fail, or
@@ -108,7 +108,7 @@ export function RepeatMatrix({
                   </Link>
                 </div>
                 {architectures.map((id) => (
-                  <div role="cell" key={id} className="flex items-center justify-center px-1 pb-3 pt-1.5 lg:py-2.5">
+                  <div role="cell" key={id} className="flex items-center justify-center px-1 pb-2 pt-0.5 lg:py-1.5">
                     <RunSquares runs={cells[`${id}::${task.id}`] ?? []} architecture={id} task={task.title} />
                   </div>
                 ))}
@@ -134,7 +134,7 @@ export function RunSquares({ runs, architecture, task }: { runs: RepeatCell[]; a
   }
   const name = architectureName(architecture);
   return (
-    <span className="flex flex-wrap justify-center gap-[3px]">
+    <span className="flex max-w-full justify-center">
       {runs.map((run) => (
         <Link
           key={run.runId}
@@ -142,9 +142,14 @@ export function RunSquares({ runs, architecture, task }: { runs: RepeatCell[]; a
           data-readout-title={`${name} on ${task}, repeat ${run.repeat}`}
           data-readout-detail={detailOf(run)}
           aria-label={`${name}, repeat ${run.repeat}: ${detailOf(run)}`}
-          className="block h-3 w-3 rounded-[3px] transition-transform hover:scale-125 focus-visible:scale-125 sm:h-3.5 sm:w-3.5"
+          // The mark is 14px but the target is 24px wide and tall, as WCAG 2.2
+          // asks. A phone's cell holds three of them only at 16px wide, which
+          // keeps each architecture's runs reading as a group.
+          className="group flex h-6 w-4 min-w-0 shrink items-center justify-center sm:w-6"
         >
-          <Square outcome={run.outcome} cut={run.legacyProblems > 0} />
+          <span className="block h-3 w-3 transition-transform group-hover:scale-125 group-focus-visible:scale-125 sm:h-3.5 sm:w-3.5">
+            <Square outcome={run.outcome} cut={run.legacyProblems > 0} />
+          </span>
         </Link>
       ))}
     </span>

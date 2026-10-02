@@ -11,6 +11,10 @@ import { useState } from 'react';
  * a scrolling table would clip at its edges; it is also where a keyboard
  * user's focus is announced, politely.
  *
+ * It floats at the bottom of the screen only while it has a mark to describe.
+ * Idle, it sits under the grid as plain text: pinned, an instruction would
+ * cover the last rows of a long grid for as long as the reader scrolls it.
+ *
  * A device that cannot hover gets no line at all: a tap there opens the mark
  * straight away, so the line would rarely say anything and would cover the
  * grid while it scrolls.
@@ -27,10 +31,16 @@ export function Readout({ children, prompt }: { children: ReactNode; prompt: str
     });
   };
 
+  // Focus moving from one mark to another is a blur then a focus; only focus
+  // leaving the grid clears the line.
+  const leaveFocus = (event: FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setCurrent(null);
+  };
+
   return (
-    <div onMouseOver={pick} onFocus={pick}>
+    <div onMouseOver={pick} onFocus={pick} onMouseLeave={() => setCurrent(null)} onBlur={leaveFocus}>
       {children}
-      <div className="sticky bottom-3 z-10 mt-3 [@media(hover:none)]:hidden">
+      <div className={`z-10 mt-3 [@media(hover:none)]:hidden ${current ? 'sticky bottom-3' : ''}`}>
         <p
           aria-live="polite"
           className="flex min-h-[3.25rem] flex-col justify-center rounded-[12px] border border-rule-strong bg-surface/95 px-4 py-2 shadow-[var(--shadow-card)] backdrop-blur"
