@@ -2,6 +2,7 @@ import type { ModelAnalysis } from '../../lib/analysis';
 import { architectureName } from '../../lib/architectures';
 import { formatDelta } from '../../lib/format';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import { ScrollRegion } from '../ScrollRegion';
 
 /**
  * The evidence behind the ranks: every pair of architectures on this model,
@@ -21,7 +22,7 @@ export function PairMatrix({ model, order }: { model: ModelAnalysis; order: stri
   };
 
   return (
-    <div className="scroll-x rounded-[14px] border border-rule bg-surface">
+    <ScrollRegion label="Paired score differences between every two architectures" className="rounded-[14px] border border-rule bg-surface">
       <table className="w-full border-collapse text-[0.8125rem]">
         <caption className="sr-only">
           Paired score difference, row architecture minus column architecture, and whether the row scores reliably
@@ -90,6 +91,6 @@ export function PairMatrix({ model, order }: { model: ModelAnalysis; order: stri
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }

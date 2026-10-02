@@ -11,6 +11,7 @@ import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { architectureColor, architectureName, compareArchitectures } from '../architectures';
 import { defaultModel } from '../derive';
 import type { Difficulty, RunRecord, TraceEvent } from '../records';
+import { sourceUrl } from '../site';
 import { pickRepresentative } from '../strategies';
 import { timelineFromTrace } from '../timeline';
 import { buildViewGroups, trimGroups } from '../traceView';
@@ -111,8 +112,14 @@ export async function loadEvidenceRace(): Promise<RaceGroup | null> {
   return evidence ? findRace(evidence) : null;
 }
 
-/** A race as the replay gallery wants it: one entry per architecture. */
-export function toReplayEntries(race: Pick<RaceGroup, 'runs'>): ReplayEntry[] {
+/**
+ * A race as the replay gallery wants it: one entry per architecture. A run
+ * has a page only in the published run set, so a replay of any other set
+ * (the first run set's, on the post-mortem) links to its record instead.
+ */
+export async function toReplayEntries(race: Pick<RaceGroup, 'runs' | 'data'>): Promise<ReplayEntry[]> {
+  const published = await loadRunSet();
+  const hasPage = published?.runSetId === race.data.runSetId;
   return race.runs.map(({ record, trace }) => ({
     runId: record.runId,
     strategyId: record.strategyId,
@@ -122,6 +129,9 @@ export function toReplayEntries(race: Pick<RaceGroup, 'runs'>): ReplayEntry[] {
     groups: trimGroups(buildViewGroups(trace)),
     score: record.score,
     passed: record.passed,
+    href: hasPage
+      ? `/runs/${record.runId}/`
+      : sourceUrl(`results/${race.data.runSetId}/runs/${record.runId}.json`),
   }));
 }
 

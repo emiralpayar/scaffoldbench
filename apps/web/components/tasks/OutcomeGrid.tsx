@@ -72,7 +72,7 @@ export function OutcomeGrid({
                   <div
                     key={model}
                     role="columnheader"
-                    className={`px-2 py-3 text-center ${model === current ? 'bg-sunken' : ''}`}
+                    className={`px-2 py-3 text-center ${model === current && models.length > 1 ? 'bg-sunken' : ''}`}
                   >
                     <Link
                       href={`/tasks/${taskId}/${model}/`}
@@ -107,7 +107,7 @@ export function OutcomeGrid({
                         role="cell"
                         key={model}
                         className={`flex flex-col items-center justify-center gap-1.5 px-1 pb-3 pt-1.5 lg:py-3 ${
-                          model === current ? 'bg-sunken' : ''
+                          model === current && models.length > 1 ? 'bg-sunken' : ''
                         }`}
                       >
                         <RunSquares

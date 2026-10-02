@@ -84,7 +84,7 @@ export function TaskView({ data, taskId, model }: { data: RunSetData; taskId: st
         </div>
       ) : null}
 
-      <dl className="mb-14 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-14 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label="Task id">{task.id}</Field>
         <Field label="Turn limit">{task.maxTurns || '—'}</Field>
         <Field label={`Runs on ${modelShortName(model)}`}>
@@ -92,7 +92,7 @@ export function TaskView({ data, taskId, model }: { data: RunSetData; taskId: st
           {here.length !== ranked.length ? <span className="text-muted"> of {here.length}</span> : null}
         </Field>
         <Field label="Pass rate">{passRate === null ? '—' : formatPercent(passRate)}</Field>
-      </dl>
+      </div>
 
       {task.hypothesis ? (
         <Hypothesis task={task} means={means} model={model} unverified={unverified} />

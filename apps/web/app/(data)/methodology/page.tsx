@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { PageHeader } from '../../../components/Layout';
+import { ScrollRegion } from '../../../components/ScrollRegion';
 import { VerdictDiagram } from '../../../components/methodology/VerdictDiagram';
 import { analyzeForSite } from '../../../lib/analysis';
 import { ARCHITECTURES } from '../../../lib/architectures';
@@ -278,11 +279,11 @@ export default async function MethodologyPage() {
               Everything on this site is read from <code className="code-inline">results/</code> at build time, and the
               records are plain JSON. To run a cell yourself, from the repository root:
             </p>
-            <div className="scroll-x rounded-[12px] border border-rule bg-sunken">
+            <ScrollRegion label="Commands to run a cell yourself" className="rounded-[12px] border border-rule bg-sunken">
               <pre className="w-max p-4 font-mono text-[0.75rem] leading-relaxed text-ink-2">{`npm ci
 npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1
 npm run dev:web`}</pre>
-            </div>
+            </ScrollRegion>
             <p>
               Adding a task is described in {doc('docs/ADDING-A-TASK.md', 'docs/ADDING-A-TASK.md')}, and the shape of the
               code in {doc('docs/ARCHITECTURE.md', 'docs/ARCHITECTURE.md')}.

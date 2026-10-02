@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { ArchitectureGlyph } from '../ArchitectureGlyph';
+
 interface Destination {
   href: string;
   title: string;
@@ -28,9 +30,21 @@ const DESTINATIONS: Destination[] = [
     art: <ScatterArt />,
   },
   {
+    href: '/strategies/',
+    title: 'The six designs',
+    body: 'Each architecture drawn as the calls it makes, what each call costs, and the checks that prove it ran.',
+    art: <DesignsArt />,
+  },
+  {
+    href: '/health/',
+    title: 'Harness health',
+    body: 'Every integrity check, how often it held, and each run that was left out because one did not.',
+    art: <HealthArt />,
+  },
+  {
     href: '/live/',
-    title: 'Run it yourself',
-    body: 'One command re-runs any cell of the benchmark on your own machine and key.',
+    title: 'Replay a run',
+    body: 'Watch a recorded run call by call, then re-run any cell yourself on your own machine and key.',
     art: <TerminalArt />,
   },
 ];
@@ -43,7 +57,7 @@ export function Explore() {
         <h2 id="explore-title" className="h1 mt-4 max-w-[40rem] text-ink">
           Go as deep as the data goes.
         </h2>
-        <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DESTINATIONS.map((destination) => (
             <li key={destination.href}>
               <Link
@@ -131,6 +145,33 @@ function ScatterArt() {
         <g key={i} stroke={color} strokeWidth={2} strokeLinecap="round">
           <line x1={x} x2={x} y1={y - 9} y2={y + 9} opacity={0.8} />
           <circle cx={x} cy={y} r={4.5} fill={color} stroke="none" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function DesignsArt() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+      {(['plan-execute', 'orchestrator-workers', 'propose-select', 'plan-execute-verify'] as const).map((id) => (
+        <ArchitectureGlyph key={id} id={id} width={56} decorative />
+      ))}
+    </div>
+  );
+}
+
+function HealthArt() {
+  const rows = [112, 104, 96, 112];
+  return (
+    <svg viewBox="0 0 140 72" width={140} height={72}>
+      {rows.map((width, i) => (
+        <g key={i}>
+          <rect x={6} y={8 + i * 15} width={112} height={7} rx={3.5} fill="var(--sunken)" />
+          <rect x={6} y={8 + i * 15} width={width} height={7} rx={3.5} fill="var(--good)" />
+          {width < 112 ? (
+            <rect x={6 + width} y={8 + i * 15} width={4} height={7} rx={1} fill="var(--bad)" />
+          ) : null}
         </g>
       ))}
     </svg>

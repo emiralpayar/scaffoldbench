@@ -3,6 +3,7 @@ import { architectureName } from '../../lib/architectures';
 import { formatDelta, formatMultiple } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
+import { ScrollRegion } from '../ScrollRegion';
 
 const VERDICT: Record<PairedVerdict, { text: string; className: string }> = {
   better: { text: 'scaffold wins', className: 'chip-good' },
@@ -31,7 +32,7 @@ export function ScaleTable({ analysis, verified }: { analysis: SiteAnalysis; ver
               Each architecture on <strong className="font-medium">{modelShortName(model)}</strong> against a single
               agent on <strong className="font-medium">{modelShortName(next)}</strong>
             </p>
-            <div className="scroll-x">
+            <ScrollRegion label={`Each architecture on ${modelShortName(model)} against a single agent on ${modelShortName(next)}`}>
               <table className="w-full min-w-[34rem] border-collapse text-[0.875rem]">
                 <thead>
                   <tr className="border-b border-rule text-left">
@@ -90,7 +91,7 @@ export function ScaleTable({ analysis, verified }: { analysis: SiteAnalysis; ver
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </div>
         );
       })}

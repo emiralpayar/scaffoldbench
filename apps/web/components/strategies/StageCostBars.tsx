@@ -2,6 +2,7 @@ import { architectureColor } from '../../lib/architectures';
 import { formatPercent, formatUsd } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
 import type { ModelStageCosts } from '../../lib/strategies';
+import { ScrollRegion } from '../ScrollRegion';
 
 const SHADES = [1, 0.62, 0.34];
 
@@ -55,7 +56,7 @@ export function StageCostBars({ strategyId, costs }: { strategyId: string; costs
           ))}
         </ul>
 
-        <div className="scroll-x mt-6 border-t border-rule pt-4">
+        <ScrollRegion label="Cost of each stage, per model" className="mt-6 border-t border-rule pt-4">
           <table className="w-full min-w-[26rem] border-collapse text-[0.8125rem]">
             <thead>
               <tr className="border-b border-rule">
@@ -97,7 +98,7 @@ export function StageCostBars({ strategyId, costs }: { strategyId: string; costs
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       </div>
       <figcaption className="mt-3 text-[0.8125rem] leading-relaxed text-muted">
         Mean cost of a ranked run, by the stage of the design that spent it. Judge calls are not counted.

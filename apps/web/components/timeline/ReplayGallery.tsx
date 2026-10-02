@@ -18,6 +18,12 @@ export interface ReplayEntry {
   groups: ViewGroup[];
   score: number;
   passed: boolean;
+  /**
+   * Where the whole run can be read: its page when the published run set has
+   * one, its record in the repository when the replay is of another set, and
+   * nothing when neither exists.
+   */
+  href?: string | undefined;
 }
 
 /**
@@ -63,10 +69,18 @@ export function ReplayGallery({ entries, initial }: { entries: ReplayEntry[]; in
         autoplay
       />
       <p className="text-[0.875rem] text-ink-2">
-        Every message, tool call and denial of this run is on its own page:{' '}
-        <Link href={`/runs/${entry.runId}/`} className="link font-mono text-[0.8125rem]">
-          {entry.runId}
-        </Link>
+        {entry.href?.startsWith('/') ? 'Every message, tool call and denial of this run is on its own page: ' : 'This run: '}
+        {entry.href?.startsWith('/') ? (
+          <Link href={entry.href} className="link font-mono text-[0.8125rem]">
+            {entry.runId}
+          </Link>
+        ) : entry.href ? (
+          <a href={entry.href} className="link font-mono text-[0.8125rem]">
+            {entry.runId}
+          </a>
+        ) : (
+          <span className="font-mono text-[0.8125rem]">{entry.runId}</span>
+        )}
       </p>
     </div>
   );

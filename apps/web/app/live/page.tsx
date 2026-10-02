@@ -36,7 +36,7 @@ const STEPS = [
 
 export default async function LivePage() {
   const race = await loadReplays();
-  const entries: ReplayEntry[] = race ? toReplayEntries(race) : [];
+  const entries: ReplayEntry[] = race ? await toReplayEntries(race) : [];
   // Open on the design with the most going on: the one that fans out.
   const initial =
     entries.find((entry) => entry.strategyId === 'propose-select') ??
@@ -119,7 +119,12 @@ export default async function LivePage() {
                   <span className="num text-muted">{String(index + 1).padStart(2, '0')}</span>
                   {step.label}
                 </p>
-                <pre className="scroll-x bg-sunken px-4 py-3 font-mono text-[0.8125rem] leading-relaxed text-ink">
+                <pre
+                  role="region"
+                  aria-label={`Command: ${step.label}`}
+                  tabIndex={0}
+                  className="scroll-x bg-sunken px-4 py-3 font-mono text-[0.8125rem] leading-relaxed text-ink"
+                >
                   <code>{step.command}</code>
                 </pre>
               </li>

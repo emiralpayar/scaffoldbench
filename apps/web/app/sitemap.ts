@@ -21,6 +21,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tasks = (data?.catalog.tasks ?? [])
     .map((task) => task.id)
     .filter((id) => id !== EMPTY_PARAM)
-    .map((id) => `/tasks/${id}/`);
+    .flatMap((id) => [`/tasks/${id}/`, ...models.map((model) => `/tasks/${id}/${model}/`)]);
   return [...pages, ...designs, ...perModel, ...tasks].map((pathname) => ({ url: absoluteUrl(pathname) }));
 }

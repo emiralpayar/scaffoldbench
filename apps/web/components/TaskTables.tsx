@@ -14,6 +14,7 @@ import {
 } from '../lib/format';
 import { MiniBar } from './MiniBar';
 import { Verdict } from './Layout';
+import { ScrollRegion } from './ScrollRegion';
 
 export interface StrategyCellRow {
   strategyId: string;
@@ -27,7 +28,7 @@ export function TaskStrategyTable({ rows }: { rows: readonly StrategyCellRow[] }
   }
 
   return (
-    <div className="scroll-x">
+    <ScrollRegion label="Results of each strategy on this task">
       <table className="w-full min-w-[42rem] border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-rule">
@@ -84,7 +85,7 @@ export function TaskStrategyTable({ rows }: { rows: readonly StrategyCellRow[] }
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -104,7 +105,7 @@ export function AssertionTable({ stats }: { stats: readonly AssertionStat[] }) {
   }
 
   return (
-    <div className="scroll-x">
+    <ScrollRegion label="Graded assertions of this task">
       <table className="w-full min-w-[40rem] border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-rule">
@@ -152,7 +153,7 @@ export function AssertionTable({ stats }: { stats: readonly AssertionStat[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -166,7 +167,7 @@ export function RunsTable({
   if (records.length === 0) return null;
 
   return (
-    <div className="scroll-x">
+    <ScrollRegion label="Every run of this task">
       <table className="w-full min-w-[44rem] border-collapse text-[12.5px]">
         <thead>
           <tr className="border-b border-rule">
@@ -224,6 +225,6 @@ export function RunsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }

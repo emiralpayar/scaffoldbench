@@ -5,6 +5,7 @@ import { ArchitectureGlyph } from '../../../components/ArchitectureGlyph';
 import { EmptyState } from '../../../components/EmptyState';
 import { PageHeader } from '../../../components/Layout';
 import { RunSetBanner } from '../../../components/RunSetMeta';
+import { ScrollRegion } from '../../../components/ScrollRegion';
 import { CheckRateList } from '../../../components/health/CheckRateList';
 import { HealthStrip } from '../../../components/leaderboard/HealthStrip';
 import { ARCHITECTURES, architectureName } from '../../../lib/architectures';
@@ -189,7 +190,7 @@ function ExcludedRuns({ runs }: { runs: readonly RunRecord[] }) {
   const shown = runs.slice(0, LISTED);
   return (
     <div className="card overflow-hidden">
-      <div className="scroll-x">
+      <ScrollRegion label="Runs excluded for failing a check">
         <table className="w-full min-w-[44rem] border-collapse text-[0.8125rem]">
           <caption className="sr-only">Runs excluded because an integrity check failed, with the check and what it found.</caption>
           <thead>
@@ -224,7 +225,7 @@ function ExcludedRuns({ runs }: { runs: readonly RunRecord[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       {runs.length > shown.length ? (
         <p className="border-t border-rule px-4 py-3 text-[0.8125rem] text-muted">
           and {formatInt(runs.length - shown.length)} more, in the run records.

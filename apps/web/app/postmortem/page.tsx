@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ScrollRegion } from '../../components/ScrollRegion';
 import { Cause, Evidence } from '../../components/postmortem/Cause';
 import { DesignedVsRan } from '../../components/postmortem/DesignedVsRan';
 import { ScoreStrip } from '../../components/postmortem/ScoreStrip';
@@ -37,7 +38,7 @@ export default async function PostmortemPage() {
     published?.runSetId === POSTMORTEM_RUN_SET_ID
       ? `/runs/${runId}/`
       : sourceUrl(`${PUBLISHED_HERE}/${POSTMORTEM_RUN_SET_ID}/runs/${runId}.json`);
-  const entries = race ? toReplayEntries(race) : [];
+  const entries = race ? await toReplayEntries(race) : [];
   const entry = entries.find((e) => e.strategyId === 'propose-select') ?? entries[0];
   const gate = published?.verification === 'verified' ? summarizeHealth(published.records) : null;
   const extra = report ? wastedShareOfExtraCost(report) : null;
@@ -330,7 +331,7 @@ export default async function PostmortemPage() {
             The run records are plain JSON and stay in the repository unchanged. From the repository root:
           </p>
         </div>
-        <div className="scroll-x mt-6 max-w-[56rem] rounded-[12px] border border-rule bg-sunken">
+        <ScrollRegion label="Commands that re-derive the counts" className="mt-6 max-w-[56rem] rounded-[12px] border border-rule bg-sunken">
           <pre className="w-max p-4 font-mono text-[0.75rem] leading-relaxed text-ink-2">{`cd results/${POSTMORTEM_RUN_SET_ID}
 
 # steps that asked for a structured reply and ended in an error (72)
@@ -344,7 +345,7 @@ jq -s '[.[] | select(.strategyId == "orchestrator-workers") | [.phases[] | selec
 
 # second and third proposers that made no tool call (36)
 jq -s '[.[] | select(.strategyId == "debate-select") | .phases[] | select((.phase | test("^propose-[23]$")) and .toolCalls == 0)] | length' runs/*.json`}</pre>
-        </div>
+        </ScrollRegion>
         <p className="mt-4 max-w-[44rem] text-[0.875rem] leading-relaxed text-muted">
           The counts that need the traces (empty plans, the connectors, the proposers&rsquo; tool lists) were taken from
           the {ACT_ONE.runs} original traces

@@ -1,15 +1,35 @@
 # ScaffoldBench site
 
 The Next.js site that renders a stored run set: the landing story, results
-model by model, score against cost, the per-run matrix, run and task pages.
-Every figure is read from `results/` at build time, and nothing in the
-static build calls an API.
+model by model, score against cost, the per-run matrix, task, run and
+architecture pages, harness health, the methodology and the post-mortem of
+the first run set. Every figure is read from `results/` at build time, and
+nothing in the static build calls an API.
 
 ```sh
 npm run dev:web                    # http://localhost:3210, the published run set
 ARENA_DEMO=1 npm run dev:web       # synthetic data, after `npm run demo:data`
 npm run build:web                  # static export to apps/web/out
 ```
+
+## Pages
+
+| Route | What it answers |
+|---|---|
+| `/` | The question, a race of every architecture on one task, Act 1 and Act 2 in short. |
+| `/results/`, `/results/<model>/`, `/results/scale/` | Who ranks where on a model, with intervals and ties; the cross-model "scaffold or scale" view. |
+| `/pareto/` | Score against cost. |
+| `/matrix/`, `/matrix/<model>/` | Every run as a square, and who fell into which declared trap. |
+| `/tasks/<task>/`, `/tasks/<task>/<model>/` | A task: its pre-registered hypothesis, every run, the traps and the graded items each design missed. |
+| `/runs/<run>/` | One run, explored or replayed call by call. |
+| `/strategies/`, `/strategies/<id>/` | A design drawn as the calls it makes, what it costs by stage, which checks held. |
+| `/health/` | Every integrity check and the runs excluded for failing one. |
+| `/methodology/` | How a run is scored, how it proves it ran, how runs become claims, and the limits. |
+| `/postmortem/` | The first run set, retracted: what its traces showed. |
+| `/live/` | Recorded runs replayed; with `NEXT_PUBLIC_ARENA_LIVE=1`, a run on a visitor's own key. |
+
+Per-model pages are static pages of their own, so a model is a link and the
+switch needs no script.
 
 ## Build modes
 
@@ -44,6 +64,12 @@ long-lived Node host, not a serverless function. The rules that keep it safe
   that touches the filesystem.
 - `components/charts/` draws every chart as server-rendered SVG, each with a
   table of its numbers.
+- `lib/designs.ts` describes what each architecture is made of (its stages,
+  what each call is shown, its fidelity checks), and a test holds it to the
+  glyph geometry in `lib/glyphs.ts`.
+- `lib/postmortem.ts` holds the first run set's numbers (`ACT_ONE`).
+  `test/postmortem.test.ts` re-derives every one from the committed run
+  records, and from the traces whenever a checkout has them.
 - `app/globals.css` holds the colour, type, space and motion tokens for both
   themes; `test/tokens.test.ts` checks their contrast and the architecture
   palette's separation.

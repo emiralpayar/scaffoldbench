@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { PlacedLabel } from '../../lib/charts';
+import { ScrollRegion } from '../ScrollRegion';
 
 /**
  * Shared pieces of the SVG chart kit. Everything renders on the server: the
@@ -198,7 +199,7 @@ export function DataTable({
   return (
     <details className="mt-4 text-[0.875rem]">
       <summary className="inline-flex items-center text-ink-2 hover:text-ink">{summary}</summary>
-      <div className="scroll-x mt-3 rounded-[10px] border border-rule">
+      <ScrollRegion label={`${summary}: the numbers`} className="mt-3 rounded-[10px] border border-rule">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-rule">
@@ -224,7 +225,7 @@ export function DataTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </details>
   );
 }

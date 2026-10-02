@@ -396,7 +396,7 @@ describe('formatting', () => {
 
 describe('taskAnatomy', () => {
   const item = (id: string, earned: number) => ({ id, label: `Item ${id}`, weight: 2, earned });
-  const rule = (id: string) => ({ id, label: `Rule ${id}`, kind: 'forbidden' as const, multiplier: 0 });
+  const rule = (id: string) => ({ id, label: `Rule ${id}`, kind: 'policy_violation' as const, multiplier: 0 });
   const records = [
     run({ runId: 'a1', strategyId: 'single', breakdown: [item('state', 1), item('reply', 0.5)], penalties: [] }),
     run({ runId: 'a2', strategyId: 'single', repeat: 2, breakdown: [item('state', 0), item('reply', 1)], penalties: [rule('policy')] }),

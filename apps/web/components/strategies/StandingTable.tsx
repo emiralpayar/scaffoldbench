@@ -5,6 +5,7 @@ import { formatDelta, formatMultiple, formatPercent, formatScore, formatUsd } fr
 import type { LeaderRow } from '../../lib/leaderboard';
 import { rankLabel } from '../../lib/leaderboard';
 import { modelShortName } from '../../lib/models';
+import { ScrollRegion } from '../ScrollRegion';
 
 const VERDICT: Record<PairedVerdict | 'control', { text: string; className: string }> = {
   better: { text: 'better than single', className: 'chip-good' },
@@ -29,7 +30,7 @@ export interface Standing {
 export function StandingTable({ standings, verified }: { standings: readonly Standing[]; verified: boolean }) {
   return (
     <div className="card overflow-hidden">
-      <div className="scroll-x">
+      <ScrollRegion label="This architecture’s standing on each model">
         <table className="w-full min-w-[40rem] border-collapse text-[0.875rem]">
           <caption className="sr-only">
             Rank, score, cost and paired difference from a single agent, for this architecture on each model.
@@ -66,9 +67,11 @@ export function StandingTable({ standings, verified }: { standings: readonly Sta
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <span className="num block text-ink">{formatScore(row.score.mean)}</span>
-                  <span className="num block text-[0.75rem] text-muted">
-                    {formatScore(row.score.low)}–{formatScore(row.score.high)}
-                  </span>
+                  {verified ? (
+                    <span className="num block text-[0.75rem] text-muted">
+                      {formatScore(row.score.low)}–{formatScore(row.score.high)}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <span className="num block text-ink">{formatUsd(row.costUsd.mean)}</span>
@@ -100,7 +103,7 @@ export function StandingTable({ standings, verified }: { standings: readonly Sta
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </div>
   );
 }

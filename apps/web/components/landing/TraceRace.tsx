@@ -138,7 +138,7 @@ export function TraceRace({
       </div>
 
       <div
-        role="img"
+        role="group"
         aria-label={
           recorded
             ? `The same task run by ${lanes.length} architectures, replayed together: ${lanes

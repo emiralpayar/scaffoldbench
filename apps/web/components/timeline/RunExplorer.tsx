@@ -300,7 +300,7 @@ function Replay({
             {shown.length} / {feed.length}
           </span>
         </p>
-        <ol ref={box} className="max-h-[22rem] overflow-y-auto">
+        <ol ref={box} tabIndex={0} aria-label="Events so far, scrollable" className="max-h-[22rem] overflow-y-auto">
           {shown.length === 0 ? <li className="px-4 py-3 text-[0.8125rem] text-muted">Nothing has happened yet.</li> : null}
           {shown.map(({ call, item }) => (
             <li

@@ -6,6 +6,7 @@ import type { RunRecord } from '../lib/records';
 import { normalizeError } from '../lib/timeline';
 import { MiniBar } from './MiniBar';
 import { Tag, Verdict } from './Layout';
+import { ScrollRegion } from './ScrollRegion';
 
 /** The graded assertions behind a score, each as a pass, a partial or a miss. */
 export function ScoreBreakdown({ breakdown }: { breakdown: readonly ScoreItem[] }) {
@@ -72,7 +73,7 @@ export function PhaseTable({ rows }: { rows: readonly PhaseRow[] }) {
 
   return (
     <div>
-      <div className="scroll-x">
+      <ScrollRegion label="Phases of the run">
         <table className="w-full min-w-[36rem] border-collapse text-[12.5px]">
           <thead>
             <tr className="border-b border-rule">
@@ -120,7 +121,7 @@ export function PhaseTable({ rows }: { rows: readonly PhaseRow[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       {derived ? (
         <p className="mt-2 text-[11px] text-muted">
           This strategy recorded no phase list, so the table above is reconstructed from the trace:

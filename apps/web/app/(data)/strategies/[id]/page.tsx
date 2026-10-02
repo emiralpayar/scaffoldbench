@@ -27,6 +27,7 @@ import { harnessCheckRates, ownCheckRates, stageCosts } from '../../../../lib/st
 import { timelineFromPhases, timelineFromTrace } from '../../../../lib/timeline';
 import { buildViewGroups, trimGroups } from '../../../../lib/traceView';
 import { formatInt } from '../../../../lib/format';
+import { runReceipts } from '../../../../lib/postmortem';
 import { schematicTimeline } from '../../../../lib/schematic';
 
 interface Params {
@@ -145,9 +146,11 @@ export default async function StrategyPage({ params }: Params) {
                 What the structure buys
               </h2>
               <p className="prose-serif mb-8 max-w-3xl">
-                {info.id === 'single'
-                  ? 'The control. Every other architecture is measured as a difference from these numbers, task by task and repeat by repeat.'
-                  : `${info.name} against a single agent on the same tasks and repeats, on each model. The interval is on the paired difference, so it is as wide as the evidence is thin.`}
+                {!verified
+                  ? 'This run set carries no fidelity checks, so nothing proves the runs below executed this design and no comparison is drawn from them. They are the numbers the runs produced.'
+                  : info.id === 'single'
+                    ? 'The control. Every other architecture is measured as a difference from these numbers, task by task and repeat by repeat.'
+                    : `${info.name} against a single agent on the same tasks and repeats, on each model. The interval is on the paired difference, so it is as wide as the evidence is thin.`}
               </p>
               <StandingTable standings={standings} verified={verified} />
             </section>
@@ -211,8 +214,13 @@ export default async function StrategyPage({ params }: Params) {
               <p className="prose-serif mb-8 max-w-3xl">
                 {info.name} on <em>{representative.record.taskTitle}</em> with {modelShortName(representative.record.model)},
                 repeat {representative.record.repeat}.{' '}
-                {representative.record.passed ? 'It passed.' : `It scored ${representative.record.score.toFixed(3)}.`}
+                {representative.record.integrity
+                  ? representative.record.passed
+                    ? 'It passed.'
+                    : `It scored ${representative.record.score.toFixed(3)}.`
+                  : ''}
               </p>
+              {representative.record.integrity ? null : <LegacyReceipts record={representative.record} />}
               <Representative run={representative} color={color} name={architectureName(info.id)} />
               <p className="mt-4 text-[0.875rem]">
                 <Link href={`/runs/${representative.record.runId}/`} className="link">
@@ -255,6 +263,33 @@ export default async function StrategyPage({ params }: Params) {
         </span>
       </nav>
     </>
+  );
+}
+
+/**
+ * A run recorded before the fidelity checks has only its own records to
+ * vouch for it, so say what they admit to: the same receipts its run page
+ * gives. Without this, showing it as "a run of" the design would be a claim
+ * the records do not support.
+ */
+function LegacyReceipts({ record }: { record: Parameters<typeof runReceipts>[0] }) {
+  const receipts = runReceipts(record);
+  return (
+    <div role="note" className="banner banner-bad mb-6 max-w-3xl">
+      <p className="banner-title">Recorded before the fidelity checks</p>
+      <p className="banner-body">
+        {receipts.length === 0
+          ? 'Nothing in its records shows a problem, but nothing proves the design ran either.'
+          : 'By its own records, this run did not run as designed:'}
+      </p>
+      {receipts.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-[0.9375rem] leading-snug text-ink-2">
+          {receipts.map((receipt) => (
+            <li key={receipt}>{receipt}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
