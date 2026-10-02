@@ -30,6 +30,25 @@ export interface OutputStream {
   off?(event: 'resize', listener: () => void): unknown;
 }
 
+/**
+ * The smallest terminal the live view can be drawn in. Its frame is at least
+ * 40 columns wide (one column is left unwritten, so nothing auto-wraps) and
+ * is clipped to the rows below the cursor; in anything smaller a redraw would
+ * wrap or scroll, and the lines it moves back over would be the wrong ones.
+ */
+export const LIVE_MIN_COLUMNS = 41;
+export const LIVE_MIN_ROWS = 8;
+
+/** Whether `stream` is a terminal the live view fits in; anything else gets one line per run. */
+export function canDrawLive(stream: OutputStream, env: NodeJS.ProcessEnv): boolean {
+  return (
+    stream.isTTY === true &&
+    env.TERM !== 'dumb' &&
+    (stream.columns ?? LIVE_MIN_COLUMNS) >= LIVE_MIN_COLUMNS &&
+    (stream.rows ?? LIVE_MIN_ROWS) >= LIVE_MIN_ROWS
+  );
+}
+
 const ESC = '\u001b[';
 const HIDE_CURSOR = `${ESC}?25l`;
 const SHOW_CURSOR = `${ESC}?25h`;

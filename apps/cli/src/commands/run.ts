@@ -33,12 +33,21 @@ import { credentialText, describeCredential } from '../env';
 import { displayPath, formatDuration, formatUsd, plural } from '../format';
 import { emptyHistory, expectedCost, loadCostHistory } from '../history';
 import { createLiveState } from '../live';
-import { JUDGE_CALL_CAP_USD, MAX_ATTEMPTS, capsText, ceilingText, matrixCells, resolveResume, spendPlan } from '../plan';
+import {
+  JUDGE_CALL_CAP_USD,
+  MAX_ATTEMPTS,
+  capsText,
+  ceilingText,
+  firstRunIdClash,
+  matrixCells,
+  resolveResume,
+  spendPlan,
+} from '../plan';
 import { formatReport } from '../report';
 import { listRunSets, loadRunSet } from '../runSet';
 import type { LoadedRunSet } from '../runSet';
 import { StopController, installInterruptHandlers } from '../stop';
-import { LiveReporter, PlainReporter } from '../terminal';
+import { LiveReporter, PlainReporter, canDrawLive } from '../terminal';
 import type { Reporter } from '../terminal';
 import { closest } from '../suggest';
 import { buildReportView } from '../view';
@@ -114,6 +123,15 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
     tasks.map((t) => t.id),
     args.repeats,
   );
+  const clash = firstRunIdClash(cells);
+  if (clash) {
+    ctx.fail(
+      `The models ${JSON.stringify(clash[0].model)} and ${JSON.stringify(clash[1].model)} would both be recorded as ` +
+        `${clash[1].runId}: file names allow only letters, digits, dots, dashes and underscores, and both spell the ` +
+        'same one. List the model once.',
+    );
+    return 1;
+  }
   const skip = args.resume !== undefined ? await completedCells(runSetId, resultsRoot) : new Set<string>();
   const pending = cells.filter((cell) => !skip.has(cell.key));
   const recorded = args.resume !== undefined ? await recordedByCell(runSetId, resultsRoot) : new Map<string, RunRecord>();
@@ -193,7 +211,7 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
     budgetUsd: args.totalBudgetUsd,
     now: Date.now(),
   });
-  const useLive = !args.plain && ctx.stderr.isTTY === true && ctx.env.TERM !== 'dumb';
+  const useLive = !args.plain && canDrawLive(ctx.stderr, ctx.env);
   const reporter: Reporter = useLive
     ? new LiveReporter(state, ctx.stderr, style)
     : new PlainReporter(state, ctx.stderr, style);

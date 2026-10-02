@@ -10,7 +10,7 @@ import type { Judge, RunRecord, RunSetManifest, Strategy, Task } from '@arena/co
 import { parseArgs } from '../src/args';
 import type { RunArgs } from '../src/args';
 import { addToHistory, emptyHistory, expectedCost } from '../src/history';
-import { MAX_ATTEMPTS, ceilingText, matrixCells, resolveResume, spendPlan } from '../src/plan';
+import { MAX_ATTEMPTS, ceilingText, firstRunIdClash, matrixCells, resolveResume, spendPlan } from '../src/plan';
 import { makeRecord } from './support';
 
 function run(argv: string[]): RunArgs {
@@ -76,6 +76,16 @@ describe('matrixCells', () => {
     const cells = matrixCells(['m1', 'm2'], ['s1', 's2'], ['t1', 't2'], 2);
     expect(cells.map((cell) => cell.runId)).toEqual(started);
     expect(cells[0]).toMatchObject({ model: 'm1', strategyId: 's1', taskId: 't1', repeat: 1, key: 'm1|s1|t1|1' });
+  });
+});
+
+describe('firstRunIdClash', () => {
+  it('finds two models that are one once made file-safe, and nothing in an honest matrix', () => {
+    expect(firstRunIdClash(matrixCells(['claude-haiku-4-5-20251001', 'claude-sonnet-5-5'], ['s1', 's2'], ['t1'], 2))).toBeUndefined();
+
+    const clash = firstRunIdClash(matrixCells(['claude/sonnet-5-5', 'claude-sonnet-5-5'], ['s1'], ['t1'], 1));
+    expect(clash?.map((cell) => cell.model)).toEqual(['claude/sonnet-5-5', 'claude-sonnet-5-5']);
+    expect(clash?.[0].runId).toBe(clash?.[1].runId);
   });
 });
 

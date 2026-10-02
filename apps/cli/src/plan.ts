@@ -48,6 +48,24 @@ export function matrixCells(
   return cells;
 }
 
+/**
+ * Two cells that would be recorded under one run id, if any: the second
+ * would silently replace the first. Strategies and tasks are de-duplicated
+ * when they are selected, and models when they are parsed, so this takes two
+ * model ids that read the same once made file-safe, such as `claude/x` and
+ * `claude-x`. The runner refuses such a matrix too, but only after the plan
+ * has been printed and with a stack trace.
+ */
+export function firstRunIdClash(cells: readonly MatrixCell[]): [MatrixCell, MatrixCell] | undefined {
+  const seen = new Map<string, MatrixCell>();
+  for (const cell of cells) {
+    const earlier = seen.get(cell.runId);
+    if (earlier) return [earlier, cell];
+    seen.set(cell.runId, cell);
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Resuming
 // ---------------------------------------------------------------------------

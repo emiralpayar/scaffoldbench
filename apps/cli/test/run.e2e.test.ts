@@ -130,6 +130,18 @@ describe('arena run', () => {
     expect(again.err.join('\n')).toMatch(/--repeats is 3, but the run set was measured with 1/);
   });
 
+  it('refuses two models that would share a run id before it plans, instead of dying with a stack trace', async () => {
+    setScript(async function* () {
+      throw new Error('nothing may start');
+    });
+    const clash = fakeContext();
+    const code = await runCommand(args(...ONE_CELL, '--models', 'claude/haiku,claude-haiku', '--dry-run'), clash.ctx);
+
+    expect(code).toBe(1);
+    expect(clash.err.join('\n')).toMatch(/"claude\/haiku" and "claude-haiku" would both be recorded as claude-haiku__single__airline-easy__r1/);
+    expect(clash.stderrText()).not.toMatch(/Matrix/);
+  });
+
   it('plans without starting anything on --dry-run', async () => {
     setScript(async function* () {
       throw new Error('a dry run must not start a session');
@@ -181,6 +193,19 @@ describe('arena run', () => {
     expect(code).toBe(0);
     expect(run.stderrText()).toMatch(/Finished: 4 runs recorded \(1 hit an API error\)/);
     expect(run.stderrText()).toMatch(/1 run hit an API error and was not scored\. Run it again with: arena run --resume e2e-some/);
+  });
+
+  it('writes one line per run, not a frame it cannot fit, on a terminal too small for the live view', async () => {
+    setScript(async function* () {
+      yield success({ text: 'done', costUsd: 0.01 });
+    });
+    for (const size of [{ columns: 30, rows: 40 }, { columns: 110, rows: 5 }]) {
+      const small = fakeContext({}, { tty: true, ...size });
+      expect(await runCommand(args(...ONE_CELL, '--run-set', `e2e-small-${size.columns}`), small.ctx)).toBe(0);
+      const raw = small.stderrText();
+      expect(raw, JSON.stringify(size)).not.toContain('\u001b[?25l');
+      expect(plain(raw)).toMatch(/\[1\/1\] [●◑✗] claude-haiku-4-5-20251001__single__airline-easy__r1/);
+    }
   });
 
   it('draws the live grid on a terminal and gives the cursor back', async () => {

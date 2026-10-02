@@ -127,7 +127,10 @@ export interface Captured {
   signals: EventEmitter;
 }
 
-export function fakeContext(overrides: Partial<CliContext> = {}, options: { tty?: boolean } = {}): Captured {
+export function fakeContext(
+  overrides: Partial<CliContext> = {},
+  options: { tty?: boolean; columns?: number; rows?: number } = {},
+): Captured {
   const out: string[] = [];
   const err: string[] = [];
   let stderrText = '';
@@ -140,8 +143,8 @@ export function fakeContext(overrides: Partial<CliContext> = {}, options: { tty?
     stderr: {
       write: (chunk: string) => ((stderrText += chunk), true),
       isTTY: options.tty === true,
-      columns: 110,
-      rows: 40,
+      columns: options.columns ?? 110,
+      rows: options.rows ?? 40,
     },
     signals,
     out: (line) => out.push(line),
