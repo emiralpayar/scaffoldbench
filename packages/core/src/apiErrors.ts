@@ -9,7 +9,8 @@
  * first run set used, `There's an issue with the selected model …` with
  * `is_error` set on 0.3.287 — and that text used to be graded as the agent's
  * answer and scored `wrong_answer`. Everything here exists so such a call is
- * labelled for what it is and never becomes an answer.
+ * labelled for what it is and never becomes an answer — and so a limit the
+ * run hit itself, which the CLI dresses the same way, is not excused as one.
  */
 
 import type { ApiError, ApiErrorKind } from './types';
@@ -191,4 +192,48 @@ export function apiErrorOfAssistant(message: unknown): ApiError | undefined {
   if (isApiErrorText(text)) return classifyFailureText(text);
   if (m.message?.model === SYNTHETIC_MODEL && text !== '') return recognizeFailureText(text);
   return undefined;
+}
+
+/** The SDK's code for a turn that ran out of output tokens or context. */
+const OUTPUT_LIMIT_CODE = 'max_output_tokens';
+
+/**
+ * The CLI's notice that the model ran out of room, if `message` is one,
+ * without the "API Error:" it is written with.
+ *
+ * When a response runs past the output-token maximum, or the conversation
+ * fills the context window, the CLI writes a synthetic assistant message
+ * dressed exactly like an API failure — `API Error: Claude's response
+ * exceeded the 64000 output token maximum…`, `API Error: The model has
+ * reached its context window limit.` — under the typed code
+ * `max_output_tokens`. It first lets the model try to carry on; the notice
+ * ends the turn only when that fails. Nothing failed at the API: the run hit
+ * a limit of its own, like running out of turns, so it is a losing data
+ * point and must not be excused (and retried) as an infrastructure failure.
+ */
+export function outputLimitOfAssistant(message: unknown): string | undefined {
+  if (typeof message !== 'object' || message === null) return undefined;
+  if ((message as { error?: unknown }).error !== OUTPUT_LIMIT_CODE) return undefined;
+  const text = assistantText(message as { message?: { content?: unknown } });
+  return text.replace(API_ERROR_PREFIX, '').trim() || OUTPUT_LIMIT_CODE;
+}
+
+/**
+ * True when the CLI wrote `message` in the model's place — an API failure, a
+ * limit notice or any other stand-in — so its text is never the agent's
+ * words and can never be salvaged as its answer.
+ */
+export function isSyntheticAssistant(message: unknown): boolean {
+  if (typeof message !== 'object' || message === null) return false;
+  const m = message as {
+    error?: unknown;
+    is_api_error_message?: unknown;
+    message?: { content?: unknown; model?: unknown };
+  };
+  return (
+    typeof m.error === 'string' ||
+    m.is_api_error_message === true ||
+    m.message?.model === SYNTHETIC_MODEL ||
+    isApiErrorText(assistantText(m))
+  );
 }

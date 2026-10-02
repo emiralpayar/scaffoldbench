@@ -344,6 +344,33 @@ describe('API errors', () => {
     expect(outcome.text).toBe(answer);
   });
 
+  it('counts a model that ran out of room against the run, never as an API failure', async () => {
+    // What the CLI streams once its own attempts to let the model carry on
+    // have failed: the cut-off text, then its notice dressed as an API error,
+    // then a result whose text is the notice.
+    const notice =
+      "API Error: Claude's response exceeded the 64000 output token maximum. To configure this " +
+      'behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.';
+    setScript(async function* () {
+      yield assistant('The first half of a very long answer', {
+        usage: { input_tokens: 1_000, output_tokens: 64_000 },
+      });
+      yield assistant(notice, { model: '<synthetic>', error: 'max_output_tokens', usage: {} });
+      yield success({ text: notice, isError: true, costUsd: 0.33 });
+    });
+    const ctx = makeCtx();
+
+    const outcome = await runQuery(ctx, { phase: 'main', prompt: 'go' });
+
+    expect(outcome.apiError).toBeUndefined();
+    expect(outcome.text).toBe('The first half of a very long answer');
+    expect(outcome.error).toMatch(/^output limit: Claude's response exceeded the 64000 output token maximum/);
+    expect(outcome.costUsd).toBe(0.33);
+    const spoken = ctx.trace.events.filter((e) => e.kind === 'assistant_text').map((e) => e.text);
+    expect(spoken).toEqual(['The first half of a very long answer']);
+    expect(ctx.trace.events.find((e) => e.kind === 'phase_end')?.meta?.outputLimit).toBe(true);
+  });
+
   it('does not blame the API for a call the run itself aborted', async () => {
     const parent = new AbortController();
     setScript(async function* (session) {

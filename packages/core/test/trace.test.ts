@@ -233,6 +233,30 @@ describe('normalizeSdkMessage', () => {
     expect(events[0]?.meta?.apiError).toMatchObject({ kind: 'auth', retryable: false });
   });
 
+  it('records the CLI’s notice that the model ran out of room as an error, not as speech', () => {
+    const events = normalizeSdkMessage(
+      asMessage({
+        type: 'assistant',
+        parent_tool_use_id: null,
+        error: 'max_output_tokens',
+        message: {
+          model: '<synthetic>',
+          content: [{ type: 'text', text: 'API Error: The model has reached its context window limit.' }],
+        },
+      }),
+      ctx,
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'error',
+      isError: true,
+      text: 'The model has reached its context window limit.',
+      meta: { outputLimit: true },
+    });
+    expect(events[0]?.meta?.apiError).toBeUndefined();
+  });
+
   it('notes a retried API request', () => {
     const events = normalizeSdkMessage(
       asMessage({

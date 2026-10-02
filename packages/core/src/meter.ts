@@ -6,6 +6,7 @@ import {
   isApiErrorText,
   kindFromStatus,
   makeApiError,
+  outputLimitOfAssistant,
   recognizeFailureText,
 } from './apiErrors';
 import { emptyUsage } from './budget';
@@ -42,6 +43,12 @@ export interface CallReport {
   /** Per-model breakdown, including the SDK's own helper-model calls when it reports them. */
   byModel: Record<string, ModelSpend>;
   apiError?: ApiError;
+  /**
+   * The CLI's notice when the turn ended because the model ran out of room
+   * (the output-token maximum or the context window). A limit of the run's
+   * own, so it never comes with an `apiError`, though the result looks like one.
+   */
+  outputLimit?: string;
   /** MCP servers as the session's init message listed them. */
   mcpServers: McpServerStatus[];
 }
@@ -68,6 +75,8 @@ export class CallMeter {
   #anonymous = 0;
   #assistantError: ApiError | undefined;
   #thrown: ApiError | undefined;
+  /** The CLI's limit notice, while it is the last thing the main thread said. */
+  #outputLimit: string | undefined;
   #mcpServers: McpServerStatus[] = [];
 
   constructor(defaultModel: string) {
@@ -107,8 +116,15 @@ export class CallMeter {
       result?.subtype === 'success' && result.is_error !== true && !isApiErrorText(result.result);
     const cost = this.#cost(result);
 
+    // A turn the CLI ended with its limit notice reports itself the way an
+    // API failure does — `is_error`, the notice as its text — but is not one.
+    const outputLimit = success ? undefined : this.#outputLimit;
+
     let apiError: ApiError | undefined;
-    if (!success) {
+    if (outputLimit !== undefined) {
+      // Only a crash after the notice is the infrastructure's.
+      apiError = this.#thrown;
+    } else if (!success) {
       const fromResult = resultApiError(result);
       apiError = this.#assistantError ?? fromResult ?? this.#thrown;
       // The assistant message names the failure; the result may add its status.
@@ -126,6 +142,7 @@ export class CallMeter {
       turns: result?.num_turns ?? this.#streamedTurns(),
       ...cost,
       ...(apiError ? { apiError } : {}),
+      ...(outputLimit !== undefined && apiError === undefined ? { outputLimit } : {}),
       mcpServers: this.#mcpServers,
     };
   }
@@ -133,6 +150,7 @@ export class CallMeter {
   #observeAssistant(message: Extract<SDKMessage, { type: 'assistant' }>): void {
     const apiError = apiErrorOfAssistant(message);
     if (apiError) this.#assistantError = apiError;
+    if (message.parent_tool_use_id == null) this.#outputLimit = outputLimitOfAssistant(message);
 
     const body = message.message as { id?: unknown; model?: unknown; usage?: unknown } | undefined;
     const model = typeof body?.model === 'string' ? body.model : this.#defaultModel;

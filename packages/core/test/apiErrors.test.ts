@@ -3,10 +3,28 @@ import {
   apiErrorOfAssistant,
   classifyFailureText,
   isApiErrorText,
+  isSyntheticAssistant,
   kindFromSdkCode,
   kindFromStatus,
+  outputLimitOfAssistant,
   recognizeFailureText,
 } from '@arena/core';
+
+/** An assistant message as the SDK streams it. */
+const message = (text: string, extra: Record<string, unknown> = {}, model = 'claude-sonnet-5-5') => ({
+  type: 'assistant',
+  parent_tool_use_id: null,
+  message: { model, content: [{ type: 'text', text }] },
+  ...extra,
+});
+
+/** The CLI's notices when the model runs out of room (CLI bundled with Agent SDK 0.3.287). */
+const OUTPUT_LIMIT =
+  "API Error: Claude's response exceeded the 64000 output token maximum. To configure this " +
+  'behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.';
+const CONTEXT_LIMIT = 'API Error: The model has reached its context window limit.';
+const limitNotice = (text: string) =>
+  message(text, { error: 'max_output_tokens', is_api_error_message: true }, '<synthetic>');
 
 describe('kindFromStatus', () => {
   it.each([
@@ -80,13 +98,6 @@ describe('recognizeFailureText', () => {
 });
 
 describe('apiErrorOfAssistant', () => {
-  const message = (text: string, extra: Record<string, unknown> = {}, model = 'claude-sonnet-5-5') => ({
-    type: 'assistant',
-    parent_tool_use_id: null,
-    message: { model, content: [{ type: 'text', text }] },
-    ...extra,
-  });
-
   it('reads the typed error code', () => {
     expect(apiErrorOfAssistant(message('Rate limited', { error: 'rate_limit' }))).toMatchObject({
       kind: 'rate_limit',
@@ -108,5 +119,41 @@ describe('apiErrorOfAssistant', () => {
   it('leaves ordinary model output alone', () => {
     expect(apiErrorOfAssistant(message('Back off and retry on HTTP 429.'))).toBeUndefined();
     expect(apiErrorOfAssistant(message('Truncated', { error: 'max_output_tokens' }))).toBeUndefined();
+  });
+
+  it('does not take the CLI’s notice that the model ran out of room for an API failure', () => {
+    expect(apiErrorOfAssistant(limitNotice(OUTPUT_LIMIT))).toBeUndefined();
+    expect(apiErrorOfAssistant(limitNotice(CONTEXT_LIMIT))).toBeUndefined();
+  });
+});
+
+describe('outputLimitOfAssistant', () => {
+  it('reads the notice that the model ran out of room, without its "API Error" dress', () => {
+    expect(outputLimitOfAssistant(limitNotice(OUTPUT_LIMIT))).toMatch(
+      /^Claude's response exceeded the 64000 output token maximum\./,
+    );
+    expect(outputLimitOfAssistant(limitNotice(CONTEXT_LIMIT))).toBe(
+      'The model has reached its context window limit.',
+    );
+  });
+
+  it('is not an API failure, nor the model talking about limits', () => {
+    const overloaded = message('API Error: 529 Overloaded', { error: 'overloaded' }, '<synthetic>');
+    expect(outputLimitOfAssistant(overloaded)).toBeUndefined();
+    expect(outputLimitOfAssistant(message('The reply exceeded the output token maximum.'))).toBeUndefined();
+  });
+});
+
+describe('isSyntheticAssistant', () => {
+  it('recognises everything the CLI writes in the model’s place', () => {
+    expect(isSyntheticAssistant(limitNotice(OUTPUT_LIMIT))).toBe(true);
+    expect(isSyntheticAssistant(message('Rate limited', { error: 'rate_limit' }))).toBe(true);
+    expect(isSyntheticAssistant(message('boom', { is_api_error_message: true }))).toBe(true);
+    expect(isSyntheticAssistant(message('No response requested.', {}, '<synthetic>'))).toBe(true);
+    expect(isSyntheticAssistant(message('API Error: 500 Internal server error'))).toBe(true);
+  });
+
+  it('leaves the model’s own words alone', () => {
+    expect(isSyntheticAssistant(message('Back off and retry on HTTP 429.'))).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { apiErrorOfAssistant } from './apiErrors';
+import { apiErrorOfAssistant, outputLimitOfAssistant } from './apiErrors';
 import type { TraceEvent, TraceKind, TraceSink, UsageTotals } from './types';
 
 const MAX_TEXT = 8_000;
@@ -144,6 +144,20 @@ export function normalizeSdkMessage(message: SDKMessage, ctx: NormalizeContext):
           isError: true,
           text: truncate(apiError.message, 2_000),
           meta: { apiError },
+        });
+        break;
+      }
+      // So is the CLI's notice that the model ran out of room, though it is
+      // the run's own limit rather than the API's failure.
+      const outputLimit = outputLimitOfAssistant(message);
+      if (outputLimit !== undefined) {
+        out.push({
+          ...base,
+          depth,
+          kind: 'error',
+          isError: true,
+          text: truncate(outputLimit, 2_000),
+          meta: { outputLimit: true },
         });
         break;
       }

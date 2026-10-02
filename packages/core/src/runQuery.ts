@@ -1,6 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { apiErrorOfAssistant, assistantText } from './apiErrors';
+import { assistantText, isSyntheticAssistant } from './apiErrors';
 import { emptyUsage } from './budget';
 import { SANDBOX_DENYLIST, createSandboxGuard } from './guard';
 import type { ToolCallReviewer } from './guard';
@@ -271,7 +271,8 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
   const meter = new CallMeter(options.model ?? ctx.model);
   let toolCalls = 0;
   // This call's own last words, for when the turn is cut short. Tracked here
-  // rather than read back from the trace, which concurrent siblings share.
+  // rather than read back from the trace, which concurrent siblings share,
+  // and only ever the model's: never text the CLI wrote in its place.
   let lastText = '';
   // Which of the run's limits made us abort the call mid-stream, if one did.
   let stoppedBy: BudgetStopReason | undefined;
@@ -283,7 +284,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       if (
         message.type === 'assistant' &&
         message.parent_tool_use_id == null &&
-        apiErrorOfAssistant(message) === undefined
+        !isSyntheticAssistant(message)
       ) {
         const said = assistantText(message);
         if (said.trim() !== '') lastText = said;
@@ -343,9 +344,11 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
     ? `API error (${apiError.kind}${apiError.status !== undefined ? ` ${apiError.status}` : ''}): ${apiError.message}`
     : aborted
       ? `aborted: ${stoppedBy ? `run ${stoppedBy} limit reached` : 'run aborted'}`
-      : report.subtype !== undefined && report.subtype !== 'success'
-        ? report.errors.join('; ') || report.subtype
-        : undefined;
+      : report.outputLimit !== undefined
+        ? `output limit: ${report.outputLimit}`
+        : report.subtype !== undefined && report.subtype !== 'success'
+          ? report.errors.join('; ') || report.subtype
+          : undefined;
 
   lease.settle({ costUsd: report.costUsd, turns: report.turns, usage: report.usage });
 
@@ -373,6 +376,7 @@ export async function runQuery(ctx: RunContext, spec: QuerySpec): Promise<QueryO
       ...(report.unpricedModels.length > 0 ? { unpricedModels: report.unpricedModels } : {}),
       ...(structuredMissing ? { structuredMissing: true } : {}),
       ...(apiError ? { apiError } : {}),
+      ...(report.outputLimit !== undefined ? { outputLimit: true } : {}),
       ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
       costByModel: Object.fromEntries(
         Object.entries(report.byModel).map(([model, spend]) => [model, spend.costUsd]),
