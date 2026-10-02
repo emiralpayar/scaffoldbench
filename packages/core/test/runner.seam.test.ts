@@ -416,3 +416,20 @@ describe('API failures through the real call path', () => {
     expect(manifest).toMatchObject({ status: 'interrupted', stoppedBy: 'auth' });
   });
 });
+
+describe('effort through the real call path', () => {
+  it('records the effort each model actually ran at, not only the one asked for', async () => {
+    setScript(solves);
+    const sonnet = 'claude-sonnet-5-5';
+
+    const { records, manifest } = await runMatrix(config({ models: [MODEL, sonnet], effort: 'low' }));
+
+    // Haiku 4.5 takes no effort parameter, so asking for 'low' sent none.
+    expect(records.map((r) => [r.model, r.effort, r.effectiveEffort])).toEqual([
+      [MODEL, 'low', null],
+      [sonnet, 'low', 'low'],
+    ]);
+    expect(manifest.effort).toBe('low');
+    expect(manifest.effectiveEffort).toEqual({ [MODEL]: null, [sonnet]: 'low' });
+  });
+});

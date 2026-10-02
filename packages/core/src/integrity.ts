@@ -94,6 +94,8 @@ export interface TracedCall {
     structuredMissing: boolean;
     /** The MCP servers the harness gave the call. Absent in traces older than per-call servers. */
     mcpServersExpected?: string[];
+    /** The effort level the call reported running at; see `QueryOutcome.effectiveEffort`. */
+    effectiveEffort?: string | null;
   };
   /** Tools the sandbox guard refused, in order. */
   deniedTools: string[];
@@ -160,6 +162,9 @@ export function tracedCalls(
           structuredMissing: meta.structuredMissing === true,
           ...(Array.isArray(meta.mcpServersExpected)
             ? { mcpServersExpected: stringArray(meta.mcpServersExpected) }
+            : {}),
+          ...(typeof meta.effectiveEffort === 'string' || meta.effectiveEffort === null
+            ? { effectiveEffort: meta.effectiveEffort }
             : {}),
         };
         break;

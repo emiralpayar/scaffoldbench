@@ -306,6 +306,25 @@ describe('tracedCalls', () => {
       ['call-2', 'propose-2', 'success', ['Bash']],
     ]);
   });
+
+  it('tells a call sent no effort apart from one that never reported it', () => {
+    const ending = (callId: string, meta: Record<string, unknown>) =>
+      event(callId, 'main', { kind: 'phase_end', meta: { subtype: 'success', ...meta } });
+
+    const calls = tracedCalls([
+      ending('call-1', { effectiveEffort: 'high' }),
+      ending('call-2', { effectiveEffort: null }),
+      ending('call-3', {}),
+      ending('call-4', { effectiveEffort: 7 }),
+    ]);
+
+    expect(calls.map((c) => c.end && 'effectiveEffort' in c.end ? c.end.effectiveEffort : 'absent')).toEqual([
+      'high',
+      null,
+      'absent',
+      'absent',
+    ]);
+  });
 });
 
 describe('traces from before calls carried an id', () => {

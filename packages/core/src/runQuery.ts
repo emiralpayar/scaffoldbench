@@ -121,8 +121,8 @@ export interface QueryOutcome {
   /**
    * The effort level the CLI reported applying to this call's turns, after
    * any silent downgrade for the model: `null` when it sent no effort
-   * parameter (a model without effort support), absent when no reply or tool
-   * call came back to report it. See `watchEffort`.
+   * parameter (a model without effort support), absent when the call ended
+   * before a tool call or a finished reply could report it. See `watchEffort`.
    */
   effectiveEffort?: string | null;
   /** Names of the MCP servers this call was given. */

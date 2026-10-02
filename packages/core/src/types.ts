@@ -530,6 +530,7 @@ export interface RunRecord {
   taskDifficulty: Task['difficulty'];
   strategyId: string;
   model: string;
+  /** The effort level every call asked for; `effectiveEffort` is what the model ran at. */
   effort: EffortLevel;
   repeat: number;
   /** When the recorded attempt started building its environment. */
@@ -587,6 +588,16 @@ export interface RunRecord {
    * `integrity.ok === false` must not be ranked; see `Integrity`.
    */
   integrity?: Integrity;
+  /**
+   * The effort level the CLI reported applying to this run's calls, which can
+   * differ from the `effort` they asked for: `null` means no effort parameter
+   * was sent at all, as for a model without effort support (Haiku 4.5);
+   * `EFFORT_MIXED` (`'mixed'`) means the calls reported different levels,
+   * each of which its `phase_end` trace event keeps. Absent when no
+   * call reported one, because every call ended before a tool call or a
+   * finished reply; see `QueryOutcome.effectiveEffort`.
+   */
+  effectiveEffort?: string | null;
 }
 
 /** How a run set's session ended, or that it is still going. */
@@ -661,6 +672,7 @@ export interface RunSetManifest {
    * with ", ". Kept for readers that predate `models`.
    */
   model: string;
+  /** The effort level requested; `effectiveEffort` says what each model ran at. */
   effort: EffortLevel;
   repeats: number;
   fixtureMode: FixtureMode;
@@ -690,6 +702,13 @@ export interface RunSetManifest {
   startedAt?: string;
   /** Model ids, in matrix order. */
   models?: string[];
+  /**
+   * The effort level each model actually ran at, by model id, from the
+   * `effectiveEffort` of the run set's records: `null` for a model that was
+   * sent no effort parameter, whatever `effort` asked for. A model none of
+   * whose records reported a level is left out.
+   */
+  effectiveEffort?: Record<string, string | null>;
   maxWallClockMsPerRun?: number;
   totalBudgetUsd?: number;
   concurrency?: number;

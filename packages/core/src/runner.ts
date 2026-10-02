@@ -62,6 +62,9 @@ import type {
   TraceEvent,
 } from './types';
 
+/** `RunRecord.effectiveEffort` when the calls behind it reported different levels. */
+export const EFFORT_MIXED = 'mixed';
+
 /** Three attempts, 5 s then 10 s apart (each ± jitter), never more than a minute. */
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxAttempts: 3,
@@ -598,6 +601,9 @@ async function executeAttempt(
   // Also when the strategy threw: a run that lost a call to the API is an
   // API failure, whatever the strategy did next.
   agentApiError ??= apiErrorsOf(calls, outcome.phases)[0];
+  const effectiveEffort = commonEffort(
+    calls.flatMap((call) => (call.end?.effectiveEffort !== undefined ? [call.end.effectiveEffort] : [])),
+  );
   const judgeOutage = judgeCalls > 0 && judgeFailures >= judgeCalls;
   const apiError = agentApiError ?? (judgeOutage ? judgeApiError : undefined);
 
@@ -661,6 +667,7 @@ async function executeAttempt(
     finalText: outcome.finalText.slice(0, 20_000),
     ...(verdict.error !== undefined ? { error: verdict.error } : {}),
     ...(apiError ? { apiError } : {}),
+    ...(effectiveEffort !== undefined ? { effectiveEffort } : {}),
   };
 
   return {
@@ -759,6 +766,14 @@ function runtimeFailure(stoppedBy: BudgetStopReason | undefined): FailureMode | 
 function actingTools(env: TaskEnvironment): string[] {
   const mutating = env.allowedTools.filter((tool) => !env.readOnlyTools.includes(tool));
   return mutating.length > 0 ? mutating : env.allowedTools;
+}
+
+/**
+ * The one effort level several reports share, `EFFORT_MIXED` when they
+ * differ, or undefined when there are none.
+ */
+function commonEffort(levels: readonly (string | null)[]): string | null | undefined {
+  return levels.every((level) => level === levels[0]) ? levels[0] : EFFORT_MIXED;
 }
 
 /** A strategy's fidelity checks, with a check of its own when they throw. */
@@ -1022,6 +1037,7 @@ function buildManifest(input: ManifestInput): RunSetManifest {
     model: config.models.join(', '),
     models: [...config.models],
     effort: config.effort,
+    effectiveEffort: effortByModel(config.models, [...recorded.values()]),
     repeats: config.repeats,
     fixtureMode: config.fixtureMode,
     strategyIds: config.strategies.map((s) => s.id),
@@ -1060,6 +1076,20 @@ function sessionOf(manifest: RunSetManifest): ManifestSession {
     ...(manifest.concurrency !== undefined ? { concurrency: manifest.concurrency } : {}),
     ...(manifest.provenance ? { provenance: manifest.provenance } : {}),
   };
+}
+
+/** `RunSetManifest.effectiveEffort`: each model's level, from the records that report one. */
+function effortByModel(models: readonly string[], records: readonly RunRecord[]): Record<string, string | null> {
+  const byModel: Record<string, string | null> = {};
+  for (const model of models) {
+    const level = commonEffort(
+      records.flatMap((record) =>
+        record.model === model && record.effectiveEffort !== undefined ? [record.effectiveEffort] : [],
+      ),
+    );
+    if (level !== undefined) byModel[model] = level;
+  }
+  return byModel;
 }
 
 async function writeCatalog(config: RunnerConfig, resultsRoot: string): Promise<void> {

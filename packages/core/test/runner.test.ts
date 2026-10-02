@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_RETRY_POLICY,
+  EFFORT_MIXED,
   HARNESS_CHECK,
   REPO_ROOT,
   buildScore,
@@ -646,6 +647,50 @@ describe('integrity', () => {
       ok: false,
       detail: 'main: selection unreadable; kept proposal 1',
     });
+  });
+});
+
+describe('effort', () => {
+  /** A stub whose calls reported running at these levels, as `runQuery` would trace them. */
+  function reportsEffort(id: string, levels: readonly (string | null | undefined)[]): Strategy {
+    return makeStrategy(id, (ctx) => {
+      solve(ctx);
+      levels.forEach((level, index) => {
+        ctx.trace.append({
+          phase: `call-${index + 1}`,
+          callId: `call-${index + 1}`,
+          depth: 0,
+          kind: 'phase_end',
+          meta: { subtype: 'success', ...(level !== undefined ? { effectiveEffort: level } : {}) },
+        });
+      });
+    });
+  }
+
+  it('records the level the calls reported, and says when they disagree', async () => {
+    const { records, manifest } = await runMatrix(
+      config({
+        strategies: [
+          reportsEffort('agrees', ['high', undefined, 'high']),
+          reportsEffort('disagrees', ['high', 'low']),
+        ],
+      }),
+    );
+
+    const effortOf = (id: string) => records.find((r) => r.strategyId === id)?.effectiveEffort;
+    expect(effortOf('agrees')).toBe('high');
+    expect(effortOf('disagrees')).toBe(EFFORT_MIXED);
+    expect(manifest.effort).toBe('high');
+    expect(manifest.effectiveEffort).toEqual({ 'stub-model': EFFORT_MIXED });
+  });
+
+  it('claims no level when no call reported one', async () => {
+    const { records, manifest } = await runMatrix(
+      config({ strategies: [reportsEffort('silent', [undefined])] }),
+    );
+
+    expect(records[0]).not.toHaveProperty('effectiveEffort');
+    expect(manifest.effectiveEffort).toEqual({});
   });
 });
 

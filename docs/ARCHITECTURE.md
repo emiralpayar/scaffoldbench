@@ -75,6 +75,9 @@ What lives at this level rather than inside a cell:
   the totals, and provenance: git sha and whether the tree was dirty, Agent SDK and bundled Claude
   Code versions, Node version, platform and command line
   ([`provenance.ts`](../packages/core/src/provenance.ts)). This is what makes a result citable.
+  Beside the effort that was asked for, `effectiveEffort` gives the level each model actually ran
+  at, from its records: `null` for a model that was sent no effort parameter at all, such as
+  Haiku 4.5, so a manifest cannot claim compute a model never used.
 - **Resuming.** `skipCells` leaves out cells an earlier session finished; `completedCells(runSetId)`
   lists them from `runs/*.json`, except `api_error` records, which measured nothing and run again.
   A run set that already holds runs is only written to this way, and only under the settings it was
@@ -264,6 +267,7 @@ Held identical for every architecture, on every call:
 | Cost accounting | the call's own `result` message settles its lease; a call that never gets one (aborted, crashed) is charged for the usage it streamed, priced from a list-price table and flagged `costEstimated` |
 | API failures | auth, rate-limit, overload, server and invalid-request failures come back as `apiError` and never as answer text |
 | Trace capture | every SDK message is normalized and appended to `ctx.trace`, tagged with the call's `callId` |
+| Effort | `ctx.effort` is requested on every call; the level the CLI actually applied, which it lowers or drops for a model that does not support it, is read from the `PreToolUse` and `Stop` hooks and recorded as `effectiveEffort` on the call, the run record and the manifest |
 | Abort | the parent `AbortSignal` is forwarded, and the stream is cut mid-flight the moment `budget.exceeded` flips |
 | Isolation | `persistSession: false`, per-run `cwd` |
 | Structured output | `outputSchema` → `outputFormat: { type: 'json_schema' }` with the SDK's `StructuredOutput` tool allowed, read back by `readStructured`; a schema phase that gets none back is flagged `structuredMissing` |
