@@ -28,10 +28,13 @@ export interface PageMetadataInput {
   description: string;
   /** The page's route, with the trailing slash the export uses: `/postmortem/`. */
   path: string;
+  /** A card of the page's own, as a route under it (`/postmortem/og.png`), in place of the shared one. */
+  image?: { path: string; alt: string };
 }
 
-export function pageMetadata({ title, description, path }: PageMetadataInput): Metadata {
+export function pageMetadata({ title, description, path, image }: PageMetadataInput): Metadata {
   const url = absoluteUrl(path);
+  const card = image ? { url: absoluteUrl(image.path), width: SOCIAL_CARD.width, height: SOCIAL_CARD.height, alt: image.alt } : SOCIAL_CARD;
   const full = `${title} · ${SITE_NAME}`;
   return {
     title,
@@ -44,13 +47,13 @@ export function pageMetadata({ title, description, path }: PageMetadataInput): M
       description,
       url,
       locale: 'en_US',
-      images: [SOCIAL_CARD],
+      images: [card],
     },
     twitter: {
       card: 'summary_large_image',
       title: full,
       description,
-      images: [SOCIAL_CARD],
+      images: [card],
     },
   };
 }

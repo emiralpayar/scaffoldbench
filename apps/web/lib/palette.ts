@@ -10,6 +10,8 @@ export const DARK = {
   'ink-2': '#c5c2b9',
   muted: '#98958b',
   rule: '#25262a',
+  good: '#4cc06a',
+  bad: '#f2756a',
   'arch-single': '#bcbab5',
   'arch-plan-execute': '#5994e0',
   'arch-orchestrator-workers': '#c05101',

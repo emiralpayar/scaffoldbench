@@ -6,6 +6,7 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { ReactNode } from 'react';
 
 import { ARCHITECTURES } from '../../lib/architectures';
 import type { GlyphGeometry, GlyphNode } from '../../lib/glyphs';
@@ -14,12 +15,12 @@ import { DARK } from '../../lib/palette';
 
 export const CARD_SIZE = { width: 1200, height: 630 };
 
-const INK = DARK.ink;
-const INK_2 = DARK['ink-2'];
-const MUTED = DARK.muted;
-const PLANE = DARK.plane;
-const RULE = DARK.rule;
-const arch = (id: string): string =>
+export const INK = DARK.ink;
+export const INK_2 = DARK['ink-2'];
+export const MUTED = DARK.muted;
+export const PLANE = DARK.plane;
+export const RULE = DARK.rule;
+export const arch = (id: string): string =>
   (DARK as Record<string, string>)[`arch-${id}`] ?? INK_2;
 
 async function font(file: string): Promise<ArrayBuffer> {
@@ -56,8 +57,20 @@ const RADIUS: Record<GlyphNode['kind'], number> = {
   reviewer: 2.3,
 };
 
-function Glyph({ geometry, color, width }: { geometry: GlyphGeometry; color: string; width: number }) {
+/** One architecture's glyph. `dead` nodes never did their job: dimmed and struck through, as on the site. */
+export function Glyph({
+  geometry,
+  color,
+  width,
+  dead = [],
+}: {
+  geometry: GlyphGeometry;
+  color: string;
+  width: number;
+  dead?: readonly string[];
+}) {
   const byId = new Map(geometry.nodes.map((node) => [node.id, node]));
+  const deadSet = new Set(dead);
   return (
     <svg width={width} height={(width * GLYPH_HEIGHT) / GLYPH_WIDTH} viewBox={`0 0 ${GLYPH_WIDTH} ${GLYPH_HEIGHT}`}>
       {geometry.edges.map((edge) => {
@@ -76,6 +89,7 @@ function Glyph({ geometry, color, width }: { geometry: GlyphGeometry; color: str
             />
           );
         }
+        const broken = deadSet.has(edge.from) || deadSet.has(edge.to);
         return (
           <line
             key={`${edge.from}-${edge.to}`}
@@ -85,44 +99,86 @@ function Glyph({ geometry, color, width }: { geometry: GlyphGeometry; color: str
             y2={b.y}
             stroke={color}
             strokeWidth={1.15}
-            opacity={0.6}
-            strokeDasharray={edge.kind === 'review' ? '1.6 1.2' : undefined}
+            opacity={broken ? 0.3 : 0.6}
+            strokeDasharray={broken ? '0.9 0.9' : edge.kind === 'review' ? '1.6 1.2' : undefined}
           />
         );
       })}
       {geometry.nodes.map((node) => {
         const r = RADIUS[node.kind];
-        if (node.kind === 'plan' || node.kind === 'reviewer') {
-          return <circle key={node.id} cx={node.x} cy={node.y} r={r} fill={PLANE} stroke={color} strokeWidth={1.4} />;
-        }
-        if (node.kind === 'decide') {
-          const s = r * 1.05;
-          return (
-            <path
-              key={node.id}
-              d={`M ${node.x} ${node.y - s} L ${node.x + s} ${node.y} L ${node.x} ${node.y + s} L ${node.x - s} ${node.y} Z`}
-              fill={color}
-            />
-          );
-        }
-        if (node.kind === 'gate') {
-          return (
-            <path
-              key={node.id}
-              d={`M ${node.x - 1.4} ${node.y - r} V ${node.y + r} M ${node.x + 1.4} ${node.y - r} V ${node.y + r}`}
-              stroke={color}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-            />
-          );
-        }
-        return <circle key={node.id} cx={node.x} cy={node.y} r={r} fill={color} />;
+        const dead = deadSet.has(node.id);
+        const shape = (() => {
+          if (node.kind === 'plan' || node.kind === 'reviewer') {
+            return <circle cx={node.x} cy={node.y} r={r} fill={PLANE} stroke={color} strokeWidth={1.4} />;
+          }
+          if (node.kind === 'decide') {
+            const s = r * 1.05;
+            return (
+              <path
+                d={`M ${node.x} ${node.y - s} L ${node.x + s} ${node.y} L ${node.x} ${node.y + s} L ${node.x - s} ${node.y} Z`}
+                fill={color}
+              />
+            );
+          }
+          if (node.kind === 'gate') {
+            return (
+              <path
+                d={`M ${node.x - 1.4} ${node.y - r} V ${node.y + r} M ${node.x + 1.4} ${node.y - r} V ${node.y + r}`}
+                stroke={color}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+              />
+            );
+          }
+          return <circle cx={node.x} cy={node.y} r={r} fill={color} />;
+        })();
+        const reach = Math.min(r, 3.4) + 0.4;
+        return (
+          <g key={node.id}>
+            <g opacity={dead ? 0.5 : 1}>{shape}</g>
+            {dead ? (
+              <path
+                d={`M ${node.x - reach} ${node.y - reach} L ${node.x + reach} ${node.y + reach} M ${node.x - reach} ${node.y + reach} L ${node.x + reach} ${node.y - reach}`}
+                stroke={DARK.bad}
+                strokeWidth={1.1}
+                strokeLinecap="round"
+              />
+            ) : null}
+          </g>
+        );
       })}
     </svg>
   );
 }
 
-export function SocialCard({ footnote, host }: { footnote: string; host: string }) {
+/** The top of every card: the wordmark on the left, the address on the right. */
+export function CardHeader({ host }: { host: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <svg width={44} height={44} viewBox="0 0 64 64">
+          <path
+            d="M18.4 29.4 27 18.6M18.6 32h8.6M18.4 34.6 27 45.4M37 18.6l8.6 10.8M36.8 32h8.6M37 45.4l8.6-10.8"
+            stroke={INK}
+            strokeWidth={3}
+            strokeLinecap="round"
+            opacity={0.5}
+          />
+          <circle cx={13.5} cy={32} r={6} fill={INK} />
+          <circle cx={50.5} cy={32} r={6} fill={INK} />
+          <circle cx={32} cy={14.5} r={5} fill={arch('plan-execute')} />
+          <circle cx={32} cy={32} r={5} fill={arch('orchestrator-workers')} />
+          <circle cx={32} cy={49.5} r={5} fill={arch('plan-execute-verify')} />
+        </svg>
+        <span style={{ fontFamily: 'Newsreader', fontSize: 36, letterSpacing: -0.4 }}>ScaffoldBench</span>
+      </div>
+      <span style={{ fontFamily: 'Geist Mono', fontSize: 18, color: MUTED }}>{host}</span>
+    </div>
+  );
+}
+
+/** The dark grid every card is drawn on. */
+export function CardFrame({ children }: { children: ReactNode }) {
   return (
     <div
       style={{
@@ -139,26 +195,15 @@ export function SocialCard({ footnote, host }: { footnote: string; host: string 
         color: INK,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <svg width={44} height={44} viewBox="0 0 64 64">
-            <path
-              d="M18.4 29.4 27 18.6M18.6 32h8.6M18.4 34.6 27 45.4M37 18.6l8.6 10.8M36.8 32h8.6M37 45.4l8.6-10.8"
-              stroke={INK}
-              strokeWidth={3}
-              strokeLinecap="round"
-              opacity={0.5}
-            />
-            <circle cx={13.5} cy={32} r={6} fill={INK} />
-            <circle cx={50.5} cy={32} r={6} fill={INK} />
-            <circle cx={32} cy={14.5} r={5} fill={arch('plan-execute')} />
-            <circle cx={32} cy={32} r={5} fill={arch('orchestrator-workers')} />
-            <circle cx={32} cy={49.5} r={5} fill={arch('plan-execute-verify')} />
-          </svg>
-          <span style={{ fontFamily: 'Newsreader', fontSize: 36, letterSpacing: -0.4 }}>ScaffoldBench</span>
-        </div>
-        <span style={{ fontFamily: 'Geist Mono', fontSize: 18, color: MUTED }}>{host}</span>
-      </div>
+      {children}
+    </div>
+  );
+}
+
+export function SocialCard({ footnote, host }: { footnote: string; host: string }) {
+  return (
+    <CardFrame>
+      <CardHeader host={host} />
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', fontFamily: 'Newsreader', fontSize: 88, lineHeight: 1.02, letterSpacing: -2 }}>
@@ -178,6 +223,6 @@ export function SocialCard({ footnote, host }: { footnote: string; host: string 
       <div style={{ display: 'flex', borderTop: `1px solid ${RULE}`, paddingTop: 22 }}>
         <span style={{ fontFamily: 'Newsreader', fontSize: 26, lineHeight: 1.3, color: INK_2 }}>{footnote}</span>
       </div>
-    </div>
+    </CardFrame>
   );
 }

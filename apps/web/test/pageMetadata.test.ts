@@ -28,4 +28,17 @@ describe('pageMetadata', () => {
     expect(meta.twitter?.images).toEqual([SOCIAL_CARD]);
     expect(SOCIAL_CARD.url).toBe(`${SITE_URL}/og.png`);
   });
+
+  it('can name a card of the page’s own', () => {
+    const own = pageMetadata({
+      title: 'Post-mortem',
+      description: 'd',
+      path: '/postmortem/',
+      image: { path: '/postmortem/og.png', alt: 'The scores, struck through.' },
+    });
+    expect(own.openGraph?.images).toEqual([
+      { url: `${SITE_URL}/postmortem/og.png`, width: 1200, height: 630, alt: 'The scores, struck through.' },
+    ]);
+    expect(own.twitter?.images).toEqual(own.openGraph?.images);
+  });
 });

@@ -22,6 +22,10 @@ export const metadata: Metadata = pageMetadata({
   description:
     'The first run set scored five agent architectures between 0.980 and 1.000. The traces showed that four of them never ran as designed: what broke, the receipts, and why every score still looked plausible.',
   path: '/postmortem/',
+  image: {
+    path: '/postmortem/og.png',
+    alt: 'Five architectures with the first leaderboard\'s scores, and the steps of four of them struck through.',
+  },
 });
 
 const PUBLISHED_HERE = 'results';
