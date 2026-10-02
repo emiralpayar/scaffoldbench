@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { ARCHITECTURES } from '../../lib/architectures';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
 import Link from '../Link';
 
@@ -153,9 +154,9 @@ function ScatterArt() {
 
 function DesignsArt() {
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-      {(['plan-execute', 'orchestrator-workers', 'propose-select', 'plan-execute-verify'] as const).map((id) => (
-        <ArchitectureGlyph key={id} id={id} width={56} decorative />
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {ARCHITECTURES.map((info) => (
+        <ArchitectureGlyph key={info.id} id={info.id} width={44} decorative />
       ))}
     </div>
   );
