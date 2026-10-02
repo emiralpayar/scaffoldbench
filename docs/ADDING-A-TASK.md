@@ -372,7 +372,15 @@ export const supportIncidentSpec: ToolUseTaskSpec<SupportOpsWorld> = {
   `firedTraps(task, scoreOrRunRecord)` (in [`traps.ts`](../packages/tasks/src/traps.ts)) lists the
   traps a run fell into: a listed penalty applied, or a listed assertion earned less than full
   credit. Point each trap at the items specific to it, so the trap rate per architecture means
-  something; two traps that share every item always fire together.
+  something; two traps that share every item always fire together. Watch for items that fail for
+  more than one reason: a total such as "all stock used", or the outcome of a record a mid-run
+  arrival also decides, fires the trap for runs that only fell into the other one: in
+  calibration, a Sonnet run whose only miss was one late delivery registered three traps. Where
+  the items allow it, test that a naive path fires its own trap and nothing else
+  (`toEqual([trap])`, not `toContain`).
+- **A trap must be reachable.** If the naive path the description gives scores the same as the
+  reference, the trap never fires and reads as a perfect record. Drive the naive path in a test;
+  a distractor that turns out not to change the outcome stays in the world, out of `traps`.
 
 ### Expectations come from an oracle
 
