@@ -1,4 +1,5 @@
 import { REPO_URL, SITE_NAME, TAGLINE } from '../lib/site';
+import { HeaderShell } from './HeaderShell';
 import Link from './Link';
 import { LogoMark, Wordmark } from './Logo';
 import { SiteNav } from './SiteNav';
@@ -6,7 +7,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 export function SiteHeader() {
   return (
-    <header className="z-40 border-b sm:sticky sm:top-0 border-rule bg-plane/85 backdrop-blur-md backdrop-saturate-150">
+    <HeaderShell>
       <div className="container-page flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
         <Link href="/" className="flex items-center gap-2.5 text-ink" aria-label={`${SITE_NAME} home`}>
           <LogoMark size={28} />
@@ -31,7 +32,7 @@ export function SiteHeader() {
           <ThemeToggle />
         </div>
       </div>
-    </header>
+    </HeaderShell>
   );
 }
 

@@ -41,7 +41,7 @@ export function Hero({ facts, note, race }: { facts: HeroFact[]; note?: string; 
               checks that each design actually ran, and reports what the extra structure buys, with an
               interval on every number.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
               <Link href="/results/" className="btn btn-primary">
                 See the results <span aria-hidden>→</span>
               </Link>
