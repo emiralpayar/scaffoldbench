@@ -558,6 +558,24 @@ describe('airline-hard', () => {
     expect(score.breakdown.find((item) => item.id === 'reservation-cancelled')?.earned).toBe(1);
   });
 
+  it('judges cash eligibility by the fare bought, so switching cabin first unlocks nothing', async () => {
+    // Economy is refundable to the card; moving the booking into it before
+    // cancelling must not turn a basic-economy refund into an eligible one.
+    const d = drive();
+    await d.call('get_refund_policy', { reservationId: 'R3311' });
+    await d.call('change_flight', { reservationId: 'R3311', newFlightId: 'AA660', cabin: 'economy' });
+    await d.call('cancel_reservation', { reservationId: 'R3311' });
+    await d.call('issue_refund', {
+      reservationId: 'R3311',
+      amountCents: 24_800,
+      method: 'original_payment',
+    });
+
+    const score = await airlineHardTask.score(scoreInput(d));
+    expect(penaltyIds(score)).toEqual(['cash-refund-on-ineligible-fare']);
+    expect(score.score).toBe(0);
+  });
+
   it('hard-fails a refund issued before the refund policy was consulted', async () => {
     const d = drive();
     await d.call('get_reservation', { reservationId: 'R3311' });

@@ -404,10 +404,11 @@ export const airlineHardTask: Task = defineToolUseTask<AirlineWorld>({
       label: 'Returned money to the original payment method for an ineligible fare',
       detail:
         'Basic economy is non-refundable, and the trip insurance only pays cash outside its window.',
+      // Eligibility belongs to the fare the customer bought, so it is read off
+      // the seed: moving the booking into a refundable cabin before cancelling
+      // must not make a card refund look allowed.
       violated: (world) => {
-        const reservation = findReservation(world, HARD_RESERVATION);
-        if (!reservation) return false;
-        if (cashRefundPermitted(world, reservation)) return false;
+        if (expectedSettlement().method === 'original_payment') return false;
         return ledgerFor(world, HARD_RESERVATION).some(
           (entry) => entry.kind === 'refund' && entry.method === 'original_payment',
         );
