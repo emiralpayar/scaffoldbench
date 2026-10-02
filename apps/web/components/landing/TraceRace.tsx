@@ -251,8 +251,9 @@ function Lane({
         {done ? (
           recorded && outcome ? (
             <Link href={`/runs/${outcome.runId}/`} className="group inline-flex flex-col items-end leading-tight">
-              <span className={`num text-[0.9375rem] ${outcome.passed ? 'text-good' : 'text-bad'}`}>
-                {outcome.passed ? '✓' : '✗'} {formatScore(outcome.score)}
+              <span className={`num text-[0.9375rem] ${STAMP[stampOf(outcome)].className}`}>
+                <span aria-hidden>{STAMP[stampOf(outcome)].glyph}</span>
+                <span className="sr-only">{STAMP[stampOf(outcome)].words}, score </span> {formatScore(outcome.score)}
               </span>
               <span className="num text-[0.6875rem] text-muted group-hover:text-ink-2">
                 {formatUsd(outcome.costUsd)} · {formatDuration(outcome.latencyMs)}
@@ -269,6 +270,21 @@ function Lane({
       </div>
     </li>
   );
+}
+
+/**
+ * How a finished lane is stamped. A score short of full credit is partial
+ * credit, not a failure, and is drawn as the matrix draws it (amber, not red).
+ */
+const STAMP = {
+  pass: { glyph: '✓', words: 'passed', className: 'text-good' },
+  partial: { glyph: '◐', words: 'partial credit', className: 'text-warn' },
+  fail: { glyph: '✗', words: 'failed', className: 'text-bad' },
+} as const;
+
+function stampOf(outcome: { passed: boolean; score: number }): keyof typeof STAMP {
+  if (outcome.passed) return 'pass';
+  return outcome.score > 0 ? 'partial' : 'fail';
 }
 
 /** What a schematic lane shows when it finishes: the design's shape in counts. */

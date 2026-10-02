@@ -11,6 +11,7 @@ import type { ReplayEntry } from '../../components/timeline/ReplayGallery';
 import { architectureColor, architectureName, compareArchitectures } from '../architectures';
 import { defaultModel } from '../derive';
 import type { Difficulty, RunRecord, TraceEvent } from '../records';
+import { isRankable } from '../records';
 import { sourceUrl } from '../site';
 import { pickRepresentative } from '../strategies';
 import { timelineFromTrace } from '../timeline';
@@ -39,11 +40,16 @@ const DIFFICULTY: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2, ex
  * The best (task, model, repeat) to race in a run set: the one with the most
  * architectures traced, then the harder task, the default model and the
  * first repeat. `null` when fewer than two architectures share one.
+ *
+ * `rankableOnly` leaves out runs that are excluded from every ranking (a
+ * failed fidelity check, an API loss): a race presented as the designs at
+ * work should not include one the site itself throws out.
  */
-export async function findRace(data: RunSetData): Promise<RaceGroup | null> {
+export async function findRace(data: RunSetData, options: { rankableOnly?: boolean } = {}): Promise<RaceGroup | null> {
   const groups = new Map<string, RunRecord[]>();
   for (const record of data.records) {
     if (!hasTrace(data, record)) continue;
+    if (options.rankableOnly && !isRankable(record)) continue;
     const key = `${record.taskId}\u0000${record.model}\u0000${record.repeat}`;
     const bucket = groups.get(key) ?? [];
     if (!bucket.some((other) => other.strategyId === record.strategyId)) bucket.push(record);
@@ -103,7 +109,7 @@ export async function loadReplays(): Promise<RaceGroup | null> {
 export async function loadHeroRace(): Promise<RaceGroup | null> {
   const published = await loadRunSet();
   if (!published || published.verification === 'unverified') return null;
-  return findRace(published);
+  return findRace(published, { rankableOnly: true });
 }
 
 /** The first run set's race, for the post-mortem: the evidence, replayed. */
