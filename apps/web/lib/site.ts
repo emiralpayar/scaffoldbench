@@ -16,7 +16,7 @@
 export const SITE_NAME = 'ScaffoldBench';
 export const TAGLINE = 'Does your agent scaffold pay for itself?';
 export const SITE_DESCRIPTION =
-  'An open benchmark of agent harness architectures on the Claude Agent SDK: the same models, tools and tasks for every design, a fidelity gate that proves each architecture actually ran, and paired statistics with confidence intervals on every number.';
+  'An open benchmark of agent harness architectures on the Claude Agent SDK. Every design gets the same models, tools and tasks, a fidelity gate proves it ran, and every number carries an interval.';
 
 function normalizeBasePath(value: string | undefined): string {
   if (!value || value === '/') return '';

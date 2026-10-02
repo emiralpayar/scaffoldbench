@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!info) return { title: id };
   return pageMetadata({
     title: `${info.name}: how it runs and what it costs`,
-    description: `${info.summary} The stages of the design, where a run's money goes, and the fidelity checks that prove it ran.`,
+    description: `${info.summary} Its stages, where a run's money goes, and the checks that prove it ran.`,
     path: `/strategies/${id}/`,
   });
 }

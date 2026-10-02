@@ -20,7 +20,7 @@ import { sourceUrl, treeUrl } from '../../lib/site';
 export const metadata: Metadata = pageMetadata({
   title: 'Post-mortem: the run set that tied',
   description:
-    'The first run set scored five agent architectures between 0.980 and 1.000. The traces showed that four of them never ran as designed: what broke, the receipts, and why every score still looked plausible.',
+    'The first run set scored five agent architectures between 0.980 and 1.000. The traces showed four never ran as designed: what broke, the receipts, and why every score looked plausible.',
   path: '/postmortem/',
   image: {
     path: '/postmortem/og.png',
