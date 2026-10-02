@@ -430,30 +430,38 @@ export function renderLiveFrame(state: LiveState, options: FrameOptions): string
   const spent = spentSoFar(state);
   const rate = elapsed > 0 ? state.finished / elapsed : 0;
   const remaining = state.total - state.finished;
+  // Below 100 columns the footer cannot hold every tally and still end with
+  // the ETA: separators tighten and a tally that is zero is left out, so what
+  // is shown is what has happened.
+  const roomy = width >= 100;
+  const gap = roomy ? '   ' : '  ';
   const eta =
     state.stage === 'running' && state.finished > 0 && remaining > 0 && rate > 0
-      ? `   ETA ${formatDuration(remaining / rate)}`
+      ? `${gap}ETA ${formatDuration(remaining / rate)}`
       : '';
   footer.push(
-    ` ${renderBar(fraction, Math.max(10, Math.min(30, width - 75)), style)}  ` +
-      `${state.finished}/${state.total}  ${Math.floor(fraction * 100)}%   ` +
-      `${style.bold(formatUsd(spent))} ${style.dim(`of ${formatBudget(state.budgetUsd)}`)}   ` +
-      `${state.inFlight.size} in flight   ${style.dim(formatDuration(elapsed))}${eta}`,
+    ` ${renderBar(fraction, Math.max(6, Math.min(30, width - (roomy ? 75 : 72))), style)}  ` +
+      `${state.finished}/${state.total}  ${Math.floor(fraction * 100)}%${gap}` +
+      `${style.bold(formatUsd(spent))} ${style.dim(`of ${formatBudget(state.budgetUsd)}`)}${gap}` +
+      `${state.inFlight.size} in flight${gap}${style.dim(formatDuration(elapsed))}${eta}`,
   );
   const counts = state.counts;
+  const tallies: [number, string, (text: string) => string][] = [
+    [counts.api_error, `${GLYPH.apiError} ${plural(counts.api_error, 'API error')}`, style.infra],
+    [counts.integrity, `${GLYPH.integrity} ${counts.integrity} integrity`, style.bad],
+    [state.retries, `${GLYPH.retry} ${plural(state.retries, 'retry', 'retries')}`, style.warn],
+    [state.denied, `${state.denied} denied`, style.warn],
+  ];
   footer.push(
     ' ' +
       [
         `${style.ok(GLYPH.pass)} ${counts.pass} pass`,
         `${style.warn(GLYPH.partial)} ${counts.partial} partial`,
         `${style.bad(GLYPH.fail)} ${counts.fail} fail`,
-        tally(counts.api_error, `${GLYPH.apiError} ${plural(counts.api_error, 'API error')}`, style.infra, style),
-        tally(counts.integrity, `${GLYPH.integrity} ${counts.integrity} integrity`, style.bad, style),
-        tally(state.retries, `${GLYPH.retry} ${plural(state.retries, 'retry', 'retries')}`, style.warn, style),
-        tally(state.denied, `${state.denied} denied`, style.warn, style),
+        ...tallies.filter(([count]) => roomy || count > 0).map(([count, text, tone]) => tally(count, text, tone, style)),
         ...(state.modelStops > 0 ? [style.warn(`${plural(state.modelStops, 'model stop')}`)] : []),
         ...(state.discarded > 0 ? [style.dim(`${GLYPH.discarded} ${state.discarded} discarded`)] : []),
-      ].join('   '),
+      ].join(gap),
   );
 
   const flightLines = [...state.inFlight.entries()].map(([runId, flight]) => {

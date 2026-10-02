@@ -160,6 +160,25 @@ describe('renderLiveFrame', () => {
     expect(text).toMatch(/Ctrl-C: start nothing new and let the runs in flight finish · twice: abort them/);
   });
 
+  it('keeps the whole footer, ETA included, in 80 columns by leaving out tallies that are zero', () => {
+    const state = setup();
+    const run1 = id('single', 'airline-easy', 1);
+    applyRunnerEvent(state, { type: 'run-start', runId: run1, index: 0, total: 8 }, T0);
+    finish(state, run1, { score: 1, passed: true, failureMode: 'none', costUsd: 0.05 }, T0 + 20_000);
+    applyRunnerEvent(state, { type: 'run-start', runId: id('plan-execute', 'airline-easy', 1), index: 1, total: 8 }, T0 + 20_000);
+
+    const narrow = renderLiveFrame(state, { width: 80, height: 30, now: T0 + 30_000 }).map(plain);
+    for (const line of narrow) expect(visibleWidth(line), line).toBeLessThanOrEqual(80);
+    const text = narrow.join('\n');
+    expect(text).toMatch(/1\/8 {2}12% {2}\$0\.050 of \$5\.00 {2}1 in flight {2}30\.0s {2}ETA 3m30s/);
+    expect(text).toMatch(/● 1 pass {2}◑ 0 partial {2}✗ 0 fail$/m);
+    expect(text).not.toMatch(/retries|denied|integrity/);
+
+    // ...and says the zeros once there is room for them.
+    const wide = renderLiveFrame(state, { width: 120, height: 30, now: T0 + 30_000 }).map(plain).join('\n');
+    expect(wide).toMatch(/0 retries {3}0 denied/);
+  });
+
   it('changes its hint as the stop progresses, and drops it from the final frame', () => {
     const state = setup();
     applyRunnerEvent(state, { type: 'run-start', runId: id('single', 'airline-easy', 1), index: 0, total: 8 }, T0);
