@@ -411,6 +411,33 @@ export function unrequestedCredit(world: EcommerceOpsWorld): string[] {
     .map((entry) => entry.id);
 }
 
+/**
+ * The lines a message asks to cancel: Sofia's whole order, Nadia's unshipped
+ * monitor, Lena's cables and Omar's dock. Priya's monitor has a rule of its
+ * own (she withdrew the request).
+ */
+const REQUESTED_CANCELLATIONS = ['O-6103/L1', 'O-6103/L2', 'O-6112/L2', 'O-6101/L2', 'O-6114/L1'];
+const WITHDRAWN_CANCELLATION = 'O-6106/L2';
+
+/** Lines the run cancelled that no message asked to cancel. A cancellation cannot be undone. */
+export function unrequestedCancellations(world: EcommerceOpsWorld): string[] {
+  const seed = createInboxWorld();
+  return world.orders.flatMap((entry) =>
+    entry.lines
+      .filter((candidate) => candidate.status === 'cancelled')
+      .map((candidate) => `${entry.id}/${candidate.id}`)
+      .filter((key) => {
+        const [orderId, lineId] = key.split('/') as [string, string];
+        const before = seed.orders.find((order) => order.id === orderId)?.lines.find((line) => line.id === lineId);
+        return (
+          before?.status !== 'cancelled' &&
+          !REQUESTED_CANCELLATIONS.includes(key) &&
+          key !== WITHDRAWN_CANCELLATION
+        );
+      }),
+  );
+}
+
 const INBOX_ORDERS = [
   'O-6101',
   'O-6102',
@@ -442,6 +469,12 @@ export const ecommerceInboxSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       description:
         'Cancels the monitor on O-6106 from the first message before reading the later one that withdraws it.',
       caughtBy: ['withdrawn-cancellation', 'kept:O-6106'],
+    },
+    {
+      id: 'unrequested-cancellation',
+      description:
+        'Cancels a line no message asked to cancel: the keyboard Lena keeps, the dock on the order Priya now wants in full.',
+      caughtBy: ['unrequested-cancellation'],
     },
     {
       id: 'superseded-address',
@@ -663,6 +696,13 @@ export const ecommerceInboxSpec: ToolUseTaskSpec<EcommerceOpsWorld> = {
       multiplier: 0.5,
       violated: (world) => refundedGoodsNotBack(world).length > 0,
       detail: (world) => `Refunded: ${refundedGoodsNotBack(world).join(', ')}.`,
+    },
+    {
+      id: 'unrequested-cancellation',
+      label: 'Cancelled a line no message asked to cancel',
+      multiplier: 0.5,
+      violated: (world) => unrequestedCancellations(world).length > 0,
+      detail: (world) => `Cancelled: ${unrequestedCancellations(world).join(', ')}.`,
     },
     {
       id: 'withdrawn-cancellation',
