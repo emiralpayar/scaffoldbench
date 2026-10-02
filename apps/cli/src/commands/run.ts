@@ -33,6 +33,7 @@ import { credentialText, describeCredential } from '../env';
 import { displayPath, formatBudget, formatDuration, formatUsd, plural } from '../format';
 import { emptyHistory, expectedCost, loadCostHistory } from '../history';
 import { createLiveState } from '../live';
+import { acquireRunSetLock } from '../lock';
 import {
   JUDGE_CALL_CAP_USD,
   MAX_ATTEMPTS,
@@ -60,8 +61,30 @@ export const EXIT_STOPPED_EARLY = 2;
 export const EXIT_INTERRUPTED = 130;
 
 export async function runCommand(input: RunArgs, ctx: CliContext): Promise<number> {
-  const { err, out } = ctx;
   const resultsRoot = input.resultsDir ? path.resolve(ctx.cwd, input.resultsDir) : RESULTS_DIR;
+
+  // A run set named on the command line may be in use by another process: two
+  // would run the same cells and spend twice. A new, timestamped one cannot be.
+  const named = input.resume ?? input.runSetId;
+  const lock = input.persist && !input.dryRun && named !== undefined ? await acquireRunSetLock(resultsRoot, named) : undefined;
+  if (lock && !lock.acquired) {
+    ctx.fail(
+      `Run set "${named}" is already being run by process ${lock.holder.pid}` +
+        `${lock.holder.startedAt ? ` (started ${lock.holder.startedAt})` : ''}. Wait for it to finish, or interrupt it, ` +
+        `then resume; two runs of one run set would repeat each other's cells and spend twice. If process ${lock.holder.pid} ` +
+        `is not an arena run, delete ${lock.file}.`,
+    );
+    return 1;
+  }
+  try {
+    return await startRun(input, ctx, resultsRoot);
+  } finally {
+    await lock?.release();
+  }
+}
+
+async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): Promise<number> {
+  const { err, out } = ctx;
 
   // -- What to run ----------------------------------------------------------
   let args = input;

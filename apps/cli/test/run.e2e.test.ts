@@ -159,6 +159,41 @@ describe('arena run', () => {
     expect(moves.stderrText()).not.toMatch(/left alone/);
   });
 
+  it('lets one process at a time run a run set, so a second resume cannot spend twice', async () => {
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => (started = resolve));
+    let finish!: () => void;
+    const held = new Promise<void>((resolve) => (finish = resolve));
+    setScript(async function* () {
+      started();
+      await held;
+      yield success({ text: 'done', costUsd: 0.01 });
+    });
+
+    const first = fakeContext();
+    const firstRun = runCommand(args(...ONE_CELL, '--run-set', 'e2e-lock', '--plain'), first.ctx);
+    await running;
+
+    // The same run set, named either way, is refused while the first run is in flight.
+    for (const flags of [['--run-set', 'e2e-lock'], ['--resume', 'e2e-lock']]) {
+      const second = fakeContext();
+      expect(await runCommand(args(...flags, '--plain'), second.ctx)).toBe(1);
+      expect(second.err.join('\n')).toMatch(new RegExp(`Run set "e2e-lock" is already being run by process ${process.pid} \\(started `));
+      expect(second.err.join('\n')).toMatch(/spend twice/);
+    }
+    // A dry run only reads, and another run set is another run set.
+    const dry = fakeContext();
+    expect(await runCommand(args(...ONE_CELL, '--run-set', 'e2e-lock', '--dry-run'), dry.ctx)).toBe(0);
+
+    finish();
+    expect(await firstRun).toBe(0);
+
+    // Released: the run set can be resumed now (there is nothing left to run).
+    const after = fakeContext();
+    expect(await runCommand(args('--resume', 'e2e-lock', '--plain'), after.ctx)).toBe(0);
+    expect(after.stderrText()).toMatch(/Nothing to run: every cell of e2e-lock is recorded/);
+  });
+
   it('refuses to write into a run set that already holds runs unless resuming', async () => {
     setScript(async function* () {
       yield success({ text: 'done', costUsd: 0.01 });
