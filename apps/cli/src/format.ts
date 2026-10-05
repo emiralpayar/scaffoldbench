@@ -78,6 +78,14 @@ export function formatDelta(value: number, digits = 3): string {
   return value > 0 ? `+${fixed}` : fixed;
 }
 
+/** `×1.44`, `×0.35`, `×12.3`: a ratio at three significant figures; `mark` false drops the `×`. */
+export function formatRatio(value: number, mark = true): string {
+  if (!Number.isFinite(value)) return MISSING;
+  const magnitude = Math.abs(value);
+  const digits = magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2;
+  return `${mark ? '×' : ''}${value.toFixed(digits)}`;
+}
+
 /** `claude-haiku-4-5-20251001` → `haiku-4-5`: short enough for a column header. */
 export function shortModel(model: string): string {
   return model.replace(/^claude-/, '').replace(/-\d{8}$/, '');

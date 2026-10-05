@@ -34,7 +34,7 @@ flowchart TD
     CELL --> cell
     SCORE --> REC["RunRecord<br/>score · cost · judgeCost · latency · phases · failureMode · integrity"]
     REC --> DISK["results/&lt;runSetId&gt;/<br/>manifest.json · catalog.json · runs/*.json · traces/*.jsonl"]
-    DISK --> REPORT["arena report<br/>summarizeRuns() + bootstrap CIs"]
+    DISK --> REPORT["arena report<br/>analyzeRunSet(): paired, task-clustered"]
     REPORT --> SITE["apps/web — leaderboard, matrix, Pareto, trace viewer"]
 ```
 
@@ -460,8 +460,13 @@ not require re-recording.
 
 [`stats.ts`](../packages/core/src/stats.ts) · [`aggregate.ts`](../packages/core/src/aggregate.ts)
 
-`summarizeRuns` reduces raw records into everything the site renders, once, at report time — the
-site stays a pure renderer with no statistics of its own.
+`analyzeRunSet` ([`analysis.ts`](../packages/core/src/analysis.ts), method in
+[STATISTICS.md](STATISTICS.md)) reduces raw records into everything `arena report` and the site
+show, once, at report time: task-clustered intervals per strategy, contrasts paired by task and
+repeat with Holm-adjusted verdicts, the Scaffold-or-Scale contrasts across models and an
+uncertainty-aware frontier. The CLI and the site map its output onto their own view models and
+add no statistics of their own. The bullets below describe the older descriptive helpers
+(`summarizeRuns` and friends), which still work but are not what either front end cites.
 
 - **Bootstrap CIs.** Percentile bootstrap for the mean, 2,000 iterations, from a seeded mulberry32
   PRNG. The seed matters: confidence intervals that moved between two reports of the same data

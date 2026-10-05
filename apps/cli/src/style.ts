@@ -100,6 +100,7 @@ export const GLYPH = {
   warn: '⚠',
   info: '·',
   frontier: '★',
+  tied: '☆',
   better: '▲',
   worse: '▼',
   equivalent: '≈',

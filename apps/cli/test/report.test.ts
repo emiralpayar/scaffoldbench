@@ -12,6 +12,7 @@ import {
   formatMatrix,
   formatPairwise,
   formatReport,
+  formatVsBaseline,
   inertMarkdown,
   publicationProblems,
   toMarkdown,
@@ -20,7 +21,7 @@ import { auditLegacy } from '../src/runSet';
 import { createStyle, visibleWidth } from '../src/style';
 import { buildReportView, exclusionOf, orderModels } from '../src/view';
 import type { ModelView } from '../src/view';
-import { makeRecord, overlappingRecords, plain, runSetOf } from './support';
+import { gridRecords, jitter, makeRecord, overlappingRecords, plain, runSetOf } from './support';
 
 const manifest = (overrides: Partial<RunSetManifest> = {}): RunSetManifest => ({
   runSetId: 'test-set',
@@ -172,15 +173,33 @@ describe('terminal report', () => {
   });
 
   it('renders the leaderboard with intervals, exact pass counts and aligned columns', () => {
-    const lines = formatLeaderboard(model).split('\n');
+    const grid = buildReportView(
+      runSetOf(
+        gridRecords({
+          strategies: {
+            alpha: { score: (t, r) => 0.5 + t * 0.04 + jitter(t, r) },
+            beta: { score: (t, r) => 0.4 + t * 0.04 + jitter(t, r, 1) },
+          },
+        }),
+      ),
+    ).models[0];
+    if (!grid) throw new Error('no model');
+    const lines = formatLeaderboard(grid).split('\n');
     const header = lines[0] ?? '';
     const scoreColumn = header.indexOf('SCORE');
 
     expect(header).toMatch(/STRATEGY\s+N\s+SCORE \(95% CI\)\s+PASS\s+COST\/RUN\s+LATENCY\s+SCORE\/\$/);
     for (const line of lines.slice(1, 3)) {
       expect(line.slice(scoreColumn)).toMatch(/^\d\.\d{3} \[\d\.\d{3}, \d\.\d{3}\]/);
-      expect(line).toMatch(/0\/6/);
+      expect(line).toMatch(/0\/16/);
     }
+  });
+
+  it('prints "no interval" where the data cannot support one, never a zero-width interval', () => {
+    // Two tasks: a task-clustered interval needs more.
+    const lines = formatLeaderboard(model).split('\n');
+    for (const line of lines.slice(1, 3)) expect(line).toMatch(/\d\.\d{3} no interval/);
+    expect(lines.join('\n')).not.toMatch(/\[\d\.\d{3}, \d\.\d{3}\]/);
   });
 
   it('ranks every section in the same order', () => {
@@ -194,19 +213,67 @@ describe('terminal report', () => {
     expect(order('FAILURE MODES')).toEqual(['alpha', 'beta']);
   });
 
-  it('says inconclusive when the intervals overlap, and names a winner when they do not', () => {
-    expect(formatPairwise(model)).toMatch(/No pair separates|does not separate/);
+  it('withholds a verdict from a pair with too few tasks, and says so', () => {
+    const text = formatPairwise(model).replace(/\s+/g, ' ');
+    expect(text).toMatch(/No pair separates|does not separate/);
+    expect(text).toMatch(/1 pair has too few tasks for any verdict/);
+    expect(text).toMatch(/paired score differences per task and repeat, a task-clustered bootstrap \(10,000 draws\)/);
+    expect(text).toMatch(/Holm-adjusted/);
+    expect(text).not.toMatch(/intervals overlap/);
+  });
 
-    const decisive: RunRecord[] = [];
-    for (let repeat = 1; repeat <= 4; repeat++) {
-      decisive.push(makeRecord({ strategyId: 'winner', taskId: 'airline-easy', repeat, score: 1, passed: true }));
-      decisive.push(makeRecord({ strategyId: 'loser', taskId: 'airline-easy', repeat, score: 0 }));
-    }
-    const decided = buildReportView(runSetOf(decisive)).models[0];
-    if (!decided) throw new Error('no model');
-    const text = formatPairwise(decided);
-    expect(text).toMatch(/▲ winner beats loser by \+1\.000/);
-    expect(text).toMatch(/winner\s+—\s+▲/);
+  it('names a winner with the paired interval, and calls a near-tie equivalent', () => {
+    // Equivalence needs more tasks than a difference: at 12 this pair is inconclusive, few-informative-tasks.
+    const records = gridRecords({
+      tasks: 20,
+      strategies: {
+        winner: { score: (t, r) => 0.8 + jitter(t, r) },
+        twin: { score: (t, r) => 0.8 + jitter(t, r, 1) },
+        loser: { score: (t, r) => 0.4 + jitter(t, r, 2) },
+      },
+    });
+    const view = buildReportView(runSetOf(records)).models[0];
+    if (!view) throw new Error('no model');
+    const byPair = (a: string, b: string) =>
+      view.contrasts.find((c) => (c.a === a && c.b === b) || (c.a === b && c.b === a));
+
+    const gap = byPair('winner', 'loser');
+    expect(gap?.verdict === 'better' ? gap.a : gap?.b).toBe('winner');
+    expect(gap?.ci).not.toBeNull();
+    expect(byPair('winner', 'twin')?.verdict).toBe('equivalent');
+
+    const text = formatPairwise(view);
+    expect(text).toMatch(/▲ winner beats loser by \+0\.4\d{2} \[\+0\.\d{3}, \+0\.\d{3}\]/);
+    expect(text).toMatch(/winner\s+—\s+[≈▲]\s+▲/);
+    expect(text).toMatch(/≈/);
+  });
+
+  it('reads the interval from the winner\'s side when the row loses', () => {
+    const records = gridRecords({
+      tasks: 12,
+      strategies: {
+        high: { score: (t, r) => 0.8 + jitter(t, r) },
+        low: { score: (t, r) => 0.4 + jitter(t, r, 2) },
+      },
+    });
+    const view = buildReportView(runSetOf(records)).models[0];
+    if (!view) throw new Error('no model');
+    // Whichever way core ordered the pair, the line is the winner's gain.
+    expect(formatPairwise(view)).toMatch(/▲ high beats low by \+0\.4\d{2} \[\+0\.[34]\d{2}, \+0\.[45]\d{2}\]/);
+  });
+
+  it('shows a difference every task shares as having no interval, with the reason', () => {
+    const records = gridRecords({
+      tasks: 8,
+      strategies: {
+        single: { score: (t) => 0.3 + t * 0.05, cost: () => 0.04 },
+        scaffold: { score: (t) => 0.3 + t * 0.05, cost: () => 0.08 },
+      },
+    });
+    const view = buildReportView(runSetOf(records), { baseline: 'single' });
+    const text = plain(formatVsBaseline(view.models[0]!, view.method));
+    expect(text).toMatch(/scaffold\s+· 0\.000 no interval\*\s+▼ ×2\.00 no interval\*/);
+    expect(text).toMatch(/\* every task moved by the same amount, so there is no interval: scaffold \(score\), scaffold \(cost\)/);
   });
 
   it('dims the tasks every strategy aces and counts them', () => {
@@ -415,35 +482,160 @@ describe('publication gate', () => {
   });
 });
 
+describe('against the baseline, and across models', () => {
+  const two = ['claude-haiku-4-5-20251001', 'claude-sonnet-5-5'];
+  // The scaffold lifts the small model 0.15 for 1.5x the cost; the larger model is 0.3 better than single at 3x.
+  const records = gridRecords({
+    models: two,
+    strategies: {
+      single: { score: (t, r, m) => (m === two[0] ? 0.4 : 0.7) + t * 0.03 + jitter(t, r), cost: (_t, m) => (m === two[0] ? 0.04 : 0.12) },
+      scaffold: {
+        score: (t, r, m) => (m === two[0] ? 0.55 : 0.78) + t * 0.03 + jitter(t, r, 1),
+        cost: (t, m) => (m === two[0] ? 0.06 : 0.18) * (1 + jitter(t, 1, 3)),
+      },
+    },
+  });
+  const view = buildReportView(runSetOf(records, { manifest: manifest({ models: two }) }));
+
+  it('maps core\'s paired contrasts onto each model: estimate, interval, verdict', () => {
+    const haiku = view.models[0];
+    expect(haiku?.baseline).toBe('single');
+    const row = haiku?.vsBaseline.find((candidate) => candidate.strategyId === 'scaffold');
+    expect(row?.score).toMatchObject({ verdict: 'better', tasks: 8 });
+    expect(row?.score?.estimate).toBeCloseTo(0.15, 1);
+    expect(row?.score?.ci?.low).toBeGreaterThan(0);
+    // Cost is a ratio of the scaffold over single, so better is cheaper: this one is dearer.
+    expect(row?.cost).toMatchObject({ verdict: 'worse' });
+    expect(row?.cost?.estimate).toBeCloseTo(1.5, 1);
+    // The grid reads the same contrast from the pairwise family.
+    expect(haiku?.contrasts).toHaveLength(1);
+    expect(haiku?.contrasts[0]).toMatchObject({ verdict: expect.stringMatching(/better|worse/), tasks: 8 });
+    expect(haiku?.contrasts[0]).not.toHaveProperty('caveat');
+    expect(view.settings).toMatchObject({ baseline: 'single', alpha: 0.05, iterations: 10_000 });
+  });
+
+  it('prints a vs-baseline table per model, with the verdict glyphs and a legend', () => {
+    const text = plain(formatReport(view, { width: 100 }));
+    expect(text.match(/VS SINGLE/g)).toHaveLength(2);
+    expect(text).toMatch(/scaffold\s+▲ \+0\.1\d{2} \[\+0\.\d{3}, \+0\.\d{3}\]\s+▼ ×1\.\d{2} \[1\.\d{2}, 1\.\d{2}\]/);
+    expect(text).toMatch(/▲ better · ▼ worse · ≈ equivalent · · inconclusive; for cost, better is cheaper/);
+    expect(text).toMatch(/Holm-adjusted/);
+  });
+
+  it('adds a Scaffold-or-Scale section only when there are two or more models', () => {
+    const text = plain(formatReport(view, { width: 100 }));
+    expect(text).toMatch(/SCAFFOLD OR SCALE\?\s+each haiku-4-5 strategy against single on sonnet-5-5/);
+    const section = text.slice(text.indexOf('SCAFFOLD OR SCALE?'));
+    expect(section).toMatch(/scaffold\s+▼ -0\.\d{3} \[-0\.\d{3}, -0\.\d{3}\]\s+▲ ×0\.\d{2}/);
+    expect(section).toMatch(/single\s+▼ -0\.3\d{2}/);
+    // Cheaper but worse is not a match: the larger model's single wins on score.
+    expect(section).toMatch(/No strategy on haiku-4-5 is shown to match single on sonnet-5-5 while costing less\./);
+
+    const solo = buildReportView(runSetOf(records.filter((record) => record.model === two[0])));
+    expect(solo.scale).toEqual([]);
+    expect(plain(formatReport(solo))).not.toMatch(/SCAFFOLD OR SCALE/);
+  });
+
+  it('says a scaffold matches the larger model when its score is not worse and it costs less', () => {
+    // Equivalence needs about 20 tasks to rest on (docs/STATISTICS.md §3.3).
+    const cheap = gridRecords({
+      models: two,
+      tasks: 20,
+      strategies: {
+        single: { score: (t, r, m) => (m === two[0] ? 0.4 : 0.8) + t * 0.01 + jitter(t, r), cost: (_t, m) => (m === two[0] ? 0.04 : 0.12) },
+        scaffold: {
+          score: (t, r, m) => (m === two[0] ? 0.8 : 0.9) + t * 0.01 + jitter(t, r, 1),
+          cost: (t, m) => (m === two[0] ? 0.06 : 0.2) * (1 + jitter(t, 1, 3)),
+        },
+      },
+    });
+    const text = plain(formatReport(buildReportView(runSetOf(cheap, { manifest: manifest({ models: two }) })), { width: 100 }));
+    expect(text).toMatch(/scaffold on haiku-4-5 is shown to match or beat single on sonnet-5-5 for less\./);
+  });
+
+  it('renders a run set that predates integrity checks, and says its runs are unverified', () => {
+    const legacy = gridRecords({
+      strategies: {
+        single: { score: (t, r) => 0.5 + t * 0.04 + jitter(t, r) },
+        scaffold: { score: (t, r) => 0.6 + t * 0.04 + jitter(t, r, 1) },
+      },
+    }).map((record) => ({ ...record, integrity: undefined }));
+    const view = buildReportView(runSetOf(legacy));
+    expect(view.health).toMatchObject({ runs: 32, ranked: 32, unverified: 32 });
+    const text = plain(formatReport(view));
+    expect(text).toMatch(/32 of 32 runs predate integrity checks and have no trace to audit\. They are ranked, unverified\./);
+    expect(text).not.toMatch(/Every run passed its integrity checks/);
+    expect(text).toMatch(/VS SINGLE/);
+    expect(publicationProblems(buildReportView(runSetOf(legacy, { manifest: manifest() })))).toContain('32 runs predate integrity checks');
+  });
+
+  it('measures against the strategy the caller names, and skips the table when the model never ran it', () => {
+    const named = buildReportView(runSetOf(records), { baseline: 'scaffold' });
+    expect(named.models[0]?.vsBaseline.map((row) => row.strategyId)).toEqual(['single']);
+    const none = buildReportView(runSetOf(overlappingRecords()));
+    expect(none.models[0]?.baseline).toBeUndefined();
+    expect(plain(formatReport(none))).not.toMatch(/VS SINGLE/);
+  });
+
+  it('marks an arm that is only tied with the frontier, not on it', () => {
+    // A twin that scores a hair lower and costs a hair more: behind on point estimates, but nothing separates them.
+    const tie = gridRecords({
+      tasks: 20,
+      strategies: {
+        single: { score: (t, r) => 0.6 + jitter(t, r), cost: () => 0.04 },
+        twin: { score: (t, r) => 0.598 + jitter(t, r, 1), cost: (t) => 0.04 * (1.005 + jitter(t, 1, 1) * 3) },
+      },
+    });
+    const model = buildReportView(runSetOf(tie)).models[0]!;
+    const text = plain(formatLeaderboard(model));
+    expect(model.arms.map((arm) => [arm.strategyId, arm.frontier, arm.frontierTied])).toEqual([
+      ['single', true, false],
+      ['twin', false, true],
+    ]);
+    expect(text).toMatch(/☆\s+twin/);
+    expect(text.replace(/\s+/g, ' ')).toMatch(/☆ tied: another strategy is ahead on point estimates/);
+  });
+});
+
 describe('markdown report', () => {
   const view = buildReportView(runSetOf(overlappingRecords(), { manifest: manifest() }));
+  const two = ['claude-haiku-4-5-20251001', 'claude-sonnet-5-5'];
+  const multi = buildReportView(
+    runSetOf(
+      gridRecords({
+        models: two,
+        strategies: {
+          single: { score: (t, r, m) => (m === two[0] ? 0.4 : 0.7) + t * 0.03 + jitter(t, r) },
+          scaffold: { score: (t, r, m) => (m === two[0] ? 0.55 : 0.78) + t * 0.03 + jitter(t, r, 1), cost: (t) => 0.06 + t * 0.001 },
+        },
+      }),
+      { manifest: manifest({ models: two }) },
+    ),
+  );
 
-  it('carries the leaderboard, intervals, verdicts and health', () => {
+  it('carries the leaderboard, verdicts and health, and says where there is no interval', () => {
     const out = toMarkdown(view);
     expect(out).toMatch(/^# ScaffoldBench report — test-set/m);
     expect(out).toMatch(/^## Health/m);
     expect(out).toContain('Alpha harness');
-    expect(out).toContain('inconclusive');
+    expect(out).toContain('inconclusive (too few tasks for a verdict)');
+    expect(out).toContain('no interval');
+  });
+
+  it('carries the intervals, the baseline table and the scale section', () => {
+    const out = toMarkdown(multi);
     expect(out).toMatch(/\[\d\.\d{3}, \d\.\d{3}\]/);
     expect(out).toMatch(/```text\n[\s\S]*├[\s\S]*```/);
+    expect(out).toMatch(/^### Against single — claude-haiku-4-5-20251001/m);
+    expect(out).toMatch(/\| scaffold \| \+0\.1\d{2} \[\+0\.\d{3}, \+0\.\d{3}\] \| better \| ×1\.\d{2} \[1\.\d{2}, 1\.\d{2}\] \| costlier \|/);
+    expect(out).toMatch(/^## Scaffold or scale\? — claude-haiku-4-5-20251001 against single on claude-sonnet-5-5/m);
+    expect(out).toContain('Holm-adjusted');
   });
 
   it('gives every table a separator row and a uniform cell count', () => {
-    const lines = toMarkdown(view).split('\n');
-    const tables: string[][] = [];
-    let current: string[] = [];
-    for (const line of lines) {
-      if (line.startsWith('|')) {
-        current.push(line);
-        continue;
-      }
-      if (current.length > 0) tables.push(current);
-      current = [];
-    }
-    if (current.length > 0) tables.push(current);
-
+    const tables = markdownTables(toMarkdown(view));
     expect(tables.length).toBeGreaterThanOrEqual(4);
-    for (const table of tables) {
+    for (const table of [...tables, ...markdownTables(toMarkdown(multi))]) {
       expect(table.length).toBeGreaterThanOrEqual(3);
       expect(table[1] ?? '').toMatch(/^\|[ :|-]+\|$/);
       const width = (table[0] ?? '').split('|').length;
@@ -451,6 +643,22 @@ describe('markdown report', () => {
     }
   });
 });
+
+/** The pipe tables of a markdown document, each as its lines. */
+function markdownTables(markdown: string): string[][] {
+  const tables: string[][] = [];
+  let current: string[] = [];
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('|')) {
+      current.push(line);
+      continue;
+    }
+    if (current.length > 0) tables.push(current);
+    current = [];
+  }
+  if (current.length > 0) tables.push(current);
+  return tables;
+}
 
 describe('markdown from a model', () => {
   // What a prompt-injected model could make the harness quote: a tool name, then the failure that names it.

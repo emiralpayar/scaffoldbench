@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBudget, formatDelta, formatDuration, formatUsd, shortModel } from '../src/format';
+import { formatBudget, formatDelta, formatDuration, formatRatio, formatUsd, shortModel } from '../src/format';
 
 describe('formatDuration', () => {
   it('rounds to the unit it shows before splitting, so nothing carries into 60', () => {
@@ -58,6 +58,15 @@ describe('small formatters', () => {
     expect(formatDelta(0.031)).toBe('+0.031');
     expect(formatDelta(-0.12)).toBe('-0.120');
     expect(formatDelta(-0.0001)).toBe('0.000');
+  });
+
+  it('prints a ratio at three significant figures, with or without the ×', () => {
+    expect(formatRatio(1.4421)).toBe('×1.44');
+    expect(formatRatio(0.333)).toBe('×0.33');
+    expect(formatRatio(12.34)).toBe('×12.3');
+    expect(formatRatio(123.4)).toBe('×123');
+    expect(formatRatio(1.4421, false)).toBe('1.44');
+    expect(formatRatio(Number.NaN)).toBe('-');
   });
 
   it('shortens model ids for column headers', () => {

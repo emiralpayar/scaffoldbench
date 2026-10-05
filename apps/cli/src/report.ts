@@ -6,14 +6,25 @@
  * runs behind it are known to have measured what they claim to: the first
  * published run set ranked five architectures of which four never ran as
  * designed, and nothing in its report said so. Every headline number then
- * sits next to its bootstrap interval, and a comparison whose intervals
- * overlap is printed as inconclusive rather than as a winner.
+ * sits next to its interval, and a comparison is a paired, task-clustered
+ * contrast whose verdict is better, worse, equivalent or inconclusive: a
+ * missing interval prints as "no interval" with the reason, never as a
+ * zero-width one.
  */
 
 import { MODEL_STOP_LABELS } from '@arena/core';
 import type { ModelStop } from '@arena/core';
 
-import { formatBudget, formatDelta, formatDuration, formatScore, formatUsd, plural, shortModel } from './format';
+import {
+  formatBudget,
+  formatDelta,
+  formatDuration,
+  formatRatio,
+  formatScore,
+  formatUsd,
+  plural,
+  shortModel,
+} from './format';
 import {
   abbreviationLegend,
   abbreviations,
@@ -24,7 +35,7 @@ import {
 } from './plots';
 import { GLYPH, PLAIN, heading, renderTable, visibleWidth, wrap } from './style';
 import type { Column, Style } from './style';
-import type { ArmView, HealthView, ModelView, ReportView } from './view';
+import type { ArmView, BaselineView, ContrastView, HealthView, ModelView, PairedView, ReportView, ScaleView } from './view';
 
 export interface RenderOptions {
   style?: Style;
@@ -59,7 +70,13 @@ export function formatReport(view: ReportView, options: RenderOptions = {}): str
       const title = ` ${model.model} `;
       blocks.push(style.bold(`──${title}${'─'.repeat(Math.max(4, width - visibleWidth(title) - 2))}`));
     }
-    blocks.push(...modelBlocks(model, view.models.length > 1, width, style));
+    blocks.push(...modelBlocks(model, view.models.length > 1, view.method, width, style));
+  }
+  for (const scale of view.scale) {
+    blocks.push(
+      `${heading('SCAFFOLD OR SCALE?', `each ${shortModel(scale.model)} strategy against ${scale.baseline} on ${shortModel(scale.nextModel)}`, style)}\n` +
+        formatScale(scale, view.method, style, width),
+    );
   }
 
   if (view.models.length === 0) blocks.push(style.dim('No runs to rank.'));
@@ -322,7 +339,7 @@ function truncateText(text: string, max: number): string {
 // One model
 // ---------------------------------------------------------------------------
 
-function modelBlocks(model: ModelView, multiModel: boolean, width: number, style: Style): string[] {
+function modelBlocks(model: ModelView, multiModel: boolean, method: string, width: number, style: Style): string[] {
   const tag = multiModel ? shortModel(model.model) : undefined;
   if (model.arms.length === 0) {
     return [style.dim('No ranked runs for this model: every run was excluded (see HEALTH).')];
@@ -330,15 +347,21 @@ function modelBlocks(model: ModelView, multiModel: boolean, width: number, style
   const short = abbreviations(model.arms.map((arm) => arm.strategyId));
   const blocks = [
     `${heading('LEADERBOARD', [tag, `${plural(sum(model.arms.map((a) => a.runs)), 'ranked run')}`].filter(Boolean).join(' · '), style)}\n${formatLeaderboard(model, style, width)}`,
-    `${heading('SCORE', 'mean and 95% bootstrap interval', style)}\n${renderForestPlot(
+    `${heading('SCORE', 'mean and 95% interval, resampling tasks', style)}\n${renderForestPlot(
       model.arms.map((arm) => ({
         label: arm.strategyId,
         estimate: arm.score,
-        ...(arm.frontier ? { marker: GLYPH.frontier } : {}),
+        ...frontierMarker(arm),
       })),
       { width, style, format: (v) => v.toFixed(3), clamp: { low: 0, high: 1 } },
     ).join('\n')}`,
   ];
+  if (model.vsBaseline.length > 0 && model.baseline) {
+    blocks.push(
+      `${heading(`VS ${model.baseline.toUpperCase()}`, 'score difference and cost ratio, paired by task and repeat', style)}\n` +
+        formatVsBaseline(model, method, style, width),
+    );
+  }
   if (model.arms.length >= 2) {
     blocks.push(`${heading('PAIRWISE', 'row against column, on score', style)}\n${formatPairwise(model, short, style, width)}`);
     blocks.push(
@@ -382,7 +405,7 @@ export function formatLeaderboard(model: ModelView, style: Style = PLAIN, width 
     renderTable(
       withCi ? LEADERBOARD_COLUMNS : LEADERBOARD_COLUMNS.map((c) => (c.header === 'SCORE (95% CI)' ? { header: 'SCORE' } : c)),
       model.arms.map((arm) => [
-        arm.frontier ? style.warn(GLYPH.frontier) : ' ',
+        style.warn(frontierMarker(arm).marker ?? ' '),
         style.bold(arm.strategyId),
         String(arm.runs),
         scoreTone(arm.score.value, style)(formatScore(arm.score.value)) + (withCi ? ` ${style.dim(formatCi(arm))}` : ''),
@@ -399,18 +422,32 @@ export function formatLeaderboard(model: ModelView, style: Style = PLAIN, width 
   const fits = full.split('\n').every((line) => visibleWidth(line) <= width);
   return [
     fits ? full : table(false),
-    style.dim(`  ${GLYPH.frontier} Pareto frontier: no other strategy scores at least as high for less.`),
+    ...wrap(frontierLegend(model), width - 2).map((line) => style.dim(`  ${line}`)),
   ].join('\n');
+}
+
+function frontierLegend(model: ModelView): string {
+  return (
+    `${GLYPH.frontier} Pareto frontier: no other strategy scores at least as high for less.` +
+    (model.arms.some((arm) => arm.frontierTied)
+      ? ` ${GLYPH.tied} tied: another strategy is ahead on point estimates, but the paired comparison does not separate them.`
+      : '')
+  );
+}
+
+/** ★ on the frontier, ☆ for an arm only tied with it; nothing for one that is behind. */
+function frontierMarker(arm: ArmView): { marker?: string } {
+  return arm.frontier ? { marker: GLYPH.frontier } : arm.frontierTied ? { marker: GLYPH.tied } : {};
 }
 
 function formatCi(arm: ArmView): string {
   const ci = arm.score.ci;
-  return ci ? `[${ci.low.toFixed(3)}, ${ci.high.toFixed(3)}]` : '';
+  return ci ? `[${ci.low.toFixed(3)}, ${ci.high.toFixed(3)}]` : 'no interval';
 }
 
 /** `17/18`: exact, so a perfect 18/18 is not mistaken for certainty about the next run. */
 function passText(arm: ArmView): string {
-  return `${Math.round(arm.passRate.value * arm.runs)}/${arm.runs}`;
+  return `${arm.passed}/${arm.runs}`;
 }
 
 function scoreTone(score: number, style: Style): (text: string) => string {
@@ -436,21 +473,129 @@ export function formatPairwise(
 
   const decided = model.contrasts.filter((c) => c.verdict === 'better' || c.verdict === 'worse');
   if (decided.length === 0) {
+    const equivalent = model.contrasts.filter((c) => c.verdict === 'equivalent').length;
+    const detail =
+      equivalent === 0
+        ? `all ${model.contrasts.length} comparisons are inconclusive`
+        : `${equivalent} equivalent, ${model.contrasts.length - equivalent} inconclusive`;
     lines.push(
       model.contrasts.length === 1
-        ? '  The pair does not separate: the comparison is inconclusive.'
-        : `  No pair separates: all ${model.contrasts.length} comparisons are inconclusive.`,
+        ? `  The pair does not separate: the comparison is ${model.contrasts[0]?.verdict ?? 'inconclusive'}.`
+        : `  No pair separates: ${detail}.`,
     );
   } else {
-    for (const contrast of decided) {
-      const [winner, loser, delta] =
-        contrast.verdict === 'better'
-          ? [contrast.a, contrast.b, contrast.estimate]
-          : [contrast.b, contrast.a, -contrast.estimate];
-      lines.push(`  ${verdictGlyph('better', style)} ${style.bold(winner)} beats ${loser} by ${formatDelta(delta)}`);
-    }
+    for (const contrast of decided) lines.push(`  ${decidedLine(contrast, style)}`);
+  }
+  // A verdict withheld for want of tasks is a limit of the run set, not of the pair.
+  const untested = model.contrasts.filter((c) => c.caveat === 'too-few-tasks').length;
+  if (untested > 0) {
+    prose(`${plural(untested, 'pair')} ha${untested === 1 ? 's' : 've'} too few tasks for any verdict.`);
   }
   return lines.join('\n');
+}
+
+/** `▲ winner beats loser by +0.031 [+0.012, +0.050]`, the interval read from the winner's side. */
+function decidedLine(contrast: ContrastView, style: Style): string {
+  const flip = contrast.verdict === 'worse';
+  const [winner, loser] = flip ? [contrast.b, contrast.a] : [contrast.a, contrast.b];
+  const delta = flip ? -contrast.estimate : contrast.estimate;
+  const ci = contrast.ci && (flip ? { low: -contrast.ci.high, high: -contrast.ci.low } : contrast.ci);
+  return (
+    `${verdictGlyph('better', style)} ${style.bold(winner)} beats ${loser} by ${formatDelta(delta)} ` +
+    (ci ? `[${formatDelta(ci.low)}, ${formatDelta(ci.high)}]` : 'no interval')
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Against the baseline, and across models
+// ---------------------------------------------------------------------------
+
+/** What the data withheld, in a phrase that follows "so" or a colon. */
+const CAVEAT_TEXT = {
+  'no-variation': 'every task moved by the same amount, so there is no interval',
+  'too-few-tasks': 'too few tasks for a verdict',
+  'few-informative-tasks': 'too few tasks carry the spread to show equivalence',
+} as const;
+
+/** `▲ +0.031 [-0.021, +0.083]`, or `· +0.000 no interval *`: glyph, estimate, interval, caveat mark. */
+function pairedCell(contrast: PairedView | undefined, metric: 'score' | 'cost', style: Style): string {
+  if (!contrast) return style.dim('-');
+  const format = metric === 'score' ? formatDelta : formatRatio;
+  // A ratio's × is printed once, on the estimate.
+  const bare = (value: number) => (metric === 'score' ? formatDelta(value) : formatRatio(value, false));
+  const interval = contrast.ci ? `[${bare(contrast.ci.low)}, ${bare(contrast.ci.high)}]` : 'no interval';
+  return (
+    `${verdictGlyph(contrast.verdict, style)} ${format(contrast.estimate)} ${style.dim(interval)}` +
+    (contrast.caveat ? style.warn('*') : '')
+  );
+}
+
+/** One note per kind of caveat, naming where it applied; empty when none did. */
+function caveatLines(rows: readonly BaselineView[]): string[] {
+  const where = new Map<keyof typeof CAVEAT_TEXT, string[]>();
+  for (const row of rows) {
+    for (const [metric, contrast] of [['score', row.score], ['cost', row.cost]] as const) {
+      if (!contrast?.caveat) continue;
+      const list = where.get(contrast.caveat) ?? [];
+      list.push(`${row.strategyId} (${metric})`);
+      where.set(contrast.caveat, list);
+    }
+  }
+  return [...where].map(([caveat, list]) => `${CAVEAT_TEXT[caveat]}: ${list.join(', ')}.`);
+}
+
+const PAIRED_COLUMNS: Column[] = [{ header: 'STRATEGY' }, { header: 'SCORE Δ (95% CI)' }, { header: 'COST × (95% CI)' }];
+
+const VERDICT_LEGEND =
+  `${GLYPH.better} better · ${GLYPH.worse} worse · ${GLYPH.equivalent} equivalent · ${GLYPH.inconclusive} inconclusive; ` +
+  'for cost, better is cheaper.';
+
+function pairedTable(rows: readonly BaselineView[], method: string, style: Style, width: number): string {
+  const table = renderTable(
+    PAIRED_COLUMNS,
+    rows.map((row) => [
+      style.bold(row.strategyId),
+      pairedCell(row.score, 'score', style),
+      pairedCell(row.cost, 'cost', style),
+    ]),
+    style,
+    '  ',
+  );
+  return [
+    table,
+    ...wrap(`${VERDICT_LEGEND} Compared by ${method}.`, width - 2).map((line) => style.dim(`  ${line}`)),
+    ...caveatLines(rows).flatMap((note) =>
+      wrap(`* ${note}`, width - 2).map((line, index) => style.dim(`${index === 0 ? '  ' : '    '}${line}`)),
+    ),
+  ].join('\n');
+}
+
+/** Each strategy against the model's baseline: score difference and cost ratio, with intervals and verdicts. */
+export function formatVsBaseline(model: ModelView, method: string, style: Style = PLAIN, width = DEFAULT_WIDTH): string {
+  if (model.vsBaseline.length === 0) return 'Nothing to compare.';
+  return pairedTable(model.vsBaseline, method, style, width);
+}
+
+/**
+ * Scaffold or Scale?: does a scaffold on the smaller model do what the
+ * upgrade does, for less? "Match" needs a score shown better or equivalent
+ * and a cost shown lower; a score that is merely not shown worse is not a match.
+ */
+export function formatScale(scale: ScaleView, method: string, style: Style = PLAIN, width = DEFAULT_WIDTH): string {
+  const matches = scale.rows.filter(
+    (row) =>
+      (row.score?.verdict === 'better' || row.score?.verdict === 'equivalent') && row.cost?.verdict === 'better',
+  );
+  const small = shortModel(scale.model);
+  const large = shortModel(scale.nextModel);
+  const reading =
+    matches.length === 0
+      ? `No strategy on ${small} is shown to match ${scale.baseline} on ${large} while costing less.`
+      : `${matches.map((row) => row.strategyId).join(', ')} on ${small} ${matches.length === 1 ? 'is' : 'are'} shown to match or beat ${scale.baseline} on ${large} for less.`;
+  return [
+    pairedTable(scale.rows, method, style, width),
+    ...wrap(reading, width - 4).map((line, index) => `  ${index === 0 ? verdictGlyph(matches.length === 0 ? 'inconclusive' : 'better', style) : ' '} ${line}`),
+  ].join('\n');
 }
 
 export function formatMatrix(model: ModelView, width = DEFAULT_WIDTH, style: Style = PLAIN): string {
@@ -685,7 +830,7 @@ export function toMarkdown(view: ReportView): string {
           { header: 'Score per $', align: 'right' },
         ],
         model.arms.map((arm) => [
-          `${arm.frontier ? '★ ' : ''}${arm.strategyId}`,
+          `${arm.frontier ? '★ ' : arm.frontierTied ? '☆ ' : ''}${arm.strategyId}`,
           arm.label,
           String(arm.runs),
           `${formatScore(arm.score.value)} ${formatCi(arm)}`,
@@ -696,7 +841,7 @@ export function toMarkdown(view: ReportView): string {
         ]),
       ),
       '',
-      '★ Pareto frontier: no other strategy scores at least as high for less.',
+      frontierLegend(model),
       '',
     );
     parts.push(
@@ -705,7 +850,7 @@ export function toMarkdown(view: ReportView): string {
           model.arms.map((arm) => ({
             label: arm.strategyId,
             estimate: arm.score,
-            ...(arm.frontier ? { marker: GLYPH.frontier } : {}),
+            ...frontierMarker(arm),
           })),
           { width: 96, format: (v) => v.toFixed(3), clamp: { low: 0, high: 1 } },
         ),
@@ -713,23 +858,42 @@ export function toMarkdown(view: ReportView): string {
       '',
     );
 
+    if (model.baseline && model.vsBaseline.length > 0) {
+      parts.push(
+        `### Against ${model.baseline}${suffix}`,
+        '',
+        markdownTable(
+          [{ header: 'Strategy' }, { header: 'Score Δ (95% CI)' }, { header: 'Score verdict' }, { header: 'Cost × (95% CI)' }, { header: 'Cost verdict' }],
+          model.vsBaseline.map((row) => [
+            row.strategyId,
+            ...markdownPaired(row.score, 'score'),
+            ...markdownPaired(row.cost, 'cost'),
+          ]),
+        ),
+        '',
+        `Compared by ${view.method}. For cost, better means cheaper.`,
+        '',
+        ...markdownCaveats(model.vsBaseline),
+      );
+    }
+
     parts.push(`### Pairwise verdicts${suffix}`, '');
     if (model.contrasts.length === 0) {
       parts.push('Nothing to compare.', '');
     } else {
       parts.push(
         markdownTable(
-          [{ header: 'Comparison' }, { header: 'Mean delta', align: 'right' }, { header: 'Verdict' }],
+          [{ header: 'Comparison' }, { header: 'Mean delta (95% CI)', align: 'right' }, { header: 'Verdict' }],
           model.contrasts.map((contrast) => [
             `${contrast.a} vs ${contrast.b}`,
-            formatDelta(contrast.estimate),
+            `${formatDelta(contrast.estimate)} ${contrast.ci ? `[${formatDelta(contrast.ci.low)}, ${formatDelta(contrast.ci.high)}]` : 'no interval'}`,
             contrast.verdict === 'better'
               ? `${contrast.a} better`
               : contrast.verdict === 'worse'
                 ? `${contrast.b} better`
                 : contrast.verdict === 'equivalent'
                   ? 'equivalent'
-                  : 'inconclusive (confidence intervals overlap)',
+                  : `inconclusive${contrast.caveat ? ` (${CAVEAT_TEXT[contrast.caveat]})` : ''}`,
           ]),
         ),
         '',
@@ -761,7 +925,46 @@ export function toMarkdown(view: ReportView): string {
     parts.push(markdownTable(columns, rows), '', 'Every run, ranked or not.', '');
   }
 
+  for (const scale of view.scale) {
+    parts.push(
+      `## Scaffold or scale? — ${scale.model} against ${scale.baseline} on ${scale.nextModel}`,
+      '',
+      markdownTable(
+        [{ header: 'Strategy' }, { header: 'Score Δ (95% CI)' }, { header: 'Score verdict' }, { header: 'Cost × (95% CI)' }, { header: 'Cost verdict' }],
+        scale.rows.map((row) => [
+          row.strategyId,
+          ...markdownPaired(row.score, 'score'),
+          ...markdownPaired(row.cost, 'cost'),
+        ]),
+      ),
+      '',
+      `Each strategy on the smaller model against ${scale.baseline} on the larger one. Compared by ${view.method}. For cost, better means cheaper.`,
+      '',
+      ...markdownCaveats(scale.rows),
+    );
+  }
+
   return parts.join('\n');
+}
+
+const VERDICT_WORDS: Record<'score' | 'cost', Record<string, string>> = {
+  score: { better: 'better', worse: 'worse', equivalent: 'equivalent', inconclusive: 'inconclusive' },
+  cost: { better: 'cheaper', worse: 'costlier', equivalent: 'equivalent', inconclusive: 'inconclusive' },
+};
+
+/** The estimate with its interval, and the verdict in words, as two table cells. */
+function markdownPaired(contrast: PairedView | undefined, metric: 'score' | 'cost'): [string, string] {
+  if (!contrast) return ['-', '-'];
+  const point = metric === 'score' ? formatDelta(contrast.estimate) : formatRatio(contrast.estimate);
+  const bare = (value: number) => (metric === 'score' ? formatDelta(value) : formatRatio(value, false));
+  const interval = contrast.ci ? `[${bare(contrast.ci.low)}, ${bare(contrast.ci.high)}]` : 'no interval';
+  const verdict = VERDICT_WORDS[metric][contrast.verdict] ?? contrast.verdict;
+  return [`${point} ${interval}`, contrast.caveat ? `${verdict} (${CAVEAT_TEXT[contrast.caveat]})` : verdict];
+}
+
+function markdownCaveats(rows: readonly BaselineView[]): string[] {
+  const notes = caveatLines(rows);
+  return notes.length > 0 ? [...notes.map((note) => `- ${note}`), ''] : [];
 }
 
 function sum(values: readonly number[]): number {

@@ -105,6 +105,53 @@ export function overlappingRecords(): RunRecord[] {
   return records;
 }
 
+/** A little deterministic noise in [-0.02, 0.02], so no two tasks move by exactly the same amount. */
+export function jitter(task: number, repeat: number, salt = 0): number {
+  return (((task * 7 + repeat * 3 + salt * 2) % 5) - 2) * 0.01;
+}
+
+export interface ArmSpec {
+  score: (task: number, repeat: number, model: string) => number;
+  /** Cost of a run; defaults to $0.04 on the first model and $0.12 on any other. */
+  cost?: (task: number, model: string) => number;
+}
+
+/**
+ * A full (task × repeat) grid per arm. The paired analysis needs at least five
+ * tasks for any verdict and six that differ for a difference, which the
+ * two-task `overlappingRecords` cannot give.
+ */
+export function gridRecords(options: {
+  strategies: Record<string, ArmSpec>;
+  models?: string[];
+  tasks?: number;
+  repeats?: number;
+}): RunRecord[] {
+  const models = options.models ?? ['claude-haiku-4-5-20251001'];
+  const records: RunRecord[] = [];
+  for (const [modelIndex, model] of models.entries()) {
+    for (const [strategyId, spec] of Object.entries(options.strategies)) {
+      for (let task = 0; task < (options.tasks ?? 8); task++) {
+        for (let repeat = 1; repeat <= (options.repeats ?? 2); repeat++) {
+          const score = Math.min(1, Math.max(0, spec.score(task, repeat, model)));
+          records.push(
+            makeRecord({
+              strategyId,
+              taskId: `grid-${String(task + 1).padStart(2, '0')}`,
+              repeat,
+              model,
+              score,
+              passed: score >= 0.999,
+              costUsd: spec.cost?.(task, model) ?? (modelIndex === 0 ? 0.04 : 0.12),
+            }),
+          );
+        }
+      }
+    }
+  }
+  return records;
+}
+
 export function runSetOf(records: RunRecord[], extra: Partial<LoadedRunSet> = {}): LoadedRunSet {
   return {
     runSetId: 'test-set',

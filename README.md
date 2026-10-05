@@ -69,11 +69,12 @@ substituted page reads to the agent as a real source, where an off-target search
 ignored. The same task then scored 1.00.
 ([`webTools.ts`](packages/tasks/src/research/webTools.ts), [`fixtureStore.ts`](packages/tasks/src/research/fixtureStore.ts))
 
-**Bootstrap confidence intervals, and an explicit `inconclusive`.** Every aggregate carries a
-percentile bootstrap CI computed from a seeded PRNG, so the intervals are reproducible across
-report runs. `comparisonVerdict` returns `inconclusive` whenever two intervals overlap. With a
-handful of repeats that is usually the honest answer, and the report says so instead of ranking
-noise. ([`stats.ts`](packages/core/src/stats.ts))
+**Bootstrap confidence intervals, and an explicit `inconclusive`.** Every estimate carries a
+task-clustered bootstrap interval from a seeded PRNG, so the intervals are reproducible across
+report runs, and strategies are compared pairwise on the same (task, repeat) cells with
+Holm-adjusted verdicts: better, worse, equivalent within a stated margin, or `inconclusive`. With
+a handful of repeats that is usually the honest answer, and the report says so instead of ranking
+noise. ([`analysis.ts`](packages/core/src/analysis.ts), [method](docs/STATISTICS.md))
 
 **Judge cost tracked separately from strategy cost.** Research rubrics are graded by a model. That
 grading is billed to `judgeCostUsd` on the run record and never to `costUsd`, because folding
