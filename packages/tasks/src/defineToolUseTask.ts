@@ -10,7 +10,7 @@ import {
   type TaskEnvironment,
   type TaskTrap,
   type ToolCall,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 /** Structural deep clone, so every repeat of a task starts from an identical world. */
 export function cloneWorld<T>(value: T): T {

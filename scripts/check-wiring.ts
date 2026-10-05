@@ -37,8 +37,8 @@ import {
   TraceCollector,
   createJournaledToolServer,
   runQuery,
-} from '@arena/core';
-import type { QueryOutcome, QuerySpec, RunContext, Task, ToolCall, TraceEvent } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { QueryOutcome, QuerySpec, RunContext, Task, ToolCall, TraceEvent } from '@scaffoldbench/core';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_MAX_COST_USD = 0.4;

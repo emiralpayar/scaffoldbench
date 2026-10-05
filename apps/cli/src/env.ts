@@ -3,14 +3,14 @@
  *
  * `.env` at the repository root is loaded with `process.loadEnvFile` before
  * anything reads the environment. Variables already set in the shell win,
- * which is Node's own rule, so `ANTHROPIC_API_KEY=… npm run arena` still
+ * which is Node's own rule, so `ANTHROPIC_API_KEY=… npm run bench` still
  * overrides the file.
  */
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-import { REPO_ROOT, assertApiKeyShape } from '@arena/core';
+import { REPO_ROOT, assertApiKeyShape } from '@scaffoldbench/core';
 
 export const DOT_ENV = path.join(REPO_ROOT, '.env');
 

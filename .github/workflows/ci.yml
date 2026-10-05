@@ -65,28 +65,28 @@ jobs:
       # Every command here is free: none of them makes a model call.
       - name: Version and help
         run: |
-          npm run --silent arena -- --version
-          npm run --silent arena -- help run > /dev/null
+          npm run --silent bench -- --version
+          npm run --silent bench -- help run > /dev/null
 
       - name: Catalogs
         run: |
-          npm run --silent arena -- tasks
-          npm run --silent arena -- strategies
+          npm run --silent bench -- tasks
+          npm run --silent bench -- strategies
 
       - name: Report the committed run sets
         # Whatever state a committed run set is in (the first predates the
         # integrity checks and renders with a health warning), it must render.
         run: |
-          npm run --silent arena -- report
-          npm run --silent arena -- report demo-synthetic > /dev/null
+          npm run --silent bench -- report
+          npm run --silent bench -- report demo-synthetic > /dev/null
 
       - name: Plan a matrix without running it
-        run: npm run --silent arena -- run --tasks airline --strategies single,plan-execute --dry-run
+        run: npm run --silent bench -- run --tasks airline --strategies single,plan-execute --dry-run
 
       # Starts four real SDK sessions against an address nothing listens on, so
       # no request can leave the runner whatever credential it holds: catches
       # an SDK or CLI upgrade that breaks tool registration, structured output
-      # or per-call MCP servers. (`arena doctor` would also report that no
+      # or per-call MCP servers. (`scaffoldbench doctor` would also report that no
       # credential is configured here, which is true and, for this job, beside
       # the point.)
       - name: Wiring canary

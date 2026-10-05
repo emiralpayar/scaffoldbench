@@ -1,4 +1,4 @@
-import type { Task } from '@arena/core';
+import type { Task } from '@scaffoldbench/core';
 import { ecommerceBackordersTask } from './backorders';
 import { ecommerceInboxTask } from './inbox';
 import { ecommerceReturnsTask } from './returns';

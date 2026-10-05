@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { z } from 'zod';
-import type { JournaledToolSpec, ScoreInput, TaskScore, ToolCall } from '@arena/core';
+import type { JournaledToolSpec, ScoreInput, TaskScore, ToolCall } from '@scaffoldbench/core';
 
 /**
  * Drives a task's real tool handlers the way the journaling MCP wrapper does,
@@ -97,7 +97,7 @@ export function missed(score: Pick<TaskScore, 'breakdown'>): string[] {
 }
 
 export const environmentOptions = () => ({
-  cwd: '/tmp/arena-task-test',
+  cwd: '/tmp/scaffoldbench-task-test',
   fixtureMode: 'replay' as const,
-  fixtureDir: '/tmp/arena-task-fixtures',
+  fixtureDir: '/tmp/scaffoldbench-task-fixtures',
 });

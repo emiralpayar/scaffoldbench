@@ -1,5 +1,5 @@
 /**
- * Shared contracts for the arena.
+ * Shared contracts for the benchmark.
  *
  * Two rules make the benchmark fair, and both are encoded here:
  *

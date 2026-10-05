@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCHEMA_MIN_TURNS, emptyUsage } from '@arena/core';
+import { SCHEMA_MIN_TURNS, emptyUsage } from '@scaffoldbench/core';
 import type {
   BudgetLedger,
   FidelityInput,
@@ -13,7 +13,7 @@ import type {
   TaskScore,
   TraceEvent,
   TraceSink,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   ACTING_INSTRUCTIONS,
   FINAL_ANSWER_INSTRUCTION,
@@ -34,8 +34,8 @@ import {
   getStrategies,
   orchestratorWorkersFidelityChecks,
   proposeSelectFidelityChecks,
-} from '@arena/strategies';
-import type { StrategyDeps } from '@arena/strategies';
+} from '@scaffoldbench/strategies';
+import type { StrategyDeps } from '@scaffoldbench/strategies';
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -181,7 +181,7 @@ function makeCtx(options: CtxOptions = {}): RunContext {
     model: 'test-model',
     effort: 'medium',
     env,
-    cwd: '/tmp/arena-test',
+    cwd: '/tmp/scaffoldbench-test',
     signal: controller.signal,
     budget: options.budget ?? makeBudget(),
     trace: new FakeTrace(),

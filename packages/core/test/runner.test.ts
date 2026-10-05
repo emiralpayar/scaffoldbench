@@ -14,7 +14,7 @@ import {
   createJudge,
   retryDelayMs,
   runMatrix,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import type {
   ApiError,
   FidelityInput,
@@ -29,7 +29,7 @@ import type {
   Task,
   TaskEnvironment,
   TraceEvent,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 /**
  * End-to-end exercise of the runner with stub strategies and stub tasks.
@@ -182,7 +182,7 @@ const QUICK_RETRY = { baseDelayMs: 1, maxDelayMs: 1 };
 let resultsRoot: string;
 
 beforeEach(async () => {
-  resultsRoot = await mkdtemp(path.join(tmpdir(), 'arena-runner-'));
+  resultsRoot = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-runner-'));
 });
 
 afterEach(async () => {

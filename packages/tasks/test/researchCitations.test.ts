@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import type { ToolCall } from '@arena/core';
+import type { ToolCall } from '@scaffoldbench/core';
 import {
   CORPUS_DIRNAME,
   Corpus,
@@ -22,7 +22,7 @@ import {
 } from '../src/research/index';
 import { answerWithBlock, writeCorpus } from './researchHelpers';
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'arena-citations-'));
+const scratch = mkdtempSync(path.join(tmpdir(), 'scaffoldbench-citations-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 const SPEC_TEXT = [

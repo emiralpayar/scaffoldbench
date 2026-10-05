@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateCostUsd, priceFor } from '@arena/core';
+import { estimateCostUsd, priceFor } from '@scaffoldbench/core';
 
 describe('priceFor', () => {
   it('matches dated snapshots and provider-prefixed ids by family', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineToolUseTask, cloneWorld } from '@arena/tasks';
-import type { ScoreInput, TaskEnvironment, ToolCall } from '@arena/core';
+import { defineToolUseTask, cloneWorld } from '@scaffoldbench/tasks';
+import type { ScoreInput, TaskEnvironment, ToolCall } from '@scaffoldbench/core';
 
 interface TinyWorld {
   counter: number;
@@ -196,7 +196,7 @@ function task() {
 }
 
 function opts() {
-  return { cwd: '/tmp/arena-test', fixtureMode: 'replay' as const, fixtureDir: '/tmp/fixtures' };
+  return { cwd: '/tmp/scaffoldbench-test', fixtureMode: 'replay' as const, fixtureDir: '/tmp/fixtures' };
 }
 
 function journalEntry(name: string, ok = true): ToolCall {

@@ -293,7 +293,7 @@ export default async function MethodologyPage() {
             </p>
             <ScrollRegion label="Commands to run a cell yourself" className="rounded-[12px] border border-rule bg-sunken">
               <pre className="w-max p-4 font-mono text-[0.75rem] leading-relaxed text-ink-2">{`npm ci
-npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest
+npm run bench -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest
 npm run dev:web`}</pre>
             </ScrollRegion>
             <p>

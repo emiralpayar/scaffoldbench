@@ -6,8 +6,8 @@ import {
   callsTo,
   createJournaledToolServer,
   qualifiedToolName,
-} from '@arena/core';
-import type { ToolCall } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { ToolCall } from '@scaffoldbench/core';
 
 const entry = (name: string, ok = true): ToolCall => ({
   name,

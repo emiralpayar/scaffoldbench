@@ -7,7 +7,7 @@ import type { Task } from './types';
  * it, so no architecture gets an advantage from a better-worded brief. It is
  * deliberately written from scratch rather than reusing the Claude Code preset:
  * that preset is tuned for software work and would bias the non-coding tasks
- * this arena runs.
+ * this benchmark runs.
  */
 export function buildSystemPrompt(task: Task): string {
   const sections: string[] = [

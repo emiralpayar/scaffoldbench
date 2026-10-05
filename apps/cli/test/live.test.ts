@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RunRecord } from '@arena/core';
+import type { RunRecord } from '@scaffoldbench/core';
 
 import { applyRunnerEvent, applyTraceEvent, createLiveState, outcomeOf, renderLiveFrame, spentSoFar, windowRows } from '../src/live';
 import type { LiveState } from '../src/live';

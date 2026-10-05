@@ -1,5 +1,5 @@
 /**
- * `arena run`: the only command that spends money.
+ * `scaffoldbench run`: the only command that spends money.
  *
  * Before the first call it prints what it is about to run, what that is
  * expected to cost (from earlier run sets) and the most it can cost; with
@@ -23,10 +23,10 @@ import {
   runMatrix,
   runSetDir,
   runsDir,
-} from '@arena/core';
-import type { RunRecord, RunSetManifest, Strategy, Task, TraceEvent } from '@arena/core';
-import { getStrategies } from '@arena/strategies';
-import { getTasks } from '@arena/tasks';
+} from '@scaffoldbench/core';
+import type { RunRecord, RunSetManifest, Strategy, Task, TraceEvent } from '@scaffoldbench/core';
+import { getStrategies } from '@scaffoldbench/strategies';
+import { getTasks } from '@scaffoldbench/tasks';
 
 import type { RunArgs } from '../args';
 import { credentialText, describeCredential } from '../env';
@@ -72,7 +72,7 @@ export async function runCommand(input: RunArgs, ctx: CliContext): Promise<numbe
       `Run set "${named}" is already being run by process ${lock.holder.pid}` +
         `${lock.holder.startedAt ? ` (started ${lock.holder.startedAt})` : ''}. Wait for it to finish, or interrupt it, ` +
         `then resume; two runs of one run set would repeat each other's cells and spend twice. If process ${lock.holder.pid} ` +
-        `is not an arena run, delete ${lock.file}.`,
+        `is not a scaffoldbench run, delete ${lock.file}.`,
     );
     return 1;
   }
@@ -370,24 +370,24 @@ async function startRun(input: RunArgs, ctx: CliContext, resultsRoot: string): P
 
   err('');
   if (args.persist) {
-    err(`Results in ${displayPath(ctx.cwd, runSetDir(runSetId, resultsRoot))}. Render them again with: arena report ${runSetId}`);
+    err(`Results in ${displayPath(ctx.cwd, runSetDir(runSetId, resultsRoot))}. Render them again with: scaffoldbench report ${runSetId}`);
     if (!args.updateLatest) err(style.dim('results/latest.json, which the site shows, was left alone; --update-latest moves it.'));
   }
   if (manifest.status !== 'complete') {
-    if (args.persist) err(`Resume with: arena run --resume ${runSetId}`);
+    if (args.persist) err(`Resume with: scaffoldbench run --resume ${runSetId}`);
     if (manifest.stoppedBy === 'signal' || manifest.stoppedBy === 'drain') return EXIT_INTERRUPTED;
     return EXIT_STOPPED_EARLY;
   }
   if (nothingMeasured) {
     err(style.bad('Nothing was measured: every run hit an API error. Check the model id and the credentials above.'));
-    if (args.persist) err(`Run them again with: arena run --resume ${runSetId}`);
+    if (args.persist) err(`Run them again with: scaffoldbench run --resume ${runSetId}`);
     return 1;
   }
   if (apiErrors > 0 && args.persist) {
     err(
       style.warn(
         `${plural(apiErrors, 'run')} hit an API error and ${apiErrors === 1 ? 'was' : 'were'} not scored. ` +
-          `Run ${apiErrors === 1 ? 'it' : 'them'} again with: arena run --resume ${runSetId}`,
+          `Run ${apiErrors === 1 ? 'it' : 'them'} again with: scaffoldbench run --resume ${runSetId}`,
       ),
     );
   }

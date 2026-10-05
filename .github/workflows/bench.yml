@@ -146,7 +146,7 @@ jobs:
           trap leak_check EXIT
           # Fails before any spend if the key is malformed, the SDK cannot start,
           # or a research task cannot build its environment from the fixtures.
-          npm run --silent arena -- doctor
+          npm run --silent bench -- doctor
           # An empty input is an error here, not "all": the CLI refuses it.
           # --replay: research tasks read only recorded fixtures, so the web half
           # of the matrix costs nothing beyond the model calls and cannot drift
@@ -155,7 +155,7 @@ jobs:
           # different measurement.
           # No --update-latest: the pointer that makes the site show this run
           # set moves only when the pull request is merged (see `propose`).
-          npm run --silent arena -- run \
+          npm run --silent bench -- run \
             --run-set "$BENCH_RUN_SET" \
             --models "$BENCH_MODELS" \
             --strategies "$BENCH_STRATEGIES" \
@@ -179,7 +179,7 @@ jobs:
             echo "No run of $BENCH_RUN_SET was recorded."
             exit 0
           fi
-          npm run --silent arena -- report "$BENCH_RUN_SET" --markdown
+          npm run --silent bench -- report "$BENCH_RUN_SET" --markdown
           {
             echo "## Benchmark \`$BENCH_RUN_SET\`"
             echo
@@ -202,7 +202,7 @@ jobs:
         # Exit 3 unless the run set is complete and every run passed its
         # integrity checks with no API error. A run set that fails is not
         # published; its artifact stays for diagnosis and for --resume.
-        run: npm run --silent arena -- report "$BENCH_RUN_SET" --strict > /dev/null
+        run: npm run --silent bench -- report "$BENCH_RUN_SET" --strict > /dev/null
 
   propose:
     name: Propose the result as a pull request
@@ -236,7 +236,7 @@ jobs:
         run: |
           branch="bench/$BENCH_RUN_SET"
           report="results/$BENCH_RUN_SET/REPORT.md"
-          # What `arena run --update-latest` writes, which is what the site follows.
+          # What `scaffoldbench run --update-latest` writes, which is what the site follows.
           node -e 'require("node:fs").writeFileSync("results/latest.json", JSON.stringify({ runSetId: process.env.BENCH_RUN_SET }, null, 2) + "\n")'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

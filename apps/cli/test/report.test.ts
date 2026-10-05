@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { RunRecord, RunSetManifest, TraceEvent } from '@arena/core';
+import type { RunRecord, RunSetManifest, TraceEvent } from '@scaffoldbench/core';
 
 import {
   formatFailureModes,

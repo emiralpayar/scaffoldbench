@@ -7,7 +7,7 @@
  *   canonical URLs, the sitemap and social cards.
  * - `NEXT_PUBLIC_REPO_URL`: the repository, for "view source" links. Unset,
  *   source paths render as plain text instead of links to nowhere.
- * - `NEXT_PUBLIC_ARENA_LIVE=1`: server mode. Builds a Node server with the
+ * - `NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1`: server mode. Builds a Node server with the
  *   `/api/live` route instead of a static export. The public site never sets it.
  *
  * Pure and client-safe: `NEXT_PUBLIC_*` values are inlined into the bundle.
@@ -32,7 +32,7 @@ export const SITE_URL = (
 
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL?.replace(/\/+$/, '') || undefined;
 
-export const LIVE_ENABLED = process.env.NEXT_PUBLIC_ARENA_LIVE === '1';
+export const LIVE_ENABLED = process.env.NEXT_PUBLIC_SCAFFOLDBENCH_LIVE === '1';
 
 /**
  * Prefix a root-relative URL with the base path. `next/link` and the metadata

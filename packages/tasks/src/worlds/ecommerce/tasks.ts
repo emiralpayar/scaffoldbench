@@ -1,4 +1,4 @@
-import { callsTo, calledAfter, type Task, type ToolCall } from '@arena/core';
+import { callsTo, calledAfter, type Task, type ToolCall } from '@scaffoldbench/core';
 import { defineToolUseTask } from '../../defineToolUseTask';
 import { addedTo, anyOf, blastRadiusRule, within, type ChangeFilter } from '../../worldDiff';
 import { ECOMMERCE_HANDBOOK } from './handbook';

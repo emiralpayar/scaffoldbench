@@ -1,5 +1,5 @@
-import { tracedCalls } from '@arena/core';
-import type { FidelityInput, IntegrityCheck, PhaseRecord } from '@arena/core';
+import { tracedCalls } from '@scaffoldbench/core';
+import type { FidelityInput, IntegrityCheck, PhaseRecord } from '@scaffoldbench/core';
 import { interrupted } from './helpers';
 
 /**

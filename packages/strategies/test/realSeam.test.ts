@@ -14,7 +14,7 @@ import {
   TraceCollector,
   createJournaledToolServer,
   harnessChecks,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import type {
   BudgetStopReason,
   IntegrityCheck,
@@ -24,7 +24,7 @@ import type {
   Task,
   TaskEnvironment,
   ToolCall,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   EXECUTOR_BUDGET_SHARE,
   createGatedExecuteStrategy,
@@ -33,7 +33,7 @@ import {
   createPlanExecuteStrategy,
   createPlanExecuteVerifyStrategy,
   createSingleStrategy,
-} from '@arena/strategies';
+} from '@scaffoldbench/strategies';
 import {
   assistant,
   resetFake,

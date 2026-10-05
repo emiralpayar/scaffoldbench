@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
  * working directory looking for this workspace's package.json.
  */
 function resolveRepoRoot(): string {
-  const override = process.env.ARENA_REPO_ROOT;
+  const override = process.env.SCAFFOLDBENCH_REPO_ROOT;
   if (override && existsSync(override)) return override;
 
   try {
@@ -44,7 +44,7 @@ function isWorkspaceRoot(dir: string): boolean {
     const pkg = path.join(dir, 'package.json');
     if (!existsSync(pkg)) return false;
     const parsed = JSON.parse(readFileSync(pkg, 'utf8')) as { name?: string };
-    return parsed.name === 'agent-arena';
+    return parsed.name === 'scaffoldbench';
   } catch {
     return false;
   }

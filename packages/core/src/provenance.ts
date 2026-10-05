@@ -30,7 +30,7 @@ export async function collectProvenance(argv: readonly string[]): Promise<Proven
     claudeCodeVersion: sdk.claudeCodeVersion,
     nodeVersion: process.version,
     platform: `${process.platform}-${process.arch}`,
-    // Nothing on the arena's command line is a secret, but the manifest is
+    // Nothing on the benchmark's command line is a secret, but the manifest is
     // committed: anything key-shaped is masked all the same.
     argv: argv.map(redactSecrets),
   };

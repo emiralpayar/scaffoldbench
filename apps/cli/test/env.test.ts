@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { REPO_ROOT } from '@arena/core';
+import { REPO_ROOT } from '@scaffoldbench/core';
 
 import { credentialText, describeCredential, loadDotEnv, maskEmail, maskSecret } from '../src/env';
 
@@ -22,14 +22,14 @@ describe('.env.example', () => {
 
   it('documents each variable the CLI reads', async () => {
     const text = await readFile(path.join(REPO_ROOT, '.env.example'), 'utf8');
-    for (const name of ['ANTHROPIC_API_KEY', 'ARENA_MODEL', 'ARENA_JUDGE_MODEL', 'ARENA_MAX_COST_USD', 'ARENA_RESULTS_DIR']) {
+    for (const name of ['ANTHROPIC_API_KEY', 'SCAFFOLDBENCH_MODEL', 'SCAFFOLDBENCH_JUDGE_MODEL', 'SCAFFOLDBENCH_MAX_COST_USD', 'SCAFFOLDBENCH_RESULTS_DIR']) {
       expect(text).toContain(`# ${name}=`);
     }
   });
 });
 
 describe('loadDotEnv', () => {
-  const names = ['ARENA_CLI_TEST_FROM_FILE', 'ARENA_CLI_TEST_SHELL_WINS', 'ARENA_CLI_TEST_EMPTY'];
+  const names = ['SCAFFOLDBENCH_CLI_TEST_FROM_FILE', 'SCAFFOLDBENCH_CLI_TEST_SHELL_WINS', 'SCAFFOLDBENCH_CLI_TEST_EMPTY'];
   let dir: string | undefined;
   afterEach(async () => {
     for (const name of names) delete process.env[name];
@@ -37,27 +37,27 @@ describe('loadDotEnv', () => {
   });
 
   it('loads the file, lets the shell win, and reports what the file set', async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'arena-cli-env-'));
+    dir = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-cli-env-'));
     const file = path.join(dir, '.env');
     await writeFile(
       file,
-      'ARENA_CLI_TEST_FROM_FILE=from-file\nARENA_CLI_TEST_SHELL_WINS=from-file\n# comment\nARENA_CLI_TEST_EMPTY=\n',
+      'SCAFFOLDBENCH_CLI_TEST_FROM_FILE=from-file\nSCAFFOLDBENCH_CLI_TEST_SHELL_WINS=from-file\n# comment\nSCAFFOLDBENCH_CLI_TEST_EMPTY=\n',
     );
-    process.env.ARENA_CLI_TEST_SHELL_WINS = 'from-shell';
+    process.env.SCAFFOLDBENCH_CLI_TEST_SHELL_WINS = 'from-shell';
 
     const loaded = loadDotEnv(file);
 
     expect(loaded && 'keys' in loaded ? loaded.keys.sort() : loaded).toEqual([
-      'ARENA_CLI_TEST_EMPTY',
-      'ARENA_CLI_TEST_FROM_FILE',
+      'SCAFFOLDBENCH_CLI_TEST_EMPTY',
+      'SCAFFOLDBENCH_CLI_TEST_FROM_FILE',
     ]);
-    expect(process.env.ARENA_CLI_TEST_FROM_FILE).toBe('from-file');
-    expect(process.env.ARENA_CLI_TEST_SHELL_WINS).toBe('from-shell');
+    expect(process.env.SCAFFOLDBENCH_CLI_TEST_FROM_FILE).toBe('from-file');
+    expect(process.env.SCAFFOLDBENCH_CLI_TEST_SHELL_WINS).toBe('from-shell');
   });
 
   it('does nothing without a file, and reports a file it cannot read', async () => {
-    expect(loadDotEnv(path.join(tmpdir(), 'no-such-dir-arena', '.env'))).toBeUndefined();
-    dir = await mkdtemp(path.join(tmpdir(), 'arena-cli-env-'));
+    expect(loadDotEnv(path.join(tmpdir(), 'no-such-dir-scaffoldbench', '.env'))).toBeUndefined();
+    dir = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-cli-env-'));
     // A directory where the file should be cannot be read as one.
     const result = loadDotEnv(dir);
     expect(result && 'error' in result).toBe(true);

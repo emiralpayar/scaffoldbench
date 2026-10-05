@@ -34,7 +34,7 @@ export default async function HomePage() {
   ]);
 
   // Act 2 is drawn only from a run set whose records all carry the fidelity
-  // verdict (or, under ARENA_DEMO, from synthetic data that says so loudly).
+  // verdict (or, under SCAFFOLDBENCH_DEMO, from synthetic data that says so loudly).
   const chartable =
     published && published.records.length > 0 && published.verification !== 'unverified'
       ? published
@@ -81,7 +81,7 @@ export default async function HomePage() {
 
 /**
  * The race under the headline: recorded runs of one task when a verified
- * (or, under ARENA_DEMO, synthetic) set has their traces, else the
+ * (or, under SCAFFOLDBENCH_DEMO, synthetic) set has their traces, else the
  * schematic, labelled as such and carrying no numbers.
  */
 function heroRace(group: RaceGroup | null): HeroRace {

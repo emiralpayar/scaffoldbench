@@ -1,5 +1,5 @@
 /**
- * Rendering for the arena report. Pure functions only: a `ReportView` in,
+ * Rendering for the scaffoldbench report. Pure functions only: a `ReportView` in,
  * text out, for the terminal and for REPORT.md.
  *
  * Health comes first, because a leaderboard is only worth reading once the
@@ -12,8 +12,8 @@
  * zero-width one.
  */
 
-import { MODEL_STOP_LABELS } from '@arena/core';
-import type { ModelStop } from '@arena/core';
+import { MODEL_STOP_LABELS } from '@scaffoldbench/core';
+import type { ModelStop } from '@scaffoldbench/core';
 
 import {
   formatBudget,

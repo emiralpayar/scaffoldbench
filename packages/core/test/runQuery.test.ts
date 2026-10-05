@@ -14,8 +14,8 @@ import {
   TraceCollector,
   createJournaledToolServer,
   runQuery,
-} from '@arena/core';
-import type { RunContext, Task, TaskEnvironment, ToolCall } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { RunContext, Task, TaskEnvironment, ToolCall } from '@scaffoldbench/core';
 import {
   assistant,
   errorResult,

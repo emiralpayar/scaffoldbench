@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Task, TaskScore, ToolCall } from '@arena/core';
+import type { Task, TaskScore, ToolCall } from '@scaffoldbench/core';
 import {
   createSupportTools,
   createSupportWorld,
@@ -562,9 +562,9 @@ describe('support task definitions', () => {
 
   it('builds an environment whose tools are wired to its own world', async () => {
     const env = await supportEasyTask.createEnvironment({
-      cwd: '/tmp/arena-support',
+      cwd: '/tmp/scaffoldbench-support',
       fixtureMode: 'replay',
-      fixtureDir: '/tmp/arena-support/fixtures',
+      fixtureDir: '/tmp/scaffoldbench-support/fixtures',
     });
     expect(env.allowedTools).toContain('mcp__support__assign_ticket');
     expect(env.readOnlyTools).toContain('mcp__support__get_ticket');

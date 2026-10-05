@@ -1,9 +1,9 @@
-/** `arena --version`: what is running, precisely enough to put in a bug report. */
+/** `scaffoldbench --version`: what is running, precisely enough to put in a bug report. */
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { REPO_ROOT, gitState, sdkVersions } from '@arena/core';
+import { REPO_ROOT, gitState, sdkVersions } from '@scaffoldbench/core';
 
 import type { CliContext } from './context';
 

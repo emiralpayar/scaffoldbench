@@ -1,13 +1,13 @@
 /**
- * What `arena run` is about to do, worked out before it does any of it: the
+ * What `scaffoldbench run` is about to do, worked out before it does any of it: the
  * cells of the matrix, which of them a resumed run set still needs, the
  * settings a resume must keep, and the most the session can spend.
  *
  * Pure: the command reads the disk and hands the results in.
  */
 
-import { DEFAULT_RETRY_POLICY, cellKey, makeRunId } from '@arena/core';
-import type { CellCoordinates, EffortLevel, FixtureMode, RunSetManifest } from '@arena/core';
+import { DEFAULT_RETRY_POLICY, cellKey, makeRunId } from '@scaffoldbench/core';
+import type { CellCoordinates, EffortLevel, FixtureMode, RunSetManifest } from '@scaffoldbench/core';
 
 import { CONFIRM_ABOVE_USD } from './args';
 import type { MeasurementSetting, RunArgs } from './args';
@@ -19,7 +19,7 @@ export const JUDGE_CALL_CAP_USD = 0.5;
 /**
  * Attempts the runner gives a run: a transient API failure is retried, and
  * every attempt reserves the run's cap afresh, so a run can spend its cap
- * more than once. `arena run` does not override the runner's retry policy.
+ * more than once. `scaffoldbench run` does not override the runner's retry policy.
  */
 export const MAX_ATTEMPTS = DEFAULT_RETRY_POLICY.maxAttempts;
 
@@ -80,7 +80,7 @@ export type ResumeResult = { ok: true; args: RunArgs; notes: string[] } | { ok: 
 
 /**
  * The settings a resumed session runs under: the run set's own, so that
- * `arena run --resume <id>` needs nothing else. A flag that says otherwise
+ * `scaffoldbench run --resume <id>` needs nothing else. A flag that says otherwise
  * is refused rather than quietly overridden, because a run set measured
  * under two settings measures neither. Operational flags (concurrency, the
  * session's budget) are free to change. Settings an older manifest did not

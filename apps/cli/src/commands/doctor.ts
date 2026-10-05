@@ -1,5 +1,5 @@
 /**
- * `arena doctor`: is this machine ready to run the benchmark, and what will
+ * `scaffoldbench doctor`: is this machine ready to run the benchmark, and what will
  * a run bill? Every check prints one ✓ / ⚠ / ✗ line; any ✗ exits 1.
  *
  * Nothing here calls a model unless `--wiring-live` asks for it. The account
@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { FIXTURES_DIR, REPO_ROOT, gitState, hermeticOptions, sdkVersions } from '@arena/core';
-import { ALL_TASKS } from '@arena/tasks';
+import { FIXTURES_DIR, REPO_ROOT, gitState, hermeticOptions, sdkVersions } from '@scaffoldbench/core';
+import { ALL_TASKS } from '@scaffoldbench/tasks';
 
 import type { DoctorArgs } from '../args';
 import { credentialText, describeCredential, maskEmail } from '../env';
@@ -244,7 +244,7 @@ async function researchChecks(): Promise<Check[]> {
   if (research.length === 0) return [];
   const checks: Check[] = [await corpusCheck()];
   for (const task of research) {
-    const cwd = await mkdtemp(path.join(tmpdir(), 'arena-doctor-'));
+    const cwd = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-doctor-'));
     try {
       const env = await task.createEnvironment({ cwd, fixtureMode: 'replay', fixtureDir: FIXTURES_DIR });
       await env.dispose?.();
@@ -307,15 +307,6 @@ async function resultsCheck(): Promise<Check> {
 /** Scratch directories a killed run could not clean up. */
 async function scratchChecks(): Promise<Check[]> {
   const checks: Check[] = [];
-  const legacy = path.join(REPO_ROOT, '.arena-scratch');
-  if (existsSync(legacy)) {
-    const entries = (await readdir(legacy)).length;
-    checks.push({
-      status: 'warn',
-      title: 'Scratch',
-      detail: `${legacy} holds ${plural(entries, 'entry', 'entries')} from an older runner; nothing uses it now, so it can be deleted`,
-    });
-  }
   const temp = (await readdir(tmpdir()).catch(() => [] as string[])).filter((name) => name.startsWith('scaffoldbench-'));
   checks.push(
     temp.length > 0

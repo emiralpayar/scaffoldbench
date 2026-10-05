@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JournaledToolSpec, ToolReply } from '@arena/core';
+import type { JournaledToolSpec, ToolReply } from '@scaffoldbench/core';
 import {
   findCustomer,
   findLine,

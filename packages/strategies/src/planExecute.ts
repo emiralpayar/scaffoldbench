@@ -1,4 +1,4 @@
-import { SCHEMA_MIN_TURNS, parseLooseJson } from '@arena/core';
+import { SCHEMA_MIN_TURNS, parseLooseJson } from '@scaffoldbench/core';
 import type {
   FidelityInput,
   IntegrityCheck,
@@ -6,7 +6,7 @@ import type {
   RunContext,
   Strategy,
   StrategyOutcome,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   fail,
   metaNumber,

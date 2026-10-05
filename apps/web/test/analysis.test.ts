@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyzeRunSet } from '@arena/core';
+import { analyzeRunSet } from '@scaffoldbench/core';
 
 import { analyzeForSite, describeMethod, summarizeHealth } from '../lib/analysis';
 import { isRankable } from '../lib/records';

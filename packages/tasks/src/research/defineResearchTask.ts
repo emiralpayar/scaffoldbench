@@ -17,7 +17,7 @@ import {
   type TaskScore,
   type TaskTrap,
   type ToolCall,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   auditCitations,
   checkQuote,

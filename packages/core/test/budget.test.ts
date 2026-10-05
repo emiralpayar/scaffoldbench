@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BudgetTracker, TotalBudget, emptyUsage } from '@arena/core';
+import { BudgetTracker, TotalBudget, emptyUsage } from '@scaffoldbench/core';
 
 const usage = (input: number, output: number) => ({
   inputTokens: input,

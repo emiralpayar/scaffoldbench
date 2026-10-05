@@ -6,10 +6,10 @@ import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { REPO_ROOT } from '@arena/core';
+import { REPO_ROOT } from '@scaffoldbench/core';
 
 /**
- * The real entry point in a real process: what `npm run arena` and a future
+ * The real entry point in a real process: what `npm run bench` and a future
  * npm `bin` symlink run. Every command here is free.
  */
 
@@ -22,10 +22,10 @@ interface Result {
   stderr: string;
 }
 
-async function arena(args: string[], env: NodeJS.ProcessEnv = {}, entry = MAIN): Promise<Result> {
+async function scaffoldbench(args: string[], env: NodeJS.ProcessEnv = {}, entry = MAIN): Promise<Result> {
   const base = { ...process.env };
   // Nothing from the developer's shell may change what these tests see.
-  for (const name of ['FORCE_COLOR', 'NO_COLOR', 'ARENA_MODEL', 'ARENA_RESULTS_DIR', 'ARENA_REPO_ROOT', 'INIT_CWD']) {
+  for (const name of ['FORCE_COLOR', 'NO_COLOR', 'SCAFFOLDBENCH_MODEL', 'SCAFFOLDBENCH_RESULTS_DIR', 'SCAFFOLDBENCH_REPO_ROOT', 'INIT_CWD']) {
     delete base[name];
   }
   try {
@@ -43,30 +43,30 @@ async function arena(args: string[], env: NodeJS.ProcessEnv = {}, entry = MAIN):
 
 let scratch: string;
 beforeAll(async () => {
-  scratch = await mkdtemp(path.join(tmpdir(), 'arena-cli-smoke-'));
+  scratch = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-cli-smoke-'));
 });
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true });
 });
 
-describe.concurrent('the arena command', () => {
+describe.concurrent('the scaffoldbench command', () => {
   it('prints its version, commit and SDK', async () => {
-    const result = await arena(['--version']);
+    const result = await scaffoldbench(['--version']);
     expect(result.code).toBe(0);
     expect(result.stdout).toMatch(/^scaffoldbench \d+\.\d+\.\d+ · commit /);
     expect(result.stdout).toMatch(/Agent SDK \d+\.\d+\.\d+ · Claude Code \d+\.\d+\.\d+ · Node v\d+/);
   });
 
   it('runs through a symlink, as an npm bin entry would', async () => {
-    const link = path.join(scratch, 'arena-link.ts');
+    const link = path.join(scratch, 'scaffoldbench-link.ts');
     await symlink(MAIN, link);
-    const result = await arena(['strategies'], {}, link);
+    const result = await scaffoldbench(['strategies'], {}, link);
     expect(result.code).toBe(0);
     expect(result.stdout).toMatch(/^STRATEGIES \(\d+\)/);
   });
 
   it('renders the committed run set, data on stdout and nothing else', async () => {
-    const result = await arena(['report', '2026-07-25T20-18-35Z-3fs5']);
+    const result = await scaffoldbench(['report', '2026-07-25T20-18-35Z-3fs5']);
     expect(result.code).toBe(0);
     expect(result.stdout).toMatch(/HEALTH/);
     expect(result.stdout).toMatch(/LEADERBOARD/);
@@ -76,25 +76,25 @@ describe.concurrent('the arena command', () => {
   });
 
   it('colours when FORCE_COLOR asks, even into a pipe', async () => {
-    const result = await arena(['tasks'], { FORCE_COLOR: '1' });
+    const result = await scaffoldbench(['tasks'], { FORCE_COLOR: '1' });
     expect(result.stdout).toContain('\u001b[1m');
   });
 
   it('fails a usage error briefly, on stderr, with exit 1', async () => {
-    const result = await arena(['run', '--strategy', 'single']);
+    const result = await scaffoldbench(['run', '--strategy', 'single']);
     expect(result.code).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toMatch(/^error: Unknown flag: --strategy\. Did you mean --strategies\?/);
-    expect(result.stderr).toMatch(/Run "arena help run" for usage\./);
+    expect(result.stderr).toMatch(/Run "scaffoldbench help run" for usage\./);
   });
 
   it('loads .env from the repository root, letting the shell win', async () => {
     const root = path.join(scratch, 'repo');
     await mkdir(root, { recursive: true });
-    await writeFile(path.join(root, '.env'), 'ARENA_MODEL=claude-from-dotenv\nARENA_JUDGE_MODEL=judge-from-dotenv\n');
-    const result = await arena(
+    await writeFile(path.join(root, '.env'), 'SCAFFOLDBENCH_MODEL=claude-from-dotenv\nSCAFFOLDBENCH_JUDGE_MODEL=judge-from-dotenv\n');
+    const result = await scaffoldbench(
       ['run', '--strategies', 'single', '--tasks', 'airline-easy', '--repeats', '1', '--dry-run'],
-      { ARENA_REPO_ROOT: root, ARENA_JUDGE_MODEL: 'judge-from-shell' },
+      { SCAFFOLDBENCH_REPO_ROOT: root, SCAFFOLDBENCH_JUDGE_MODEL: 'judge-from-shell' },
     );
     expect(result.code).toBe(0);
     expect(result.stderr).toMatch(/Model\s+claude-from-dotenv/);

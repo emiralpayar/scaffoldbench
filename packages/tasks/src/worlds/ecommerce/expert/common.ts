@@ -1,4 +1,4 @@
-import type { JournaledToolSpec } from '@arena/core';
+import type { JournaledToolSpec } from '@scaffoldbench/core';
 import type { ToolUseTaskSpec } from '../../../defineToolUseTask';
 import type { ChangeFilter } from '../../../worldDiff';
 import { ECOMMERCE_OPS_HANDBOOK } from '../handbook';

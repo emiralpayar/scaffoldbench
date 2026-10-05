@@ -10,8 +10,8 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
   return { ...actual, query: fake.fakeQuery };
 });
 
-import { latestPointerPath, listJsonFiles, manifestPath, readJson, readJsonIfExists, runsDir, writeJson } from '@arena/core';
-import type { RunSetManifest } from '@arena/core';
+import { latestPointerPath, listJsonFiles, manifestPath, readJson, readJsonIfExists, runsDir, writeJson } from '@scaffoldbench/core';
+import type { RunSetManifest } from '@scaffoldbench/core';
 
 import { assistant, resetFake, setScript, sleep, success } from '../../../packages/core/test/support/fakeClaudeCode';
 import { parseArgs } from '../src/args';
@@ -20,13 +20,13 @@ import { EXIT_INTERRUPTED, runCommand } from '../src/commands/run';
 import { fakeContext, plain } from './support';
 
 /**
- * `arena run` end to end: the real command, runner, strategy, task and
+ * `scaffoldbench run` end to end: the real command, runner, strategy, task and
  * `runQuery`, with only the SDK's `query` scripted. Nothing is spent.
  */
 
 let root: string;
 beforeEach(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'arena-cli-e2e-'));
+  root = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-cli-e2e-'));
   resetFake();
 });
 afterEach(async () => {
@@ -58,7 +58,7 @@ const MATRIX = [
   '--total-budget', '5',
 ];
 
-describe('arena run', () => {
+describe('scaffoldbench run', () => {
   it('drains on the first Ctrl-C, records the run in flight, and resumes only what is missing', async () => {
     const first = fakeContext();
     let calls = 0;
@@ -77,7 +77,7 @@ describe('arena run', () => {
     const log = first.stderrText();
     expect(log).toMatch(/Stopping: no new runs will start; 1 in flight will finish/);
     expect(log).toMatch(/\[1\/4\] [●◑✗] claude-haiku-4-5-20251001__single__airline-easy__r1/);
-    expect(log).toMatch(/Resume with: arena run --resume e2e-1/);
+    expect(log).toMatch(/Resume with: scaffoldbench run --resume e2e-1/);
     expect(log).toMatch(/Stopped: 1 run recorded in \S+ this session · run set 1 of 4 · spent \$0\.010 this session/);
 
     const stopped = await readJson<RunSetManifest>(manifestPath('e2e-1', root));
@@ -126,7 +126,7 @@ describe('arena run', () => {
     expect(log).toMatch(/Stopping: no new runs will start; 1 in flight will finish/);
     expect(log).toMatch(/Aborting the runs in flight; they are discarded and run again on --resume/);
     expect(log).toMatch(/cut off by the stop and discarded/);
-    expect(log).toMatch(/Resume with: arena run --resume e2e-abort/);
+    expect(log).toMatch(/Resume with: scaffoldbench run --resume e2e-abort/);
     // Nothing was recorded for the run that was cut off, and the manifest says why.
     expect(await listJsonFiles(runsDir('e2e-abort', root))).toHaveLength(0);
     expect(await readJson<RunSetManifest>(manifestPath('e2e-abort', root))).toMatchObject({
@@ -397,7 +397,7 @@ describe('arena run', () => {
     const log = run.stderrText();
     expect(log).toMatch(/Finished: 4 runs recorded \(all hit an API error\)/);
     expect(log).toMatch(/Nothing was measured: every run hit an API error/);
-    expect(log).toMatch(/Run them again with: arena run --resume e2e-api/);
+    expect(log).toMatch(/Run them again with: scaffoldbench run --resume e2e-api/);
     // They are recorded, but a resume runs them again instead of keeping them.
     const resumed = fakeContext();
     expect(await runCommand(args('--resume', 'e2e-api', '--dry-run'), resumed.ctx)).toBe(0);
@@ -420,7 +420,7 @@ describe('arena run', () => {
 
     expect(code).toBe(0);
     expect(run.stderrText()).toMatch(/Finished: 4 runs recorded \(1 hit an API error\)/);
-    expect(run.stderrText()).toMatch(/1 run hit an API error and was not scored\. Run it again with: arena run --resume e2e-some/);
+    expect(run.stderrText()).toMatch(/1 run hit an API error and was not scored\. Run it again with: scaffoldbench run --resume e2e-some/);
   });
 
   it('writes one line per run, not a frame it cannot fit, on a terminal too small for the live view', async () => {

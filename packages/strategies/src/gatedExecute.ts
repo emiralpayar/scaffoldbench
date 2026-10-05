@@ -1,4 +1,4 @@
-import { parseLooseJson } from '@arena/core';
+import { parseLooseJson } from '@scaffoldbench/core';
 import type {
   FidelityInput,
   IntegrityCheck,
@@ -8,7 +8,7 @@ import type {
   Strategy,
   StrategyOutcome,
   ToolCallDecision,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import { checkFrom, cutShort, metaString, phase, phasePrefix, toolSurfaceCheck } from './fidelity';
 import { mainPrompt } from './single';
 import {

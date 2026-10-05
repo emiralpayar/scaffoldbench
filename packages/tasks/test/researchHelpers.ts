@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { JournaledToolSpec, ToolCall } from '@arena/core';
+import type { JournaledToolSpec, ToolCall } from '@scaffoldbench/core';
 import {
   CORPUS_DIRNAME,
   CORPUS_MANIFEST,

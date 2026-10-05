@@ -17,7 +17,7 @@
  * the data cannot support an interval, and a `caveat` says why.
  */
 
-import { analyzeRunSet, orderModels as orderModelsByTier } from '@arena/core';
+import { analyzeRunSet, orderModels as orderModelsByTier } from '@scaffoldbench/core';
 import type {
   AnalysisSettings,
   Contrast,
@@ -28,7 +28,7 @@ import type {
   RunSetAnalysis,
   RunSetManifest,
   StrategyAnalysis,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 import type { Estimate, Interval, Pair, Verdict } from './plots';
 import { integrityFor } from './runSet';

@@ -8,7 +8,7 @@ import { acquireRunSetLock, lockFile } from '../src/lock';
 
 let dir: string;
 beforeEach(async () => {
-  dir = await mkdtemp(path.join(tmpdir(), 'arena-lock-'));
+  dir = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-lock-'));
 });
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true });

@@ -3,7 +3,7 @@
  * shown, and the fidelity checks that prove the calls happened.
  *
  * This is the long form of `lib/architectures.ts`, written for the strategy
- * pages. It describes the strategies in `@arena/strategies`; `test/designs.
+ * pages. It describes the strategies in `@scaffoldbench/strategies`; `test/designs.
  * test.ts` holds it to the glyph geometry (every stage names real glyph nodes,
  * every node belongs to a stage) so a drawing and its caption cannot drift.
  *

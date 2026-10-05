@@ -1,4 +1,4 @@
-import { runQuery } from '@arena/core';
+import { runQuery } from '@scaffoldbench/core';
 import type {
   PhaseRecord,
   QueryOutcome,
@@ -6,7 +6,7 @@ import type {
   RunContext,
   StrategyOutcome,
   TaskEnvironment,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 /**
  * The single seam every strategy is built around.

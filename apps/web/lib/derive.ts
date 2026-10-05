@@ -3,12 +3,12 @@
  *
  * No filesystem access here (that is `lib/server/`), so every function is
  * testable on a literal and usable from any component. Means, bootstrap
- * intervals and the Pareto frontier come from `@arena/core` (`summarizeRuns`)
+ * intervals and the Pareto frontier come from `@scaffoldbench/core` (`summarizeRuns`)
  * or from `lib/analysis`; this module joins them to catalog metadata and
  * shapes them for rendering.
  */
 
-import { comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@arena/core';
+import { comparisonVerdict, median, paretoFrontier, summarizeRuns } from '@scaffoldbench/core';
 import type {
   Aggregate,
   CellSummary,
@@ -17,7 +17,7 @@ import type {
   StrategyInfo,
   TaskCategory,
   TraceEvent,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 import {
   architectureName,

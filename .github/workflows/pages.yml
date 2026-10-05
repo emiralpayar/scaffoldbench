@@ -46,11 +46,15 @@ jobs:
         run: npm run build:web
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url }}
-          NEXT_PUBLIC_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          # configure-pages knows the real URL (it differs under a custom
+          # domain); the fallback is the project site this repository publishes.
+          NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url || 'https://emiralpayar.github.io/scaffoldbench' }}
+          # A fork never reaches this step (see the job's `if`), so the canonical
+          # repository is the only one this build ever links to.
+          NEXT_PUBLIC_REPO_URL: https://github.com/emiralpayar/scaffoldbench
           # Fabricated demo numbers can never be published: if anything points
           # the build at a synthetic run set, the build fails instead.
-          ARENA_REQUIRE_REAL_DATA: '1'
+          SCAFFOLDBENCH_REQUIRE_REAL_DATA: '1'
 
       - uses: actions/upload-pages-artifact@v3
         with:

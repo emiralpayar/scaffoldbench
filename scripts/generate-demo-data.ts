@@ -3,7 +3,7 @@
  * spending anything.
  *
  *   npm run demo:data                 # writes apps/web/demo-data/demo-synthetic
- *   ARENA_DEMO=1 npm run dev:web      # the site then reads it, bannered
+ *   SCAFFOLDBENCH_DEMO=1 npm run dev:web      # the site then reads it, bannered
  *
  * THE NUMBERS HERE ARE INVENTED. They exist so every chart and state of the
  * site can be built before a real run set exists: three models, all six
@@ -16,11 +16,11 @@
  *  - the output goes to `apps/web/demo-data/` (gitignored), never `results/`,
  *    and `results/latest.json` is never touched, so a published build cannot
  *    pick it up by accident;
- *  - the site reads it only under `ARENA_DEMO=1`, and the GitHub Pages build
- *    sets `ARENA_REQUIRE_REAL_DATA=1`, which refuses synthetic data outright.
+ *  - the site reads it only under `SCAFFOLDBENCH_DEMO=1`, and the GitHub Pages build
+ *    sets `SCAFFOLDBENCH_REQUIRE_REAL_DATA=1`, which refuses synthetic data outright.
  *
  * The record shapes follow the v1 contract (PLAN §1), which the site declares
- * in `apps/web/lib/records.ts` ahead of `@arena/core`.
+ * in `apps/web/lib/records.ts` ahead of `@scaffoldbench/core`.
  */
 
 import { rm } from 'node:fs/promises';
@@ -28,8 +28,8 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { ensureDir, makeRng, writeJson } from '@arena/core';
-import type { Penalty, ScoreItem, StrategyInfo } from '@arena/core';
+import { ensureDir, makeRng, writeJson } from '@scaffoldbench/core';
+import type { Penalty, ScoreItem, StrategyInfo } from '@scaffoldbench/core';
 
 import { ARCHITECTURES } from '../apps/web/lib/architectures';
 import type {
@@ -871,7 +871,7 @@ async function main(): Promise<void> {
   await writeJson(path.join(dir, 'catalog.json'), catalog);
 
   console.log(`Wrote ${records.length} synthetic runs to ${path.relative(process.cwd(), dir)}`);
-  console.log('These numbers are invented. View them with: ARENA_DEMO=1 npm run dev:web');
+  console.log('These numbers are invented. View them with: SCAFFOLDBENCH_DEMO=1 npm run dev:web');
   console.log('results/ and results/latest.json were not touched.');
 }
 

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { stripVTControlCharacters } from 'node:util';
 
-import type { RunRecord, StrategyInfo, TaskInfo } from '@arena/core';
+import type { RunRecord, StrategyInfo, TaskInfo } from '@scaffoldbench/core';
 
 import type { CliContext } from '../src/commands/context';
 import type { Catalog, LoadedRunSet } from '../src/runSet';

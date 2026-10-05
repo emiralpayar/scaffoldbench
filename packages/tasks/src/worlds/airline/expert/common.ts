@@ -1,4 +1,4 @@
-import type { JournaledToolSpec } from '@arena/core';
+import type { JournaledToolSpec } from '@scaffoldbench/core';
 import type { ToolUseTaskSpec } from '../../../defineToolUseTask';
 import type { DiffOptions } from '../../../worldDiff';
 import { AIRLINE_OPS_HANDBOOK } from '../handbook';

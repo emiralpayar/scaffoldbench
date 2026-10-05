@@ -9,7 +9,7 @@ import {
   modelStopOfAssistant,
   modelStopOfResult,
   recognizeFailureText,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 /** An assistant message as the SDK streams it. */
 const message = (text: string, extra: Record<string, unknown> = {}, model = 'claude-sonnet-5-5') => ({

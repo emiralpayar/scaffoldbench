@@ -12,7 +12,7 @@ for holding something else constant, or a mechanism for proving afterwards that 
 
 ```mermaid
 flowchart TD
-    CLI["arena run --strategies … --tasks …"] --> RM["runMatrix()<br/>packages/core/src/runner.ts"]
+    CLI["scaffoldbench run --strategies … --tasks …"] --> RM["runMatrix()<br/>packages/core/src/runner.ts"]
     RM -->|"repeat x task x model x strategy"| CELL["one cell"]
 
     subgraph cell ["executeAttempt — one cell, isolated"]
@@ -34,7 +34,7 @@ flowchart TD
     CELL --> cell
     SCORE --> REC["RunRecord<br/>score · cost · judgeCost · latency · phases · failureMode · integrity"]
     REC --> DISK["results/&lt;runSetId&gt;/<br/>manifest.json · catalog.json · runs/*.json · traces/*.jsonl"]
-    DISK --> REPORT["arena report<br/>analyzeRunSet(): paired, task-clustered"]
+    DISK --> REPORT["scaffoldbench report<br/>analyzeRunSet(): paired, task-clustered"]
     REPORT --> SITE["apps/web — leaderboard, matrix, Pareto, trace viewer"]
 ```
 
@@ -461,7 +461,7 @@ not require re-recording.
 [`stats.ts`](../packages/core/src/stats.ts) · [`aggregate.ts`](../packages/core/src/aggregate.ts)
 
 `analyzeRunSet` ([`analysis.ts`](../packages/core/src/analysis.ts), method in
-[STATISTICS.md](STATISTICS.md)) reduces raw records into everything `arena report` and the site
+[STATISTICS.md](STATISTICS.md)) reduces raw records into everything `scaffoldbench report` and the site
 show, once, at report time: task-clustered intervals per strategy, contrasts paired by task and
 repeat with Holm-adjusted verdicts, the Scaffold-or-Scale contrasts across models and an
 uncertainty-aware frontier. The CLI and the site map its output onto their own view models and
@@ -491,7 +491,7 @@ results/
     catalog.json              strategy and task metadata as of that run
     runs/<runId>.json         one RunRecord per strategy x task x repeat
     traces/<runId>.jsonl      one normalized TraceEvent per line
-    REPORT.md                 written by `arena report --markdown`
+    REPORT.md                 written by `scaffoldbench report --markdown`
 ```
 
 `catalog.json` is written per run set rather than read from the live code, so a historical result

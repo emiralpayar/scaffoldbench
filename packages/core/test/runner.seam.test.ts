@@ -14,7 +14,7 @@ import {
   createJournaledToolServer,
   runMatrix,
   runQuery,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import type {
   McpServerConfig,
   PhaseRecord,
@@ -27,7 +27,7 @@ import type {
   Task,
   TaskEnvironment,
   ToolCall,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   assistant,
   errorResult,

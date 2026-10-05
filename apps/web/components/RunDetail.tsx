@@ -1,4 +1,4 @@
-import type { Penalty, ScoreItem } from '@arena/core';
+import type { Penalty, ScoreItem } from '@scaffoldbench/core';
 
 import type { PhaseRow } from '../lib/derive';
 import { FULL_CREDIT, formatDuration, formatPercent, formatScore, formatUsd } from '../lib/format';

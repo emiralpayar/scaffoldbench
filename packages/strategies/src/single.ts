@@ -1,4 +1,4 @@
-import type { FidelityInput, IntegrityCheck, RunContext, Strategy, StrategyOutcome } from '@arena/core';
+import type { FidelityInput, IntegrityCheck, RunContext, Strategy, StrategyOutcome } from '@scaffoldbench/core';
 import { phase, toolSurfaceCheck } from './fidelity';
 import {
   ACTING_INSTRUCTIONS,

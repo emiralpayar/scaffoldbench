@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CREDENTIAL_ENV_VARS } from '@arena/core';
+import { CREDENTIAL_ENV_VARS } from '@scaffoldbench/core';
 
 import {
   LIVE_MAX_CONCURRENT_RUNS,
@@ -57,7 +57,7 @@ describe('clientBucket', () => {
   });
 
   it('uses the first forwarded address behind a trusted proxy', () => {
-    expect(clientBucket(headers, { ARENA_TRUST_PROXY: '1' })).toEqual({
+    expect(clientBucket(headers, { SCAFFOLDBENCH_TRUST_PROXY: '1' })).toEqual({
       key: '203.0.113.7',
       limit: LIVE_RATE_LIMIT_PER_HOUR,
     });

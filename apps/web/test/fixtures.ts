@@ -1,6 +1,6 @@
 /** Record and event builders shared by the web tests. */
 
-import type { TraceEvent } from '@arena/core';
+import type { TraceEvent } from '@scaffoldbench/core';
 
 import type { PhaseRecord, RunRecord } from '../lib/records';
 

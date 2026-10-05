@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JournaledToolSpec, ToolReply } from '@arena/core';
+import type { JournaledToolSpec, ToolReply } from '@scaffoldbench/core';
 import {
   ADDITIONAL_CHARGEABLE_BAG_CENTS,
   BONUS_CHECKED_BAGS_BY_TIER,

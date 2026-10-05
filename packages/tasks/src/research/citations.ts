@@ -1,4 +1,4 @@
-import type { ToolCall } from '@arena/core';
+import type { ToolCall } from '@scaffoldbench/core';
 import { corpusUrlKey, type CorpusDocument, type TaskCorpus } from './corpus';
 import { quoteSegments, wordCount, wordsBetween, type QuoteMatch, type TextRange } from './text';
 import { displayedPassages } from './webTools';

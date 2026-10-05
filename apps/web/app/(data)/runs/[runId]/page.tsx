@@ -246,7 +246,7 @@ function NoTrace({
         <p className="mt-2 text-muted">
           Re-run this cell to produce one:{' '}
           <code className="code-inline">
-            npm run arena -- run --strategies {record.strategyId} --tasks {record.taskId} --models {record.model} --repeats 1 --update-latest
+            npm run bench -- run --strategies {record.strategyId} --tasks {record.taskId} --models {record.model} --repeats 1 --update-latest
           </code>
         </p>
       </div>

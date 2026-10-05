@@ -16,7 +16,7 @@ import {
   studentTQuantile,
   variance,
   wilsonInterval,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 describe('descriptive statistics', () => {
   it('handles empty input without throwing', () => {

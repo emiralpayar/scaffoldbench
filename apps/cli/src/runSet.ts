@@ -25,7 +25,7 @@ import {
   readJsonIfExists,
   runSetDir,
   runsDir,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import type {
   Integrity,
   RunRecord,
@@ -33,7 +33,7 @@ import type {
   StrategyInfo,
   TaskInfo,
   TraceEvent,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 export interface Catalog {
   strategies: StrategyInfo[];

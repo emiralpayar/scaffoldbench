@@ -1,5 +1,5 @@
 /**
- * One `arena run` at a time per run set.
+ * One `scaffoldbench run` at a time per run set.
  *
  * Two processes resuming the same run set would each work out the cells it
  * lacks from the disk, run the same ones, spend twice what either planned
@@ -28,7 +28,7 @@ export type RunSetLock =
   | { acquired: false; holder: LockHolder; file: string };
 
 /** Where the lock for a run set lives. `dir` is a test seam; the default is the system's temporary directory. */
-export function lockFile(resultsRoot: string, runSetId: string, dir: string = path.join(tmpdir(), 'arena-locks')): string {
+export function lockFile(resultsRoot: string, runSetId: string, dir: string = path.join(tmpdir(), 'scaffoldbench-locks')): string {
   const key = createHash('sha256').update(`${path.resolve(resultsRoot)}\0${runSetId}`).digest('hex').slice(0, 24);
   return path.join(dir, `${key}.lock`);
 }

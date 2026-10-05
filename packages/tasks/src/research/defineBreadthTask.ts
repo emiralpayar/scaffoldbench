@@ -7,7 +7,7 @@ import {
   type Task,
   type TaskEnvironment,
   type TaskScore,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import {
   auditCitations,
   checkQuote,

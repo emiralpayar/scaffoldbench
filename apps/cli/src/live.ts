@@ -1,5 +1,5 @@
 /**
- * The live view of `arena run`: a task × strategy grid per model, one glyph
+ * The live view of `scaffoldbench run`: a task × strategy grid per model, one glyph
  * per repeat, over a footer that says how far along the session is, what it
  * has spent against its ceiling, and what is going wrong.
  *
@@ -8,7 +8,7 @@
  * lines on a terminal is `terminal.ts`'s job.
  */
 
-import type { RunRecord, RunnerEvent, TraceEvent } from '@arena/core';
+import type { RunRecord, RunnerEvent, TraceEvent } from '@scaffoldbench/core';
 
 import { formatBudget, formatDuration, formatUsd, plural, shortModel } from './format';
 import { abbreviationLegend, abbreviations, renderBar } from './plots';

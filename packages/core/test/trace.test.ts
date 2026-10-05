@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TraceCollector, normalizeSdkMessage, truncate } from '@arena/core';
+import { TraceCollector, normalizeSdkMessage, truncate } from '@scaffoldbench/core';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 /**

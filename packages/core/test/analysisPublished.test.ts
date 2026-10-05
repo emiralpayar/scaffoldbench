@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { analyzeRunSet, comparisonVerdict, summarizeRuns } from '@arena/core';
-import type { Contrast, RunRecord } from '@arena/core';
+import { analyzeRunSet, comparisonVerdict, summarizeRuns } from '@scaffoldbench/core';
+import type { Contrast, RunRecord } from '@scaffoldbench/core';
 
 /**
  * The first published run set, re-analyzed. Its architectures were degraded

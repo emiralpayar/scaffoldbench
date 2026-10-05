@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { FIXTURES_DIR } from '@arena/core';
-import type { Judge } from '@arena/core';
-import { getStrategies } from '@arena/strategies';
-import { ALL_TASKS, getTasks } from '@arena/tasks';
+import { FIXTURES_DIR } from '@scaffoldbench/core';
+import type { Judge } from '@scaffoldbench/core';
+import { getStrategies } from '@scaffoldbench/strategies';
+import { ALL_TASKS, getTasks } from '@scaffoldbench/tasks';
 
 /** What `--tasks` and `--strategies` select, and that every task can be built and scored. */
 
@@ -105,7 +105,7 @@ describe('ALL_TASKS', () => {
 
   it('gives every task a usable environment and every tool-use task an assertion', async () => {
     const options = {
-      cwd: '/tmp/arena-cli-test',
+      cwd: '/tmp/scaffoldbench-cli-test',
       fixtureMode: 'replay' as const,
       // Research environments load the shipped corpus, so point at the real one.
       fixtureDir: FIXTURES_DIR,

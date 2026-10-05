@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { FIXTURES_DIR, type Judge, type JudgeRequest, type ScoreInput, type Task, type TaskEnvironment } from '@arena/core';
+import { FIXTURES_DIR, type Judge, type JudgeRequest, type ScoreInput, type Task, type TaskEnvironment } from '@scaffoldbench/core';
 import {
   JUDGE_EFFORT,
   UNGROUNDED_CREDIT,
@@ -25,7 +25,7 @@ import { answerWithBlock, callTool, writeCorpus } from './researchHelpers';
 // a small web for the scoring tests
 // ---------------------------------------------------------------------------
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'arena-research-'));
+const scratch = mkdtempSync(path.join(tmpdir(), 'scaffoldbench-research-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 const SPEC_URL = 'https://specs.test.org/widgets.html';

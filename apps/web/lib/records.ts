@@ -1,7 +1,7 @@
 /**
  * The run-record shape the site reads, written against the v1 contract.
  *
- * `@arena/core` owns `RunRecord`. The contract it is moving to (integrity
+ * `@scaffoldbench/core` owns `RunRecord`. The contract it is moving to (integrity
  * checks, `api_error`, setup/grading time, retries, multi-model manifests) is
  * declared here as optional additions on top of today's type, so the site can
  * render run sets from either side of that change: a legacy set simply has no
@@ -20,7 +20,7 @@ import type {
   StrategyInfo,
   TaskInfo as CoreTaskInfo,
   TraceEvent as CoreTraceEvent,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 import { canonicalArchitectureId } from './architectures';
 

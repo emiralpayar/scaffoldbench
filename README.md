@@ -1,8 +1,8 @@
-# Agent Arena
+# ScaffoldBench
 
 Everyone argues about agent architectures. Should the agent plan first, or just act? Does a
 verifier pay for itself? Is fanning work out to parallel subagents worth the coordination risk?
-The arguments are made from anecdote, and almost nobody publishes a number. Agent Arena is a
+The arguments are made from anecdote, and almost nobody publishes a number. ScaffoldBench is a
 benchmark lab for exactly that question: it runs **six agent harness architectures** over the
 **same task set**, on the same model, through the same instrumentation, and reports score, cost
 and latency with bootstrap confidence intervals. The tasks are held constant so that a difference
@@ -173,7 +173,7 @@ never opened — and catching it requires no judgement call at all.
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd agent-arena
+git clone <this repo> && cd scaffoldbench
 npm install            # Node 22+
 cp .env.example .env   # then put a real key in ANTHROPIC_API_KEY
 ```
@@ -181,15 +181,15 @@ cp .env.example .env   # then put a real key in ANTHROPIC_API_KEY
 List what is available:
 
 ```bash
-npm run arena -- tasks        # every task: id, world, category, difficulty
-npm run arena -- strategies   # the six architectures and what each one does
-npm run arena -- --help
+npm run bench -- tasks        # every task: id, world, category, difficulty
+npm run bench -- strategies   # the six architectures and what each one does
+npm run bench -- --help
 ```
 
 A cheap first run — two architectures, one task, one repeat, on the fast model:
 
 ```bash
-npm run arena -- run \
+npm run bench -- run \
   --strategies single,plan-execute \
   --tasks airline-easy \
   --repeats 1 \
@@ -206,7 +206,7 @@ npm run arena -- run \
 > once, with any single architecture, then commit what it captured:
 >
 > ```bash
-> npm run arena -- run --strategies single --tasks research --repeats 1 --record
+> npm run bench -- run --strategies single --tasks research --repeats 1 --record
 > git add fixtures && git commit -m "Record research fixtures"
 > ```
 >
@@ -216,9 +216,9 @@ npm run arena -- run \
 Then aggregate and read it:
 
 ```bash
-npm run arena -- report             # leaderboard, per-cell matrix, pairwise verdicts, Pareto frontier
-npm run arena -- report --markdown  # the same, also written to results/<runSetId>/REPORT.md
-npm run arena -- report <runSetId>  # any stored run set; defaults to results/latest.json
+npm run bench -- report             # leaderboard, per-cell matrix, pairwise verdicts, Pareto frontier
+npm run bench -- report --markdown  # the same, also written to results/<runSetId>/REPORT.md
+npm run bench -- report <runSetId>  # any stored run set; defaults to results/latest.json
 ```
 
 And browse it, including per-run traces:
@@ -253,7 +253,7 @@ npm run demo:data     # fabricate a run set so the site can be developed without
 ```
 
 `npm run demo:data` writes `apps/web/demo-data/demo-synthetic` (gitignored, never `results/`) with
-`synthetic: true` in its manifest. The site reads it only under `ARENA_DEMO=1 npm run dev:web`, and
+`synthetic: true` in its manifest. The site reads it only under `SCAFFOLDBENCH_DEMO=1 npm run dev:web`, and
 renders an unmissable banner because of it. Those numbers are invented and exist only so the
 interface can be reviewed. They are not results.
 
@@ -265,7 +265,7 @@ A full matrix is six strategies x twelve tasks x N repeats, and several of the a
 four or more model calls per run. Left unchecked that gets expensive quickly, so there are four
 brakes:
 
-- **Per-run ceiling** — `--max-cost` (default $1.00, or `ARENA_MAX_COST_USD`) and `--max-seconds`
+- **Per-run ceiling** — `--max-cost` (default $1.00, or `SCAFFOLDBENCH_MAX_COST_USD`) and `--max-seconds`
   (default 600). `BudgetTracker` enforces both across every model call a single run makes, and
   feeds the remaining budget into each subsequent call as `maxBudgetUsd` so the SDK's own limit
   agrees with ours. A run that trips it is recorded with `failureMode: 'budget_exceeded'` rather
@@ -294,7 +294,7 @@ writing anything to `results/`.
 First real run set: **`2026-07-25T20-18-35Z-3fs5`** — five architectures over the nine sandbox
 tasks, two repeats, Claude Sonnet 5 at `effort: high`, replay fixtures. 90 of 90 runs completed in
 23 minutes for $9.11, with zero harness errors and zero sandbox-guard violations. Regenerate or
-extend it with `arena report --markdown`, which writes `results/<runSetId>/REPORT.md`.
+extend it with `scaffoldbench report --markdown`, which writes `results/<runSetId>/REPORT.md`.
 
 | Strategy | n | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -355,7 +355,7 @@ an agent harness will meet some of them.
    that has an ambient Claude Code login: before the fix an invalid key silently succeeded on the
    host's account; after it, the same key correctly fails with a 401.
 
-6. **The CLI rejected a working credential setup.** `arena run` exited without `ANTHROPIC_API_KEY`,
+6. **The CLI rejected a working credential setup.** `scaffoldbench run` exited without `ANTHROPIC_API_KEY`,
    but the SDK resolves credentials in its own order and an interactive Claude Code login is a
    perfectly good one. It now reports which account will be billed and lets the request decide.
 
@@ -377,7 +377,7 @@ packages/tasks/       the task factories and the task set:
                         defineToolUseTask.ts   deterministic sandbox tasks
                         worlds/{airline,ecommerce,support}/  world, tools, tasks
                         research/              web tools, fixture store, research tasks
-apps/cli/             the `arena` command (run · report · tasks · strategies)
+apps/cli/             the `scaffoldbench` command (run · report · tasks · strategies)
 apps/web/             Next.js site rendering a stored run set — leaderboard, per-cell
                       matrix, score/cost frontier, run detail, traces, and the
                       /live page that runs one task on the visitor's own key

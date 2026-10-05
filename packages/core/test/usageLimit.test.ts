@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { asUsageLimit, isUsageLimit, makeApiError, observeRateLimit } from '@arena/core';
+import { asUsageLimit, isUsageLimit, makeApiError, observeRateLimit } from '@scaffoldbench/core';
 
 /**
  * A spent usage limit against a transient rate limit: the first stops the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { StrategyInfo, TraceEvent } from '@arena/core';
+import type { StrategyInfo, TraceEvent } from '@scaffoldbench/core';
 
 import {
   architectureMeans,

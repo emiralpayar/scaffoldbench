@@ -7,8 +7,8 @@ import {
   powerOfDesign,
   repeatsForPower,
   tasksForPower,
-} from '@arena/core';
-import type { RunRecord, VarianceComponents } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { RunRecord, VarianceComponents } from '@scaffoldbench/core';
 
 // Golden values were computed independently in Python (Simpson integration
 // of the t density for the CDF, bisection for quantiles).

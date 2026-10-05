@@ -14,8 +14,8 @@ import {
   createJudge,
   runMatrix,
   sampleJudge,
-} from '@arena/core';
-import type { Judge, JudgeRequest, Strategy, Task } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { Judge, JudgeRequest, Strategy, Task } from '@scaffoldbench/core';
 import { assistant, resetFake, sessions, setScript, success } from './support/fakeClaudeCode';
 
 /**

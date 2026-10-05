@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ScoreInput, Task, ToolCall } from '@arena/core';
+import type { ScoreInput, Task, ToolCall } from '@scaffoldbench/core';
 import {
   createEcommerceTools,
   createEcommerceWorld,
@@ -36,7 +36,7 @@ async function scoreUntouched(task: Task) {
 }
 
 function envOptions() {
-  return { cwd: '/tmp/arena-test', fixtureMode: 'replay' as const, fixtureDir: '/tmp/fixtures' };
+  return { cwd: '/tmp/scaffoldbench-test', fixtureMode: 'replay' as const, fixtureDir: '/tmp/fixtures' };
 }
 
 // ---------------------------------------------------------------------------

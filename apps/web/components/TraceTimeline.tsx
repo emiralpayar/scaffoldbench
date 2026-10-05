@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { TraceEvent } from '@arena/core';
+import type { TraceEvent } from '@scaffoldbench/core';
 
 import { groupTraceByPhase, indexToolResults } from '../lib/derive';
 import { formatDuration, formatUsd } from '../lib/format';

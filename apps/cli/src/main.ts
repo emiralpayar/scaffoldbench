@@ -1,13 +1,13 @@
 /**
- * The arena command line.
+ * The scaffoldbench command line.
  *
- *   arena run [flags]        execute the matrix and score it
- *   arena report [runSetId]  render a stored run set, health first
- *   arena doctor             check this machine is ready to run
- *   arena tasks              list the task set
- *   arena strategies         list the harness architectures
- *   arena help [command]     flags and examples
- *   arena --version          version, commit and Agent SDK
+ *   scaffoldbench run [flags]        execute the matrix and score it
+ *   scaffoldbench report [runSetId]  render a stored run set, health first
+ *   scaffoldbench doctor             check this machine is ready to run
+ *   scaffoldbench tasks              list the task set
+ *   scaffoldbench strategies         list the harness architectures
+ *   scaffoldbench help [command]     flags and examples
+ *   scaffoldbench --version          version, commit and Agent SDK
  *
  * `run` is the only command that spends money, and it prints the matrix, the
  * expected spend and the most it can spend before it starts a single run.
@@ -41,7 +41,7 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
 
   if (!parsed.ok) {
     ctx.fail(parsed.error);
-    ctx.err(ctx.errStyle.dim(`Run "arena help${parsed.topic ? ` ${parsed.topic}` : ''}" for usage.`));
+    ctx.err(ctx.errStyle.dim(`Run "scaffoldbench help${parsed.topic ? ` ${parsed.topic}` : ''}" for usage.`));
     return 1;
   }
 
@@ -125,7 +125,7 @@ function invokedDirectly(): boolean {
 }
 
 if (invokedDirectly()) {
-  // `arena report | head` closes the pipe early; that is the reader's choice, not an error.
+  // `scaffoldbench report | head` closes the pipe early; that is the reader's choice, not an error.
   for (const stream of [process.stdout, process.stderr]) {
     stream.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EPIPE') process.exit(0);

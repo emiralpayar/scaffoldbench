@@ -297,9 +297,9 @@ Registration is all it takes. `TASK_WORLDS` is derived from `ALL_TASKS`, so your
 immediately becomes a valid selector, alongside the task ids, the two categories and globs:
 
 ```bash
-npm run arena -- tasks                       # your tasks are listed
-npm run arena -- run --tasks my-world        # the whole world
-npm run arena -- run --tasks 'my-world-*'    # same, by glob
+npm run bench -- tasks                       # your tasks are listed
+npm run bench -- run --tasks my-world        # the whole world
+npm run bench -- run --tasks 'my-world-*'    # same, by glob
 ```
 
 ---
@@ -526,7 +526,7 @@ A new research task has no recordings, and in `replay` mode its searches will al
 and commit:
 
 ```bash
-npm run arena -- run --strategies single --tasks research-my-task --repeats 1 \
+npm run bench -- run --strategies single --tasks research-my-task --repeats 1 \
   --model claude-sonnet-5-5 --record
 git add fixtures && git commit -m "Record fixtures for research-my-task"
 ```
@@ -534,7 +534,7 @@ git add fixtures && git commit -m "Record fixtures for research-my-task"
 Then verify the task runs offline before you rely on it (`--replay` is the default, but say it):
 
 ```bash
-npm run arena -- run --strategies single --tasks research-my-task --repeats 1 \
+npm run bench -- run --strategies single --tasks research-my-task --repeats 1 \
   --model claude-sonnet-5-5 --replay
 ```
 
@@ -696,7 +696,7 @@ npm run check:wiring  # optional: asserts your MCP tools actually register with 
 Then run your task for real, cheaply, and read the trace:
 
 ```bash
-npm run arena -- run --strategies single --tasks my-new-task --repeats 2 \
+npm run bench -- run --strategies single --tasks my-new-task --repeats 2 \
   --model claude-sonnet-5-5 --max-cost 2 --total-budget 5
 npm run dev:web
 ```

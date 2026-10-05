@@ -5,7 +5,7 @@ import type { OutputStream } from '../terminal';
 /**
  * What a command needs from the process, gathered once by `main`. Data goes
  * to stdout and everything about the session (plans, progress, warnings,
- * errors) to stderr, so `arena report > report.txt` captures the report and
+ * errors) to stderr, so `scaffoldbench report > report.txt` captures the report and
  * nothing else.
  */
 export interface CliContext {

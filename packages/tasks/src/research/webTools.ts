@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JournaledToolSpec, ToolCall, ToolReply } from '@arena/core';
+import type { JournaledToolSpec, ToolCall, ToolReply } from '@scaffoldbench/core';
 import type { CorpusDocument, SearchHit, TaskCorpus } from './corpus';
 import type { TextRange } from './text';
 

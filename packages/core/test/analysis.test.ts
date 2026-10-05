@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeRunSet, makeRng, orderModels, uncertainFrontier, wilsonInterval } from '@arena/core';
-import type { AnalysisOptions, Contrast, RunRecord, RunSetAnalysis } from '@arena/core';
+import { analyzeRunSet, makeRng, orderModels, uncertainFrontier, wilsonInterval } from '@scaffoldbench/core';
+import type { AnalysisOptions, Contrast, RunRecord, RunSetAnalysis } from '@scaffoldbench/core';
 
 let counter = 0;
 

@@ -1,4 +1,4 @@
-import { parseLooseJson } from '@arena/core';
+import { parseLooseJson } from '@scaffoldbench/core';
 import type {
   FidelityInput,
   IntegrityCheck,
@@ -6,7 +6,7 @@ import type {
   RunContext,
   Strategy,
   StrategyOutcome,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 import { checkFrom, cutShort, haltedBy, metaString, phase, phasePrefix, toolSurfaceCheck } from './fidelity';
 import {
   ACTING_INSTRUCTIONS,

@@ -1,4 +1,4 @@
-import { analyzeRunSet } from '@arena/core';
+import { analyzeRunSet } from '@scaffoldbench/core';
 import { describe, expect, it } from 'vitest';
 
 import type { Estimate, ModelAnalysis, SiteAnalysis } from '../lib/analysis';

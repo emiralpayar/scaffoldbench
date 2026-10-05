@@ -1,4 +1,4 @@
-import type { Penalty, ScoreItem, Task } from '@arena/core';
+import type { Penalty, ScoreItem, Task } from '@scaffoldbench/core';
 
 /** Anything carrying a scored breakdown: a `TaskScore` or a stored `RunRecord`. */
 export interface ScoredRun {

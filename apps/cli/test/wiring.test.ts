@@ -6,10 +6,10 @@ import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { REPO_ROOT } from '@arena/core';
+import { REPO_ROOT } from '@scaffoldbench/core';
 
 /**
- * `check-wiring --init-only` is documented as free, and `arena doctor
+ * `check-wiring --init-only` is documented as free, and `scaffoldbench doctor
  * --wiring` and the CI canary rely on that. It starts four real Claude Code
  * sessions, and a session sends its first request right after it reports its
  * tools, so "stopped at start-up" alone is not free: this test points the

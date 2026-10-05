@@ -9,8 +9,8 @@
  *
  * Which run set is published is decided here, and the rule is strict about
  * fabricated data: synthetic run sets are only ever read when they are asked
- * for by name — `ARENA_DEMO=1`, or a `latest.json` that points at one — and
- * `ARENA_REQUIRE_REAL_DATA=1` (set by the GitHub Pages build) turns even an
+ * for by name — `SCAFFOLDBENCH_DEMO=1`, or a `latest.json` that points at one — and
+ * `SCAFFOLDBENCH_REQUIRE_REAL_DATA=1` (set by the GitHub Pages build) turns even an
  * explicit request into a build failure. There is no code path that falls
  * back to synthetic numbers because the real ones are missing.
  */
@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-import { REPO_ROOT } from '@arena/core';
+import { REPO_ROOT } from '@scaffoldbench/core';
 
 import { buildCatalog, parseTraceLines } from '../derive';
 import { compareModels } from '../models';
@@ -84,7 +84,7 @@ export class SyntheticDataRefusedError extends Error {
   constructor(runSetId: string) {
     super(
       `Refusing to publish run set "${runSetId}": its manifest says it is synthetic and ` +
-        'ARENA_REQUIRE_REAL_DATA is set. Point results/latest.json at a measured run set.',
+        'SCAFFOLDBENCH_REQUIRE_REAL_DATA is set. Point results/latest.json at a measured run set.',
     );
     this.name = 'SyntheticDataRefusedError';
   }
@@ -99,7 +99,7 @@ export function resultsRoot(): string {
   // An explicit override wins even when it does not exist: a deployment that
   // points at the wrong directory should render the empty state, not quietly
   // fall back to whatever results happen to be in the checkout.
-  const override = process.env.ARENA_RESULTS_DIR;
+  const override = process.env.SCAFFOLDBENCH_RESULTS_DIR;
   if (override) return path.resolve(override);
   return firstExisting([
     path.join(REPO_ROOT, 'results'),
@@ -186,14 +186,14 @@ export async function readRunSet(root: string, runSetId: string): Promise<RunSet
 }
 
 async function resolvePublished(): Promise<RunSetData | null> {
-  if (process.env.ARENA_DEMO === '1') {
-    if (process.env.ARENA_REQUIRE_REAL_DATA === '1') {
+  if (process.env.SCAFFOLDBENCH_DEMO === '1') {
+    if (process.env.SCAFFOLDBENCH_REQUIRE_REAL_DATA === '1') {
       throw new SyntheticDataRefusedError(DEMO_RUN_SET_ID);
     }
     const demo = await readRunSet(demoDataDir(), DEMO_RUN_SET_ID);
     if (!demo) {
       throw new Error(
-        `ARENA_DEMO=1 but ${path.join(demoDataDir(), DEMO_RUN_SET_ID)} does not exist. ` +
+        `SCAFFOLDBENCH_DEMO=1 but ${path.join(demoDataDir(), DEMO_RUN_SET_ID)} does not exist. ` +
           'Generate it with `npm run demo:data`.',
       );
     }
@@ -208,7 +208,7 @@ async function resolvePublished(): Promise<RunSetData | null> {
   if (!runSetId) return null;
 
   const data = await readRunSet(root, runSetId);
-  if (data?.verification === 'synthetic' && process.env.ARENA_REQUIRE_REAL_DATA === '1') {
+  if (data?.verification === 'synthetic' && process.env.SCAFFOLDBENCH_REQUIRE_REAL_DATA === '1') {
     throw new SyntheticDataRefusedError(runSetId);
   }
   return data;

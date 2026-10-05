@@ -3,7 +3,7 @@
  * summaries, paired contrasts against the `single` control, "scaffold or
  * scale" contrasts across model tiers, and a health summary.
  *
- * A thin adapter over `analyzeRunSet` in `@arena/core` (method:
+ * A thin adapter over `analyzeRunSet` in `@scaffoldbench/core` (method:
  * docs/STATISTICS.md). Nothing is computed here that core does not compute:
  * the intervals, the paired contrasts, the Holm adjustment, the verdicts and
  * the uncertainty-aware frontier are core's, reshaped into what the pages
@@ -17,7 +17,7 @@
  * Pure: no filesystem, safe anywhere.
  */
 
-import { analyzeRunSet, paretoFrontier } from '@arena/core';
+import { analyzeRunSet, paretoFrontier } from '@scaffoldbench/core';
 import type {
   AnalysisOptions as CoreAnalysisOptions,
   AnalysisSettings,
@@ -27,7 +27,7 @@ import type {
   Estimate as CoreEstimate,
   ModelAnalysis as CoreModelAnalysis,
   StrategyAnalysis,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 import { BASELINE_ID, compareArchitectures } from './architectures';
 import { compareModels } from './models';

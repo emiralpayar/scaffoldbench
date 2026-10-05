@@ -1,4 +1,4 @@
-import type { Task, ToolCall } from '@arena/core';
+import type { Task, ToolCall } from '@scaffoldbench/core';
 import {
   defineToolUseTask,
   type AssertionSpec,

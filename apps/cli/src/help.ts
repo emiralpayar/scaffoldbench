@@ -10,10 +10,10 @@ import type { Style } from './style';
 
 const ENVIRONMENT: [string, string][] = [
   ['ANTHROPIC_API_KEY', 'Billed when set; otherwise the SDK uses this machine\'s Claude Code login'],
-  ['ARENA_MODEL', 'Default for --models (comma-separated)'],
-  ['ARENA_JUDGE_MODEL', 'Default for --judge-model'],
-  ['ARENA_MAX_COST_USD', 'Default for --max-cost'],
-  ['ARENA_RESULTS_DIR', 'Default for --results-dir; the site reads it too'],
+  ['SCAFFOLDBENCH_MODEL', 'Default for --models (comma-separated)'],
+  ['SCAFFOLDBENCH_JUDGE_MODEL', 'Default for --judge-model'],
+  ['SCAFFOLDBENCH_MAX_COST_USD', 'Default for --max-cost'],
+  ['SCAFFOLDBENCH_RESULTS_DIR', 'Default for --results-dir; the site reads it too'],
   ['NO_COLOR, FORCE_COLOR', 'Turn colour off or on'],
 ];
 
@@ -23,14 +23,14 @@ export function generalHelp(style: Style = PLAIN, width = 100): string {
     `${style.bold('ScaffoldBench')} ${style.dim('— does your agent scaffold pay for itself?')}`,
     '',
     style.bold('USAGE'),
-    '  arena <command> [flags]',
-    `  npm run arena -- <command> [flags]  ${style.dim('from a checkout')}`,
+    '  scaffoldbench <command> [flags]',
+    `  npm run bench -- <command> [flags]  ${style.dim('inside the repo')}`,
     '',
     style.bold('COMMANDS'),
     ...wrapPairs(
       [
         ...commands.map((command): [string, string] => [command.name, command.summary]),
-        ['help', "arena help <command> shows a command's flags"],
+        ['help', "scaffoldbench help <command> shows a command's flags"],
         ['--version', 'Version, commit and Agent SDK'],
       ],
       width,

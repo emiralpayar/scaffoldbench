@@ -3,8 +3,8 @@
  * one line per run anywhere else (CI logs, pipes, `--plain`).
  */
 
-import { MODEL_STOP_LABELS } from '@arena/core';
-import type { RunnerEvent, TraceEvent } from '@arena/core';
+import { MODEL_STOP_LABELS } from '@scaffoldbench/core';
+import type { RunnerEvent, TraceEvent } from '@scaffoldbench/core';
 
 import { formatDuration, formatScore, formatUsd } from './format';
 import { applyRunnerEvent, applyTraceEvent, cellGlyph, outcomeOf, renderLiveFrame } from './live';

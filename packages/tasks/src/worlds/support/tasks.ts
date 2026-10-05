@@ -1,4 +1,4 @@
-import { called, calledAfter, type Task, type ToolCall } from '@arena/core';
+import { called, calledAfter, type Task, type ToolCall } from '@scaffoldbench/core';
 import { defineToolUseTask, type ForbiddenSpec } from '../../defineToolUseTask';
 import { findCalls } from '../../journal';
 import { anyOf, blastRadiusRule, within, type ChangeFilter } from '../../worldDiff';

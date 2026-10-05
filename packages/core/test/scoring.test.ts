@@ -6,8 +6,8 @@ import {
   extractUrls,
   fetchedUrlsFromTrace,
   normalizeUrl,
-} from '@arena/core';
-import type { Penalty, ScoreItem, TraceEvent } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { Penalty, ScoreItem, TraceEvent } from '@scaffoldbench/core';
 
 const item = (id: string, weight: number, earned: number): ScoreItem => ({
   id,

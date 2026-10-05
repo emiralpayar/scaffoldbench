@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Task, TaskScore } from '@arena/core';
+import type { Task, TaskScore } from '@scaffoldbench/core';
 import type { ToolUseTaskSpec } from '../src/defineToolUseTask';
 import { firedTraps } from '../src/traps';
 import {

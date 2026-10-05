@@ -10,7 +10,7 @@
  * docs/STATISTICS.md quotes these scenarios at 2,000 trials with the default
  * 10,000 bootstrap replicates. To reproduce its table:
  *
- *   ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts \
+ *   SCAFFOLDBENCH_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts \
  *     --testTimeout=1200000
  *
  * (about two and a half minutes, most of it the leaderboard simulation).
@@ -30,8 +30,8 @@ import {
   resolveVerdicts,
   summarizeRuns,
   wilsonInterval,
-} from '@arena/core';
-import type { InferenceSettings, RunRecord } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { InferenceSettings, RunRecord } from '@scaffoldbench/core';
 
 function gaussian(rng: () => number): () => number {
   return () => {
@@ -41,7 +41,7 @@ function gaussian(rng: () => number): () => number {
   };
 }
 
-const SCALE = Number(process.env.ARENA_SIM_TRIALS) || 0;
+const SCALE = Number(process.env.SCAFFOLDBENCH_SIM_TRIALS) || 0;
 const ITERATIONS = SCALE ? 10_000 : 1_000;
 const trialsOr = (ciDefault: number) => SCALE || ciDefault;
 

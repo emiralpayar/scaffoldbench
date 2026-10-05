@@ -12,7 +12,7 @@ import {
   manifestPath,
   runSetDir,
   writeJson,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 describe('run set ids', () => {
   it('accepts the ids the runner generates and ordinary names', () => {
@@ -70,7 +70,7 @@ describe('writeJson', () => {
   let dir: string;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'arena-paths-'));
+    dir = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-paths-'));
   });
 
   afterEach(async () => {

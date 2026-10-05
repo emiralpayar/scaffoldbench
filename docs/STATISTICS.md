@@ -410,7 +410,7 @@ table below is the same file at 2,000 trials with the default 10,000 replicates 
 half minutes):
 
 ```sh
-ARENA_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts --testTimeout=1200000
+SCAFFOLDBENCH_SIM_TRIALS=2000 npx vitest run packages/core/test/analysisSimulation.test.ts --testTimeout=1200000
 ```
 
 | Scenario | Target | Measured |
@@ -454,7 +454,7 @@ The re-analysis of the first published run set is pinned in
 ## 9. API
 
 ```ts
-import { analyzeRunSet, planPower } from '@arena/core';
+import { analyzeRunSet, planPower } from '@scaffoldbench/core';
 
 const analysis = analyzeRunSet(records, {
   baseline: 'single',          // default

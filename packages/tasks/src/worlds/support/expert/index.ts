@@ -1,4 +1,4 @@
-import type { Task } from '@arena/core';
+import type { Task } from '@scaffoldbench/core';
 import { supportAccessTask } from './access';
 import { supportIncidentTask } from './incident';
 import { supportTriageTask } from './triage';

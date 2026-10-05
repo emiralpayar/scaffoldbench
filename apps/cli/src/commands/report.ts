@@ -1,5 +1,5 @@
 /**
- * `arena report`: render a stored run set, health first.
+ * `scaffoldbench report`: render a stored run set, health first.
  *
  * `--strict` turns the health section into a gate: it exits 3 unless the run
  * set is complete and every run measured what it claims to, which is what
@@ -9,7 +9,7 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { RESULTS_DIR, runSetDir } from '@arena/core';
+import { RESULTS_DIR, runSetDir } from '@scaffoldbench/core';
 
 import type { ReportArgs } from '../args';
 import { displayPath } from '../format';
@@ -71,7 +71,7 @@ export async function reportCommand(args: ReportArgs, ctx: CliContext): Promise<
 async function listAvailable(ctx: CliContext, root: string): Promise<void> {
   const sets = await listRunSets(root);
   if (sets.length === 0) {
-    ctx.err(`There are no run sets under ${displayPath(ctx.cwd, root)} yet. Start one with: arena run`);
+    ctx.err(`There are no run sets under ${displayPath(ctx.cwd, root)} yet. Start one with: scaffoldbench run`);
     return;
   }
   ctx.err(`Run sets under ${displayPath(ctx.cwd, root)}:`);

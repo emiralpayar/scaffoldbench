@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JournaledToolSpec } from '@arena/core';
+import type { JournaledToolSpec } from '@scaffoldbench/core';
 import {
   createAirlineTools,
   describeLedgerEntry,

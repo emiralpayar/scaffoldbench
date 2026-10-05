@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { REPO_ROOT } from '@arena/core';
+import { REPO_ROOT } from '@scaffoldbench/core';
 
 /**
  * The properties of the two workflows that exist to keep money and results
@@ -156,7 +156,7 @@ describe('ci.yml', () => {
   it('smoke-tests the CLI without a model call or a credential', async () => {
     const text = code(await read('ci.yml'));
     expect(text).not.toMatch(/ANTHROPIC_API_KEY|secrets\./);
-    for (const command of ['arena -- tasks', 'arena -- strategies', 'arena -- report']) {
+    for (const command of ['bench -- tasks', 'bench -- strategies', 'bench -- report']) {
       expect(text).toContain(command);
     }
   });

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { FIXTURES_DIR, type ToolCall } from '@arena/core';
+import { FIXTURES_DIR, type ToolCall } from '@scaffoldbench/core';
 import {
   Bm25Index,
   CORPUS_DIRNAME,
@@ -33,7 +33,7 @@ afterAll(() => {
 });
 
 function freshDir(): string {
-  const dir = mkdtempSync(path.join(tmpdir(), 'arena-corpus-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'scaffoldbench-corpus-'));
   scratch.push(dir);
   return dir;
 }

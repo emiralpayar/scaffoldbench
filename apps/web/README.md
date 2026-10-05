@@ -8,7 +8,7 @@ nothing in the static build calls an API.
 
 ```sh
 npm run dev:web                    # http://localhost:3210, the published run set
-ARENA_DEMO=1 npm run dev:web       # synthetic data, after `npm run demo:data`
+SCAFFOLDBENCH_DEMO=1 npm run dev:web       # synthetic data, after `npm run demo:data`
 npm run build:web                  # static export to apps/web/out
 ```
 
@@ -26,7 +26,7 @@ npm run build:web                  # static export to apps/web/out
 | `/health/` | Every integrity check and the runs excluded for failing one. |
 | `/methodology/` | How a run is scored, how it proves it ran, how runs become claims, and the limits. |
 | `/postmortem/` | The first run set, retracted: what its traces showed. |
-| `/live/` | Recorded runs replayed; with `NEXT_PUBLIC_ARENA_LIVE=1`, a run on a visitor's own key. |
+| `/live/` | Recorded runs replayed; with `NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1`, a run on a visitor's own key. |
 
 Per-model pages are static pages of their own, so a model is a link and the
 switch needs no script.
@@ -37,7 +37,7 @@ switch needs no script.
 There is no server, no API route and nothing that asks for a key. This is
 what `.github/workflows/pages.yml` deploys to GitHub Pages.
 
-**Server (`NEXT_PUBLIC_ARENA_LIVE=1`).** A Node server that also serves
+**Server (`NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1`).** A Node server that also serves
 `/api/live`, which runs one tool-use task on a visitor's own API key and
 streams the trace. It spawns the Agent SDK's subprocess, so it needs a
 long-lived Node host, not a serverless function. The rules that keep it safe
@@ -51,11 +51,11 @@ long-lived Node host, not a serverless function. The rules that keep it safe
 | `NEXT_PUBLIC_BASE_PATH` | Sub-path the export is served under, e.g. `/scaffoldbench` for a GitHub Pages project site. |
 | `NEXT_PUBLIC_SITE_URL` | Absolute URL including the base path, for Open Graph URLs, the sitemap, robots.txt and the social card. |
 | `NEXT_PUBLIC_REPO_URL` | Repository URL. When set, trust claims and evidence link to the files they name. |
-| `ARENA_RESULTS_DIR` | Read run sets from another directory. A path that does not exist renders the empty state. |
-| `ARENA_DEMO=1` | Read the synthetic set in `demo-data/`. Every page that shows a number then carries a synthetic-data banner. |
-| `ARENA_REQUIRE_REAL_DATA=1` | Fail the build instead of rendering a synthetic set. The Pages workflow sets it. |
-| `NEXT_PUBLIC_ARENA_LIVE=1` | Server mode, above. |
-| `ARENA_TRUST_PROXY=1` | Server mode only: rate-limit by `X-Forwarded-For`, for a host behind a proxy that sets it. |
+| `SCAFFOLDBENCH_RESULTS_DIR` | Read run sets from another directory. A path that does not exist renders the empty state. |
+| `SCAFFOLDBENCH_DEMO=1` | Read the synthetic set in `demo-data/`. Every page that shows a number then carries a synthetic-data banner. |
+| `SCAFFOLDBENCH_REQUIRE_REAL_DATA=1` | Fail the build instead of rendering a synthetic set. The Pages workflow sets it. |
+| `NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1` | Server mode, above. |
+| `SCAFFOLDBENCH_TRUST_PROXY=1` | Server mode only: rate-limit by `X-Forwarded-For`, for a host behind a proxy that sets it. |
 
 ## Where things live
 

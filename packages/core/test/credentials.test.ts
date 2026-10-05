@@ -5,7 +5,7 @@ import {
   assertApiKeyShape,
   redactSecrets,
   visitorEnv,
-} from '@arena/core';
+} from '@scaffoldbench/core';
 
 const VALID_KEY = `sk-ant-api03-${'a'.repeat(60)}`;
 

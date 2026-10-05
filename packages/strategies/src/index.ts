@@ -1,4 +1,4 @@
-import type { Strategy } from '@arena/core';
+import type { Strategy } from '@scaffoldbench/core';
 import { singleStrategy } from './single';
 import { planExecuteStrategy } from './planExecute';
 import { orchestratorWorkersStrategy } from './orchestratorWorkers';

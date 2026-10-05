@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { PhaseRecord, Penalty, ScoreItem, TraceEvent } from '@arena/core';
+import type { PhaseRecord, Penalty, ScoreItem, TraceEvent } from '@scaffoldbench/core';
 
 import { architectureName } from '../lib/architectures';
 import { FULL_CREDIT, formatDuration, formatFailureMode, formatScore, formatUsd } from '../lib/format';

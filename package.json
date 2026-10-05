@@ -1,9 +1,18 @@
 {
-  "name": "agent-arena",
+  "name": "scaffoldbench",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "A benchmark lab that measures agent harness architectures on the same task set.",
+  "author": "Emir Alp Ayar",
+  "homepage": "https://github.com/emiralpayar/scaffoldbench#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emiralpayar/scaffoldbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/emiralpayar/scaffoldbench/issues"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=22"
@@ -13,13 +22,13 @@
     "apps/*"
   ],
   "scripts": {
-    "arena": "tsx apps/cli/src/main.ts",
+    "bench": "tsx apps/cli/src/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dev:web": "npm run dev --workspace @arena/web",
-    "build:web": "npm run build --workspace @arena/web",
-    "check": "npm run typecheck && npm run typecheck --workspace @arena/web && npm run test",
+    "dev:web": "npm run dev --workspace @scaffoldbench/web",
+    "build:web": "npm run build --workspace @scaffoldbench/web",
+    "check": "npm run typecheck && npm run typecheck --workspace @scaffoldbench/web && npm run test",
     "check:wiring": "tsx scripts/check-wiring.ts",
     "demo:data": "tsx scripts/generate-demo-data.ts"
   },

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { REPO_ROOT, collectProvenance, gitState, sdkVersions } from '@arena/core';
+import { REPO_ROOT, collectProvenance, gitState, sdkVersions } from '@scaffoldbench/core';
 
 describe('gitState', () => {
   let repo: string;
@@ -15,7 +15,7 @@ describe('gitState', () => {
     }).toString();
 
   beforeEach(async () => {
-    repo = await mkdtemp(path.join(tmpdir(), 'arena-provenance-'));
+    repo = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-provenance-'));
   });
 
   afterEach(async () => {

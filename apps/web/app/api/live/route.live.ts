@@ -1,7 +1,7 @@
 /**
  * Run one tool-use task, once, on a visitor's own API key, and stream the
  * trace back. Server mode only: the file is named `route.live.ts` and only a
- * `NEXT_PUBLIC_ARENA_LIVE=1` build lists `live.ts` as a page extension, so the
+ * `NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1` build lists `live.ts` as a page extension, so the
  * public static export has no API at all.
  *
  * Hosting: this spawns the Agent SDK's native subprocess (hundreds of MB of
@@ -42,10 +42,10 @@ import {
   assertApiKeyShape,
   redactSecrets,
   runMatrix,
-} from '@arena/core';
-import type { RunnerConfig, TraceEvent } from '@arena/core';
-import { getStrategies } from '@arena/strategies';
-import { getTasks } from '@arena/tasks';
+} from '@scaffoldbench/core';
+import type { RunnerConfig, TraceEvent } from '@scaffoldbench/core';
+import { getStrategies } from '@scaffoldbench/strategies';
+import { getTasks } from '@scaffoldbench/tasks';
 
 import {
   LIVE_DEFAULT_MODEL,

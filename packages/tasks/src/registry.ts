@@ -1,4 +1,4 @@
-import type { Task, TaskCategory } from '@arena/core';
+import type { Task, TaskCategory } from '@scaffoldbench/core';
 
 import { researchTasks } from './research';
 import { airlineExpertTasks, airlineTasks } from './worlds/airline';

@@ -14,8 +14,8 @@ import {
   resolveVerdicts,
   signFlipTest,
   studentTCdf,
-} from '@arena/core';
-import type { InferenceSettings, PairedTest } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { InferenceSettings, PairedTest } from '@scaffoldbench/core';
 
 const settings: InferenceSettings = { iterations: 4_000, seed: 0xa11ce, alpha: 0.05, minClusters: 5 };
 

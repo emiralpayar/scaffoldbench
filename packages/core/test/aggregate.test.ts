@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeRuns } from '@arena/core';
-import type { FailureMode, RunRecord, TaskCategory } from '@arena/core';
+import { summarizeRuns } from '@scaffoldbench/core';
+import type { FailureMode, RunRecord, TaskCategory } from '@scaffoldbench/core';
 
 let counter = 0;
 

@@ -5,8 +5,8 @@ import {
   STRUCTURED_OUTPUT_TOOL,
   TraceCollector,
   createSandboxGuard,
-} from '@arena/core';
-import type { PendingToolCall, ToolCallReviewer } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { PendingToolCall, ToolCallReviewer } from '@scaffoldbench/core';
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk';
 
 const preToolUse = (toolName: string, input: unknown = {}): HookInput =>

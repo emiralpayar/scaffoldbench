@@ -3,7 +3,7 @@
  * reading order and the colour each one wears on every chart.
  *
  * This is presentation, not the benchmark's source of truth. The strategies
- * themselves live in `@arena/strategies`; the run set's `catalog.json` carries
+ * themselves live in `@scaffoldbench/strategies`; the run set's `catalog.json` carries
  * the long description that was current when it ran. What belongs here is what
  * has to be identical across the whole site so a reader can learn it once:
  * the glyph, the colour and the short name.

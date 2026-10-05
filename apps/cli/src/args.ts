@@ -1,5 +1,5 @@
 /**
- * Dependency-free argument parsing for the arena CLI.
+ * Dependency-free argument parsing for the scaffoldbench CLI.
  *
  * The parser never exits the process and never touches the filesystem: it maps
  * an argv array plus an environment onto either a typed command or a typed
@@ -10,8 +10,8 @@
  * cannot exist without being documented, nor be documented without existing.
  */
 
-import { isValidRunSetId } from '@arena/core';
-import type { EffortLevel, FixtureMode } from '@arena/core';
+import { isValidRunSetId } from '@scaffoldbench/core';
+import type { EffortLevel, FixtureMode } from '@scaffoldbench/core';
 
 import { closest } from './suggest';
 
@@ -181,7 +181,7 @@ const RUN_FLAGS: FlagSpec[] = [
     name: 'models',
     kind: 'value',
     value: '<ids>',
-    help: 'Models under test, comma-separated, or $ARENA_MODEL',
+    help: 'Models under test, comma-separated, or $SCAFFOLDBENCH_MODEL',
     fallback: DEFAULT_MODEL,
   },
   { name: 'model', kind: 'value', value: '<id>', help: 'Same as --models', aliasOf: 'models' },
@@ -204,7 +204,7 @@ const RUN_FLAGS: FlagSpec[] = [
     name: 'max-cost',
     kind: 'value',
     value: '<usd>',
-    help: 'Cost ceiling for ONE run, or $ARENA_MAX_COST_USD',
+    help: 'Cost ceiling for ONE run, or $SCAFFOLDBENCH_MAX_COST_USD',
     fallback: money(DEFAULT_MAX_COST_USD),
   },
   {
@@ -225,7 +225,7 @@ const RUN_FLAGS: FlagSpec[] = [
     name: 'judge-model',
     kind: 'value',
     value: '<id>',
-    help: 'Model that grades research answers, or $ARENA_JUDGE_MODEL',
+    help: 'Model that grades research answers, or $SCAFFOLDBENCH_JUDGE_MODEL',
     fallback: DEFAULT_JUDGE_MODEL,
   },
   { name: 'judge-effort', kind: 'value', value: '<level>', help: 'Effort of each grading call', fallback: DEFAULT_JUDGE_EFFORT },
@@ -245,7 +245,7 @@ const RUN_FLAGS: FlagSpec[] = [
     name: 'results-dir',
     kind: 'value',
     value: '<dir>',
-    help: 'Results root, or $ARENA_RESULTS_DIR',
+    help: 'Results root, or $SCAFFOLDBENCH_RESULTS_DIR',
     fallback: 'results/',
   },
   { name: 'update-latest', kind: 'boolean', help: 'Point results/latest.json (what the site shows) here' },
@@ -267,7 +267,7 @@ const REPORT_FLAGS: FlagSpec[] = [
     name: 'results-dir',
     kind: 'value',
     value: '<dir>',
-    help: 'Results root, or $ARENA_RESULTS_DIR',
+    help: 'Results root, or $SCAFFOLDBENCH_RESULTS_DIR',
     fallback: 'results/',
   },
 ];
@@ -288,38 +288,38 @@ const DOCTOR_FLAGS: FlagSpec[] = [
 export const COMMANDS: readonly CommandSpec[] = [
   {
     name: 'run',
-    synopsis: 'arena run [flags]',
+    synopsis: 'scaffoldbench run [flags]',
     summary: 'Run the model x strategy x task matrix and score it',
     flags: RUN_FLAGS,
     examples: [
-      'arena run --strategies single,plan-execute --tasks airline-* --repeats 2',
-      'arena run --models claude-haiku-4-5-20251001,claude-sonnet-5-5 --tasks support --dry-run',
-      'arena run --resume 2026-10-02T09-14-03Z-k2p9',
+      'scaffoldbench run --strategies single,plan-execute --tasks airline-* --repeats 2',
+      'scaffoldbench run --models claude-haiku-4-5-20251001,claude-sonnet-5-5 --tasks support --dry-run',
+      'scaffoldbench run --resume 2026-10-02T09-14-03Z-k2p9',
     ],
     notes: [
       `On a terminal, a run that can cost more than ${money(CONFIRM_ABOVE_USD)} and uses the default --total-budget asks before it starts. Typing --total-budget (or --yes) is the answer; scripts and pipes are never asked.`,
       'Ctrl-C once stops starting runs and lets the runs in flight finish and be recorded; Ctrl-C again aborts them. Either way the manifest says the run set was interrupted, and --resume picks it up.',
-      'Exit status: 0 every cell ran · 1 usage or setup error, a start declined at the prompt, no run recorded, or nothing measured (every run hit an API error) · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "arena report --strict" is the gate for that.',
+      'Exit status: 0 every cell ran · 1 usage or setup error, a start declined at the prompt, no run recorded, or nothing measured (every run hit an API error) · 2 stopped early (total budget, rejected credentials, spent usage limit) · 130 interrupted. Runs that failed their integrity checks do not change it: "scaffoldbench report --strict" is the gate for that.',
     ],
   },
   {
     name: 'report',
-    synopsis: 'arena report [runSetId] [flags]',
+    synopsis: 'scaffoldbench report [runSetId] [flags]',
     summary: 'Render a stored run set (defaults to results/latest.json)',
     flags: REPORT_FLAGS,
-    examples: ['arena report', 'arena report 2026-07-25T20-18-35Z-3fs5 --markdown', 'arena report <id> --strict'],
+    examples: ['scaffoldbench report', 'scaffoldbench report 2026-07-25T20-18-35Z-3fs5 --markdown', 'scaffoldbench report <id> --strict'],
   },
   {
     name: 'doctor',
-    synopsis: 'arena doctor [flags]',
+    synopsis: 'scaffoldbench doctor [flags]',
     summary: 'Check this machine is ready to run the benchmark',
     flags: DOCTOR_FLAGS,
-    examples: ['arena doctor', 'arena doctor --wiring'],
+    examples: ['scaffoldbench doctor', 'scaffoldbench doctor --wiring'],
   },
-  { name: 'tasks', synopsis: 'arena tasks', summary: 'List the task set', flags: [], examples: [] },
-  { name: 'strategies', synopsis: 'arena strategies', summary: 'List the harness architectures', flags: [], examples: [] },
-  { name: 'help', synopsis: 'arena help [command]', summary: 'Show help for a command', flags: [], examples: [] },
-  { name: 'version', synopsis: 'arena --version', summary: 'Print the version, commit and SDK', flags: [], examples: [] },
+  { name: 'tasks', synopsis: 'scaffoldbench tasks', summary: 'List the task set', flags: [], examples: [] },
+  { name: 'strategies', synopsis: 'scaffoldbench strategies', summary: 'List the harness architectures', flags: [], examples: [] },
+  { name: 'help', synopsis: 'scaffoldbench help [command]', summary: 'Show help for a command', flags: [], examples: [] },
+  { name: 'version', synopsis: 'scaffoldbench --version', summary: 'Print the version, commit and SDK', flags: [], examples: [] },
 ];
 
 export function commandSpec(name: CommandName): CommandSpec {
@@ -418,7 +418,7 @@ function collect(tokens: readonly string[], spec: CommandSpec): Collected | { er
     }
     if (!token.startsWith('--')) {
       return {
-        error: `Unknown flag: ${token}. Flags are spelled out in full; see "arena help ${spec.name}".`,
+        error: `Unknown flag: ${token}. Flags are spelled out in full; see "scaffoldbench help ${spec.name}".`,
       };
     }
 
@@ -521,11 +521,11 @@ function invalidRunSetId(id: string): string {
   );
 }
 
-/** `--results-dir`, else `$ARENA_RESULTS_DIR` (which the site reads too); '' when given empty. */
+/** `--results-dir`, else `$SCAFFOLDBENCH_RESULTS_DIR` (which the site reads too); '' when given empty. */
 function resultsDirOf(flags: Map<string, string[]>, env: NodeJS.ProcessEnv): string | undefined {
   const fromFlag = last(flags, 'results-dir');
   if (fromFlag !== undefined) return fromFlag.trim();
-  const fromEnv = env.ARENA_RESULTS_DIR?.trim();
+  const fromEnv = env.SCAFFOLDBENCH_RESULTS_DIR?.trim();
   return fromEnv ? fromEnv : undefined;
 }
 
@@ -563,9 +563,9 @@ function parseRun(collected: Collected, env: NodeJS.ProcessEnv): ParsedCommand {
   if (fixtureFlags.length > 0) explicit.add('fixtureMode');
   const fixtureMode: FixtureMode = fixtureFlags[0] ?? DEFAULT_FIXTURE_MODE;
 
-  const envMaxCost = moneyFromEnv(env, 'ARENA_MAX_COST_USD', errors);
-  const envModels = listFromEnv(env, 'ARENA_MODEL');
-  const envJudge = env.ARENA_JUDGE_MODEL?.trim();
+  const envMaxCost = moneyFromEnv(env, 'SCAFFOLDBENCH_MAX_COST_USD', errors);
+  const envModels = listFromEnv(env, 'SCAFFOLDBENCH_MODEL');
+  const envJudge = env.SCAFFOLDBENCH_JUDGE_MODEL?.trim();
 
   const runSetId = last(flags, 'run-set');
   const resume = last(flags, 'resume');
@@ -731,7 +731,7 @@ function level(flags: Map<string, string[]>, name: string, fallback: EffortLevel
 /**
  * A malformed budget variable is reported rather than ignored: silently falling
  * back to the default is how someone ends up with a bill they did not agree to.
- * An empty one (`ARENA_MAX_COST_USD=` in a .env) is simply unset.
+ * An empty one (`SCAFFOLDBENCH_MAX_COST_USD=` in a .env) is simply unset.
  */
 function moneyFromEnv(env: NodeJS.ProcessEnv, name: string, errors: string[]): number | undefined {
   const raw = env[name];

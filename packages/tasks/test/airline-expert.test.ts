@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskScore } from '@arena/core';
+import type { TaskScore } from '@scaffoldbench/core';
 import { defineToolUseTask, type ToolUseTaskSpec } from '../src/defineToolUseTask';
 import { firedTraps } from '../src/traps';
 import {
@@ -32,7 +32,7 @@ import {
   type AirlineOpsWorld,
 } from '../src/worlds/airline';
 import { createDriver, earned, environmentOptions, missed, penaltyIds, scoreInput, type Driver } from './harness';
-import type { Task } from '@arena/core';
+import type { Task } from '@scaffoldbench/core';
 
 type OpsDriver = Driver<AirlineOpsWorld>;
 

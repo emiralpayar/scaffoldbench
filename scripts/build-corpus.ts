@@ -32,7 +32,7 @@
 
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { FIXTURES_DIR } from '@arena/core';
+import { FIXTURES_DIR } from '@scaffoldbench/core';
 import {
   CORPUS_DIRNAME,
   CORPUS_MANIFEST,
@@ -40,9 +40,9 @@ import {
   sha256,
   type CorpusDocumentRecord,
   type CorpusManifest,
-} from '@arena/tasks/research/corpus';
-import { extractDocument } from '@arena/tasks/research/extract';
-import { CORPUS_SOURCES, LICENSES, type CorpusSource } from '@arena/tasks/research/sources';
+} from '@scaffoldbench/tasks/research/corpus';
+import { extractDocument } from '@scaffoldbench/tasks/research/extract';
+import { CORPUS_SOURCES, LICENSES, type CorpusSource } from '@scaffoldbench/tasks/research/sources';
 
 /** Bump when the source list or the extraction rules change what the corpus contains. */
 const CORPUS_VERSION = 2;

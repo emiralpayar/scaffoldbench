@@ -1,5 +1,5 @@
 
-import type { CellSummary } from '@arena/core';
+import type { CellSummary } from '@scaffoldbench/core';
 
 import type { RunRecord } from '../lib/records';
 

@@ -3,7 +3,7 @@
  *
  * A trap names the scorer items that register it (`caughtBy`): it fired when
  * one of those rules' penalties was applied or one of those assertions earned
- * less than full credit. This mirrors `firedTraps` in `@arena/tasks`, which
+ * less than full credit. This mirrors `firedTraps` in `@scaffoldbench/tasks`, which
  * the tasks stream owns; once that is exported on this branch the site should
  * import it instead of keeping a copy.
  *

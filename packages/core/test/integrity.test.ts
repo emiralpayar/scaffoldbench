@@ -8,8 +8,8 @@ import {
   harnessChecks,
   integrityOf,
   tracedCalls,
-} from '@arena/core';
-import type { ApiError, IntegrityCheck, PhaseRecord, TraceEvent } from '@arena/core';
+} from '@scaffoldbench/core';
+import type { ApiError, IntegrityCheck, PhaseRecord, TraceEvent } from '@scaffoldbench/core';
 
 /**
  * The runner's own integrity checks, over hand-built traces shaped like the

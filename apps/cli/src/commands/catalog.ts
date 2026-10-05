@@ -1,7 +1,7 @@
-/** `arena tasks` and `arena strategies`: what can be selected, for free. */
+/** `scaffoldbench tasks` and `scaffoldbench strategies`: what can be selected, for free. */
 
-import { STRATEGIES } from '@arena/strategies';
-import { ALL_TASKS } from '@arena/tasks';
+import { STRATEGIES } from '@scaffoldbench/strategies';
+import { ALL_TASKS } from '@scaffoldbench/tasks';
 
 import { renderTable, wrap } from '../style';
 import type { CliContext } from './context';

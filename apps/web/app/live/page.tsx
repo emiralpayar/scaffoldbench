@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
-import { STRATEGIES } from '@arena/strategies';
-import { ALL_TASKS } from '@arena/tasks';
+import { STRATEGIES } from '@scaffoldbench/strategies';
+import { ALL_TASKS } from '@scaffoldbench/tasks';
 
 import { ArchitectureGlyph } from '../../components/ArchitectureGlyph';
 import Link from '../../components/Link';
@@ -32,7 +32,7 @@ const STEPS = [
   { label: 'Install', command: 'npm ci' },
   {
     label: 'Run two architectures on one task, once each',
-    command: 'npm run arena -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest',
+    command: 'npm run bench -- run --strategies single,plan-execute --tasks airline-hard --repeats 1 --update-latest',
   },
   { label: 'Open the site on your results', command: 'npm run dev:web' },
 ];
@@ -181,7 +181,7 @@ export default async function LivePage() {
           <p className="prose-serif mt-3 max-w-2xl">
             This copy of the site is static, so it cannot run a model and will never ask for an API
             key. To try the streaming demo, serve the site in server mode on your machine with{' '}
-            <code className="code-inline">NEXT_PUBLIC_ARENA_LIVE=1 npm run dev:web</code>; runs there
+            <code className="code-inline">NEXT_PUBLIC_SCAFFOLDBENCH_LIVE=1 npm run dev:web</code>; runs there
             are billed to the key you paste and to no other credentials.
           </p>
         )}

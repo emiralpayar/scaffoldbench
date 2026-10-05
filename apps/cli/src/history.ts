@@ -14,7 +14,7 @@
  * published run set was full of exactly such runs.
  */
 
-import type { RunRecord } from '@arena/core';
+import type { RunRecord } from '@scaffoldbench/core';
 
 import { listRunSets, loadRunSet } from './runSet';
 

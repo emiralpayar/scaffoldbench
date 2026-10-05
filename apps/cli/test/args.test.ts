@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { COMMANDS, DEFAULT_JUDGE_EFFORT, parseArgs } from '../src/args';
 import type { ParsedCommand, ReportArgs, RunArgs } from '../src/args';
 import { commandHelp, generalHelp } from '../src/help';
-import { DEFAULT_JUDGE_EFFORT as CORE_JUDGE_EFFORT } from '@arena/core';
+import { DEFAULT_JUDGE_EFFORT as CORE_JUDGE_EFFORT } from '@scaffoldbench/core';
 
 /** Narrow a ParsedCommand to a successful `run`, failing loudly otherwise. */
 function expectRun(parsed: ParsedCommand): RunArgs {
@@ -56,9 +56,9 @@ describe('parseArgs: run', () => {
   it('takes models, the judge and the per-run cap from the environment', () => {
     const args = expectRun(
       parseArgs(['run'], {
-        ARENA_MODEL: 'claude-haiku-4-5-20251001, claude-sonnet-5-5',
-        ARENA_JUDGE_MODEL: 'claude-opus-5-5',
-        ARENA_MAX_COST_USD: '0.25',
+        SCAFFOLDBENCH_MODEL: 'claude-haiku-4-5-20251001, claude-sonnet-5-5',
+        SCAFFOLDBENCH_JUDGE_MODEL: 'claude-opus-5-5',
+        SCAFFOLDBENCH_MAX_COST_USD: '0.25',
       }),
     );
 
@@ -70,7 +70,7 @@ describe('parseArgs: run', () => {
   });
 
   it('treats empty variables, as an empty .env line leaves them, as unset', () => {
-    const args = expectRun(parseArgs(['run'], { ARENA_MODEL: '  ', ARENA_JUDGE_MODEL: '', ARENA_MAX_COST_USD: '' }));
+    const args = expectRun(parseArgs(['run'], { SCAFFOLDBENCH_MODEL: '  ', SCAFFOLDBENCH_JUDGE_MODEL: '', SCAFFOLDBENCH_MAX_COST_USD: '' }));
 
     expect(args.models).toEqual(['claude-sonnet-5-5']);
     expect(args.judgeModel).toBe('claude-sonnet-5-5');
@@ -78,7 +78,7 @@ describe('parseArgs: run', () => {
   });
 
   it('lets an explicit flag beat the environment', () => {
-    const args = expectRun(parseArgs(['run', '--model', 'claude-haiku-4-5-20251001'], { ARENA_MODEL: 'claude-sonnet-5-5' }));
+    const args = expectRun(parseArgs(['run', '--model', 'claude-haiku-4-5-20251001'], { SCAFFOLDBENCH_MODEL: 'claude-sonnet-5-5' }));
 
     expect(args.models).toEqual(['claude-haiku-4-5-20251001']);
     expect(args.explicit.has('models')).toBe(true);
@@ -200,7 +200,7 @@ describe('parseArgs: run', () => {
     for (const flag of ['--max-cost', '--total-budget', '--max-seconds']) {
       expect(expectError(parseArgs(['run', flag, huge], {})), flag).toMatch(new RegExp(`${flag} expects a number greater than zero`));
     }
-    expect(expectError(parseArgs(['run'], { ARENA_MAX_COST_USD: huge }))).toMatch(/ARENA_MAX_COST_USD must be a positive number/);
+    expect(expectError(parseArgs(['run'], { SCAFFOLDBENCH_MAX_COST_USD: huge }))).toMatch(/SCAFFOLDBENCH_MAX_COST_USD must be a positive number/);
   });
 
   it('knows whether the budget was chosen, and whether the question was waived', () => {
@@ -217,7 +217,7 @@ describe('parseArgs: run', () => {
   });
 
   it('rejects a malformed budget variable instead of ignoring it', () => {
-    expect(expectError(parseArgs(['run'], { ARENA_MAX_COST_USD: 'cheap' }))).toMatch(/ARENA_MAX_COST_USD/);
+    expect(expectError(parseArgs(['run'], { SCAFFOLDBENCH_MAX_COST_USD: 'cheap' }))).toMatch(/SCAFFOLDBENCH_MAX_COST_USD/);
   });
 
   it('refuses a per-run cap above the total budget, since no run could start', () => {
@@ -289,9 +289,9 @@ describe('parseArgs: run', () => {
     expect(!parsed.ok && parsed.topic).toBe('run');
   });
 
-  it('honours $ARENA_RESULTS_DIR, and a flag over it', () => {
-    expect(expectRun(parseArgs(['run'], { ARENA_RESULTS_DIR: '/tmp/r' })).resultsDir).toBe('/tmp/r');
-    expect(expectRun(parseArgs(['run', '--results-dir', 'x'], { ARENA_RESULTS_DIR: '/tmp/r' })).resultsDir).toBe('x');
+  it('honours $SCAFFOLDBENCH_RESULTS_DIR, and a flag over it', () => {
+    expect(expectRun(parseArgs(['run'], { SCAFFOLDBENCH_RESULTS_DIR: '/tmp/r' })).resultsDir).toBe('/tmp/r');
+    expect(expectRun(parseArgs(['run', '--results-dir', 'x'], { SCAFFOLDBENCH_RESULTS_DIR: '/tmp/r' })).resultsDir).toBe('x');
   });
 });
 
@@ -373,7 +373,7 @@ describe('help', () => {
       for (const command of COMMANDS) {
         for (const line of commandHelp(command.name, undefined, width).split('\n')) {
           // Examples are commands to copy and are never broken.
-          if (line.startsWith('  arena ')) continue;
+          if (line.startsWith('  scaffoldbench ')) continue;
           expect(line.length, `${command.name} @${width}: ${line}`).toBeLessThanOrEqual(width);
         }
       }
@@ -387,7 +387,7 @@ describe('help', () => {
   it('lists every command and says how to run it from a checkout', () => {
     const text = generalHelp();
     for (const name of ['run', 'report', 'doctor', 'tasks', 'strategies']) expect(text).toContain(`  ${name}`);
-    expect(text).toContain('npm run arena --');
-    expect(text).toContain('ARENA_RESULTS_DIR');
+    expect(text).toContain('npm run bench --');
+    expect(text).toContain('SCAFFOLDBENCH_RESULTS_DIR');
   });
 });

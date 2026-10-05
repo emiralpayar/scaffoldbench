@@ -4,8 +4,8 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { completedCells, runMatrix, runsDir, writeJson } from '@arena/core';
-import type { Judge, RunRecord, RunSetManifest, Strategy, Task } from '@arena/core';
+import { completedCells, runMatrix, runsDir, writeJson } from '@scaffoldbench/core';
+import type { Judge, RunRecord, RunSetManifest, Strategy, Task } from '@scaffoldbench/core';
 
 import { parseArgs } from '../src/args';
 import type { RunArgs } from '../src/args';
@@ -180,7 +180,7 @@ describe('cells to resume', () => {
   });
 
   it('runs again only the cells with no record, and the API errors', async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'arena-cli-resume-'));
+    root = await mkdtemp(path.join(tmpdir(), 'scaffoldbench-cli-resume-'));
     const runs = runsDir('set-1', root);
     const recorded = [
       makeRecord({ model: 'm', strategyId: 's1', taskId: 't1', repeat: 1 }),

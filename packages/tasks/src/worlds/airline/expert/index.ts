@@ -1,4 +1,4 @@
-import type { Task } from '@arena/core';
+import type { Task } from '@scaffoldbench/core';
 import { airlineBaggageAuditTask } from './baggageAudit';
 import { airlineCancellationsTask } from './cancellations';
 import { airlineIrropsTask } from './irrops';

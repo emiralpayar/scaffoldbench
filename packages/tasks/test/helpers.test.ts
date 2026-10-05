@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import type { ToolCall } from '@arena/core';
+import type { ToolCall } from '@scaffoldbench/core';
 import {
   actedBeforeConsulting,
   addedTo,

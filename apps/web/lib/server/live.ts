@@ -6,8 +6,8 @@
  * Server mode only: nothing in the static export imports this module.
  */
 
-import type { Judge } from '@arena/core';
-import { visitorEnv } from '@arena/core';
+import type { Judge } from '@scaffoldbench/core';
+import { visitorEnv } from '@scaffoldbench/core';
 
 import { MODELS } from '../models';
 import type { RunRecord } from '../records';
@@ -69,14 +69,14 @@ export interface ClientBucket {
 
 /**
  * Who is asking. `X-Forwarded-For` is trivially forged, so it is trusted only
- * when the operator says a proxy sets it (`ARENA_TRUST_PROXY=1`); otherwise
+ * when the operator says a proxy sets it (`SCAFFOLDBENCH_TRUST_PROXY=1`); otherwise
  * every request shares one bucket.
  */
 export function clientBucket(
   headers: Headers,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): ClientBucket {
-  if (env.ARENA_TRUST_PROXY !== '1') {
+  if (env.SCAFFOLDBENCH_TRUST_PROXY !== '1') {
     return { key: 'shared', limit: LIVE_SHARED_RATE_LIMIT_PER_HOUR };
   }
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();

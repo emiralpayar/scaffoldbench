@@ -1,4 +1,4 @@
-import type { ToolCall } from '@arena/core';
+import type { ToolCall } from '@scaffoldbench/core';
 
 /**
  * Queries over the tool journal, shared by every world's scorer.

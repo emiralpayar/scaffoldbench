@@ -6,9 +6,9 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '@arena/core': `${root}packages/core/src/index.ts`,
-      '@arena/strategies': `${root}packages/strategies/src/index.ts`,
-      '@arena/tasks': `${root}packages/tasks/src/index.ts`,
+      '@scaffoldbench/core': `${root}packages/core/src/index.ts`,
+      '@scaffoldbench/strategies': `${root}packages/strategies/src/index.ts`,
+      '@scaffoldbench/tasks': `${root}packages/tasks/src/index.ts`,
     },
   },
   test: {
