@@ -8,7 +8,7 @@ import { run } from './fixtures';
 function records(): RunRecord[] {
   const out: RunRecord[] = [];
   const add = (strategyId: string, score: (t: number) => number, extra: Partial<RunRecord> = {}) => {
-    for (let t = 0; t < 6; t++) {
+    for (let t = 0; t < 12; t++) {
       for (const repeat of [1, 2]) {
         out.push(
           run({
@@ -28,7 +28,7 @@ function records(): RunRecord[] {
   add('single', (t) => 0.5 + t * 0.01);
   add('plan-execute', (t) => 0.9 + t * 0.01);
   // Within noise of single: it scores above on some tasks and below on others.
-  add('gated-execute', (t) => [0.6, 0.45, 0.62, 0.47, 0.6, 0.49][t] as number);
+  add('gated-execute', (t) => [0.63, 0.48, 0.65, 0.5, 0.63, 0.52, 0.61, 0.47, 0.66, 0.51, 0.62, 0.53][t] as number);
   out.push(run({ runId: 'lost', strategyId: 'gated-execute', failureMode: 'api_error', taskId: 't0', repeat: 3 }));
   return out;
 }
@@ -47,7 +47,7 @@ describe('leaderboardRows', () => {
 
   it('keeps the excluded runs visible beside the ranked ones', () => {
     const gated = leaderboardRows(model!, 'single', { ranked: true }).find((row) => row.strategyId === 'gated-execute');
-    expect(gated).toMatchObject({ ranked: 12, total: 13, apiErrors: 1, verdict: expect.any(String) });
+    expect(gated).toMatchObject({ ranked: 24, total: 25, apiErrors: 1, verdict: expect.any(String) });
     expect(leaderboardRows(model!, 'single', { ranked: true }).find((r) => r.strategyId === 'single')?.verdict).toBe(
       'control',
     );
@@ -62,8 +62,10 @@ describe('leaderboardRows', () => {
 
 describe('scoreDomain', () => {
   it('zooms to the data and stays inside 0–1, even when every run scored 1', () => {
-    const e = (mean: number, low: number, high: number) => ({ score: { mean, low, high } });
+    const e = (mean: number, low: number, high: number) => ({ score: { mean, ci: { low, high } } });
     expect(scoreDomain([e(1, 1, 1)])).toEqual([0.9, 1]);
+    // No interval: the axis still holds the point.
+    expect(scoreDomain([{ score: { mean: 0.62, ci: null } }, e(0.9, 0.84, 0.95)])[0]).toBeLessThanOrEqual(0.62);
     const [lo, hi] = scoreDomain([e(0.62, 0.55, 0.7), e(0.9, 0.84, 0.95)]);
     expect(lo).toBeLessThanOrEqual(0.55);
     expect(hi).toBeGreaterThanOrEqual(0.95);

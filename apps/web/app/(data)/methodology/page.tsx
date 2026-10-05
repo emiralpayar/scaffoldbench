@@ -175,22 +175,27 @@ export default async function MethodologyPage() {
               <li>
                 <strong className="font-medium text-ink">Comparisons are paired.</strong> Two architectures are compared on
                 the same task and the same repeat, which removes the large variance between tasks. A pass rate carries a
-                Wilson score interval; cost and latency are compared as ratios.
+                Wilson score interval, computed on the number of runs that are effectively independent once tasks are
+                accounted for; cost and latency are compared as ratios, so “better” means cheaper or faster.
               </li>
               <li>
                 <strong className="font-medium text-ink">Four verdicts, not two.</strong> A comparison ends{' '}
                 <em>better</em>, <em>worse</em>, <em>equivalent</em> within a margin, or <em>not separable</em>. “Not
-                separable” is a finding about the data, not a hidden tie.
+                separable” is a finding about the data, not a hidden tie. With fewer than {analysis.settings.minTasks}{' '}
+                tasks no verdict is drawn, and where every task moved by the same amount there is no interval to show:
+                the table says “no interval” and why.
               </li>
               <li>
-                <strong className="font-medium text-ink">Many comparisons are paid for.</strong> Each family of verdicts is
-                adjusted for the comparisons it makes at once, so the chance of any false call stays at 5% and the
-                intervals are wider than they would be alone.
+                <strong className="font-medium text-ink">Many comparisons are paid for.</strong> Each family of verdicts, one
+                kind of comparison on one metric across every model, is adjusted for the comparisons it makes at once
+                (Holm), so the chance of any false call in the family stays at {Math.round(100 - analysis.confidence * 100)}%.
+                The intervals shown are the plain {Math.round(analysis.confidence * 100)}% ones, so an interval can
+                exclude zero while the adjusted verdict stays “not separable”.
               </li>
               <li>
                 <strong className="font-medium text-ink">The margin is fixed in advance.</strong> “Equivalent” means the
-                whole interval sits within ±{analysis.margin.toFixed(2)} of score, a difference chosen before the data was
-                seen.
+                difference is shown, by two one-sided tests, to lie within ±{analysis.margin.toFixed(2)} of score (×/÷
+                {analysis.settings.margins.cost} of cost), a margin chosen before the data was seen.
               </li>
             </ul>
             <div className="rounded-[14px] border border-rule bg-surface px-5 py-4">

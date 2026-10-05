@@ -1,27 +1,26 @@
-import type { Estimate, PairedVerdict } from '../../lib/analysis';
-import { verdictFor } from '../../lib/analysis';
+import type { PairedVerdict } from '../../lib/analysis';
 import { formatDelta } from '../../lib/format';
 import { Responsive } from '../charts/parts';
 
 const VERDICT: Record<PairedVerdict, { label: string; means: string; tone: string }> = {
   better: {
     label: 'better',
-    means: 'The whole interval is above zero: it scores reliably higher than the control.',
+    means: 'The interval is above zero and the adjusted test agrees: it scores reliably higher than the control.',
     tone: 'var(--good)',
   },
   worse: {
     label: 'worse',
-    means: 'The whole interval is below zero: it scores reliably lower.',
+    means: 'The interval is below zero and the adjusted test agrees: it scores reliably lower.',
     tone: 'var(--bad)',
   },
   equivalent: {
     label: 'equivalent',
-    means: 'The whole interval sits inside the margin: any difference is too small to matter.',
+    means: 'The interval sits inside the margin and the equivalence test agrees: any difference is too small to matter.',
     tone: 'var(--focus)',
   },
   inconclusive: {
     label: 'not separable',
-    means: 'The interval spans zero and is wider than the margin: the data cannot say.',
+    means: 'The interval spans zero and is wider than the margin, or the tests cannot rule either out: the data cannot say.',
     tone: 'var(--muted)',
   },
 };
@@ -41,10 +40,11 @@ const WIDE = 480;
 const NARROW = 320;
 
 /**
- * The four verdicts, drawn. Each example interval is a paired score
- * difference from the control; the shaded band is the equivalence margin.
- * The label on every row is not typed here: it is what `verdictFor`, the
- * rule the leaderboard uses, returns for that interval.
+ * The four verdicts, drawn. Each example interval is an illustration of a
+ * paired score difference from the control, not a measurement; the shaded
+ * band is the equivalence margin. The real verdicts come from `analyzeRunSet`'s
+ * tests, which adjust for the comparisons made at once, so the picture is a
+ * way to read a result and not the rule that produces it.
  */
 export function VerdictDiagram({ margin }: { margin: number }) {
   return (
@@ -55,23 +55,19 @@ export function VerdictDiagram({ margin }: { margin: number }) {
           narrow={<VerdictSvg margin={margin} w={NARROW} />}
         />
         <dl className="mt-6 grid gap-x-8 gap-y-4 border-t border-rule pt-5 text-[0.8125rem] leading-snug sm:grid-cols-2">
-          {SAMPLES.map((sample) => {
-            const verdict = verdictFor(
-              { mean: sample.mean * margin, low: sample.low * margin, high: sample.high * margin },
-              margin,
-            );
-            return (
-              <div key={sample.id}>
-                <dt className="font-mono text-[0.75rem] uppercase tracking-[0.08em] text-ink">{VERDICT[verdict].label}</dt>
-                <dd className="text-ink-2">{VERDICT[verdict].means}</dd>
-              </div>
-            );
-          })}
+          {SAMPLES.map((sample) => (
+            <div key={sample.id}>
+              <dt className="font-mono text-[0.75rem] uppercase tracking-[0.08em] text-ink">{VERDICT[sample.id].label}</dt>
+              <dd className="text-ink-2">{VERDICT[sample.id].means}</dd>
+            </div>
+          ))}
         </dl>
       </div>
       <figcaption className="mt-4 text-[0.8125rem] leading-relaxed text-muted">
-        The shaded band is the equivalence margin, ±{margin.toFixed(2)} of score, fixed before the data is seen. Dot:
-        the mean difference. Whisker: its interval.
+        Illustrative intervals, not data. The shaded band is the equivalence margin, ±{margin.toFixed(2)} of score,
+        fixed before the data is seen. Dot: the mean difference. Whisker: its interval. A verdict comes from the
+        adjusted tests, so an interval that only just excludes zero can still read “not separable” once the number of
+        comparisons is counted.
       </figcaption>
     </figure>
   );
@@ -89,8 +85,7 @@ function VerdictSvg({ margin, w }: { margin: number; w: number }) {
         <line key={m} x1={x(m)} x2={x(m)} y1={0} y2={SAMPLES.length * ROW} stroke="var(--axis)" strokeWidth={1} strokeDasharray="3 3" />
       ))}
       {SAMPLES.map((sample, index) => {
-        const estimate: Estimate = { mean: sample.mean * margin, low: sample.low * margin, high: sample.high * margin };
-        const verdict = verdictFor(estimate, margin);
+        const verdict = sample.id;
         const tone = VERDICT[verdict].tone;
         const y = index * ROW + ROW / 2;
         return (

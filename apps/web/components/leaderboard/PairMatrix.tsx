@@ -1,23 +1,45 @@
-import type { ModelAnalysis } from '../../lib/analysis';
+import type { ContrastCaveat, Estimate, ModelAnalysis, PairedVerdict } from '../../lib/analysis';
 import { architectureName } from '../../lib/architectures';
-import { formatDelta } from '../../lib/format';
+import { caveatText, formatBracket, formatDelta } from '../../lib/format';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
 import { ScrollRegion } from '../ScrollRegion';
 
+/** How the row stands against the column, in words a screen reader can say. */
+const WORDS: Record<PairedVerdict, string> = {
+  better: 'reliably above',
+  worse: 'reliably below',
+  equivalent: 'equivalent within the margin',
+  inconclusive: 'not separable',
+};
+
+interface Cell {
+  delta: Estimate;
+  /** From the row's side. */
+  verdict: PairedVerdict;
+  caveat?: ContrastCaveat;
+}
+
 /**
  * The evidence behind the ranks: every pair of architectures on this model,
- * the paired score difference (row minus column) and whether its widened
- * interval excludes zero. A rank is one plus the number of ▼ in its row.
+ * the paired score difference (row minus column) and the verdict of the
+ * paired test, adjusted for the pairs compared. A rank is one plus the number
+ * of ▼ in its row. A * marks a pair the data withheld something from: hover
+ * for what.
  */
 export function PairMatrix({ model, order }: { model: ModelAnalysis; order: string[] }) {
-  const lookup = (row: string, column: string) => {
+  const lookup = (row: string, column: string): Cell | null => {
     const direct = model.pairwise.find((pair) => pair.a === row && pair.b === column);
-    if (direct) return { delta: direct.scoreDelta, winner: direct.winner === 'a' ? 'row' : direct.winner === 'b' ? 'column' : 'tie' };
+    if (direct) return { delta: direct.scoreDelta, verdict: direct.verdict, ...(direct.caveat ? { caveat: direct.caveat } : {}) };
     const flipped = model.pairwise.find((pair) => pair.a === column && pair.b === row);
     if (!flipped) return null;
+    const { scoreDelta } = flipped;
     return {
-      delta: { mean: -flipped.scoreDelta.mean, low: -flipped.scoreDelta.high, high: -flipped.scoreDelta.low },
-      winner: flipped.winner === 'b' ? 'row' : flipped.winner === 'a' ? 'column' : 'tie',
+      delta: {
+        mean: scoreDelta.mean === 0 ? 0 : -scoreDelta.mean,
+        ci: scoreDelta.ci && { low: -scoreDelta.ci.high, high: -scoreDelta.ci.low },
+      },
+      verdict: flipped.verdict === 'better' ? 'worse' : flipped.verdict === 'worse' ? 'better' : flipped.verdict,
+      ...(flipped.caveat ? { caveat: flipped.caveat } : {}),
     };
   };
 
@@ -26,7 +48,7 @@ export function PairMatrix({ model, order }: { model: ModelAnalysis; order: stri
       <table className="w-full border-collapse text-[0.8125rem]">
         <caption className="sr-only">
           Paired score difference, row architecture minus column architecture, and whether the row scores reliably
-          above, below, or is not separable from the column.
+          above, reliably below, equivalent within the margin, or is not separable from the column.
         </caption>
         <thead>
           <tr className="border-b border-rule">
@@ -65,25 +87,28 @@ export function PairMatrix({ model, order }: { model: ModelAnalysis; order: stri
                     </td>
                   );
                 }
-                const words =
-                  cell.winner === 'row'
-                    ? 'reliably above'
-                    : cell.winner === 'column'
-                      ? 'reliably below'
-                      : 'not separable';
+                const words = WORDS[cell.verdict];
+                const caveat = cell.caveat ? `; ${caveatText(cell.caveat)}` : '';
                 return (
                   <td
                     key={column}
                     className={`px-2 py-2 text-center ${
-                      cell.winner === 'row' ? 'text-good' : cell.winner === 'column' ? 'text-bad' : 'text-muted'
+                      cell.verdict === 'better' ? 'text-good' : cell.verdict === 'worse' ? 'text-bad' : 'text-muted'
                     }`}
-                    title={`${architectureName(row)} minus ${architectureName(column)}: ${formatDelta(cell.delta.mean)} [${formatDelta(cell.delta.low)}, ${formatDelta(cell.delta.high)}], ${words}`}
+                    title={`${architectureName(row)} minus ${architectureName(column)}: ${formatDelta(cell.delta.mean)} ${formatBracket(cell.delta, formatDelta)}, ${words}${caveat}`}
                   >
                     <span className="num whitespace-nowrap">
-                      <span aria-hidden>{cell.winner === 'row' ? '▲ ' : cell.winner === 'column' ? '▼ ' : ''}</span>
+                      <span aria-hidden>
+                        {cell.verdict === 'better' ? '▲ ' : cell.verdict === 'worse' ? '▼ ' : cell.verdict === 'equivalent' ? '≈ ' : ''}
+                      </span>
                       {formatDelta(cell.delta.mean, 2)}
+                      {cell.caveat ? <span aria-hidden>*</span> : null}
                     </span>
-                    <span className="sr-only"> {words}</span>
+                    <span className="sr-only">
+                      {' '}
+                      {words}
+                      {caveat}
+                    </span>
                   </td>
                 );
               })}

@@ -1,3 +1,4 @@
+import { analyzeRunSet } from '@arena/core';
 import { describe, expect, it } from 'vitest';
 
 import type { Estimate, ModelAnalysis, SiteAnalysis } from '../lib/analysis';
@@ -5,6 +6,7 @@ import {
   describeModel,
   describeUnverifiedModel,
   modelTableRows,
+  paretoPoints,
   payoffData,
   payoffDomains,
   payoffHeadline,
@@ -81,7 +83,7 @@ describe('placeLabels', () => {
   });
 });
 
-const e = (mean: number, low: number, high: number): Estimate => ({ mean, low, high });
+const e = (mean: number, low: number, high: number): Estimate => ({ mean, ci: { low, high } });
 
 function model(id: string, verdicts: ('better' | 'worse' | 'equivalent' | 'inconclusive')[]): ModelAnalysis {
   const ids = ['plan-execute', 'orchestrator-workers', 'plan-execute-verify', 'propose-select', 'gated-execute'];
@@ -108,10 +110,15 @@ function model(id: string, verdicts: ('better' | 'worse' | 'equivalent' | 'incon
       costRatio: e(2, 1.9, 2.1),
       latencyRatio: e(2, 1.9, 2.1),
       verdict,
+      costVerdict: 'worse' as const,
+      latencyVerdict: 'worse' as const,
+      pAdjusted: verdict === 'inconclusive' ? 0.4 : 0.01,
     })),
     pairwise: [],
     ranks: [],
     frontier: ['single'],
+    frontierTied: [],
+    meanFrontier: ['single'],
     health: EMPTY_HEALTH,
   };
 }
@@ -123,6 +130,7 @@ function analysis(models: ModelAnalysis[]): SiteAnalysis {
     baselineId: 'single',
     confidence: 0.95,
     margin: 0.05,
+    settings: analyzeRunSet([]).settings,
     method: 'method',
     models,
     scale: [],
@@ -170,6 +178,79 @@ describe('chart adapters', () => {
     expect(domains.x[0]).toBeLessThanOrEqual(1);
     expect(domains.y[0]).toBeLessThanOrEqual(-0.14);
     expect(domains.y[1]).toBeGreaterThanOrEqual(0.14);
+  });
+
+  it('says "no interval" where core withheld one, and why, instead of printing a zero-width range', () => {
+    const none = model('claude-sonnet-5-5', ['inconclusive']);
+    const contrast = none.contrasts[0];
+    if (!contrast) throw new Error('no contrast');
+    contrast.scoreDelta = { mean: 0, ci: null };
+    contrast.costRatio = { mean: 2, ci: null };
+    contrast.caveat = 'no-variation';
+
+    const [point] = payoffData(analysis([none])).panels[0]?.points ?? [];
+    expect(point?.note).toContain('0.000 score no interval');
+    expect(point?.note).toContain('every task moved by the same amount');
+    expect(point?.caveat).toBe('no-variation');
+    expect(modelTableRows(none, 'single')[1]).toMatchObject({ deltaInterval: 'no interval' });
+
+    // A point with no interval is bounded by the point itself: the axes still hold 1×, the margin and the dot.
+    const domains = payoffDomains(payoffData(analysis([none])));
+    expect(domains.x).toEqual([1, 2]);
+    expect(domains.y).toEqual([-0.05, 0.05]);
+  });
+
+  it('counts a pair without enough tasks as untested, not as a tie', () => {
+    const m = model('claude-sonnet-5-5', ['better', 'inconclusive', 'inconclusive']);
+    // Only the second inconclusive pair lacked the tasks; the other is a finding.
+    m.contrasts[1]!.caveat = 'too-few-tasks';
+    const text = describeModel(m);
+    expect(text).toContain('One is not separable from it at this sample size.');
+    expect(text).toContain('One has too few tasks for any verdict.');
+  });
+
+  it('draws the frontier from the paired evidence: a tied arm stays on it, a beaten one is a ring', () => {
+    const m = model('claude-sonnet-5-5', ['inconclusive', 'worse']);
+    m.frontier = ['single', 'plan-execute'];
+    m.frontierTied = ['plan-execute'];
+    const points = paretoPoints(m);
+    expect(points.map((p) => [p.id, p.hollow])).toEqual([
+      ['single', false],
+      ['plan-execute', false],
+      ['orchestrator-workers', true],
+    ]);
+    expect(points[1]?.note).toContain('does not separate them');
+    expect(points[2]?.note).toContain('shown to be beaten');
+  });
+
+  it('reads the frontier off the means alone for a run set that cannot support a verdict', () => {
+    const m = model('claude-sonnet-5-5', ['inconclusive']);
+    m.frontier = ['single', 'plan-execute'];
+    m.frontierTied = ['plan-execute'];
+    m.meanFrontier = ['single'];
+    expect(paretoPoints(m, { verdicts: false }).map((p) => [p.id, p.hollow])).toEqual([
+      ['single', false],
+      ['plan-execute', true],
+    ]);
+    expect(paretoPoints(m, { verdicts: false })[1]?.note).toContain('dominated on means');
+    expect(paretoPoints(m)[1]?.note).toContain('does not separate them');
+  });
+
+  it('calls a scaffold reliably cheaper only when core\'s cost verdict says so', () => {
+    const scale = (costVerdict: 'better' | 'worse', ci: { low: number; high: number } | null) => ({
+      strategyId: 'plan-execute',
+      model: 'claude-haiku-4-5-20251001',
+      nextModel: 'claude-sonnet-5-5',
+      pairs: 10,
+      tasks: 5,
+      scoreDelta: e(0.1, 0.05, 0.15),
+      costRatio: { mean: 0.5, ci },
+      verdict: 'better' as const,
+      costVerdict,
+    });
+    const base = analysis([model('claude-haiku-4-5-20251001', []), model('claude-sonnet-5-5', [])]);
+    expect(scaleHeadline({ ...base, scale: [scale('better', null)] })).toContain('it was reliably cheaper');
+    expect(scaleHeadline({ ...base, scale: [scale('worse', { low: 0.4, high: 0.6 })] })).toContain('none was reliably cheaper');
   });
 
   it('marks the control in the model table instead of comparing it with itself', () => {

@@ -39,7 +39,11 @@ export default async function ParetoPage() {
             Which architecture should I use<span className="kern-q">?</span>
           </>
         }
-        lede="Every architecture on the plane it is actually chosen on. A point is on the frontier when nothing else has a higher mean score for the same mean cost or less. The whiskers say how much that frontier can be trusted: where they overlap, the order is a statement about means only."
+        lede={
+          data.verification === 'unverified'
+            ? 'Every architecture on the plane it is actually chosen on, as recorded. A point is on the frontier when nothing else has a higher mean score for the same mean cost or less. This run set carries no fidelity checks, so that describes what ran and supports no verdict about the designs.'
+            : 'Every architecture on the plane it is actually chosen on. A point leaves the frontier only when another is shown, by the paired comparison, to beat it on score or on cost and to match it on the other. The whiskers are the intervals on each axis; where nothing separates two points, both stay.'
+        }
       />
 
       <div className="-mt-4 mb-10">
@@ -62,7 +66,11 @@ export default async function ParetoPage() {
             </p>
           </div>
           <div className="card self-start p-5 sm:p-6">
-            <ParetoPlot points={paretoPoints(model)} model={modelShortName(model.model)} />
+            <ParetoPlot
+              points={paretoPoints(model, { verdicts: data.verification !== 'unverified' })}
+              model={modelShortName(model.model)}
+              basis={data.verification === 'unverified' ? 'means' : 'evidence'}
+            />
           </div>
         </section>
       ))}
@@ -83,18 +91,23 @@ function advice(model: ModelAnalysis): string {
   const cheapest = frontier[0];
   if (!cheapest) return 'No architecture has runs on this model.';
   const dominated = model.architectures.filter((a) => !model.frontier.includes(a.strategyId));
+  const tied = model.architectures.filter((a) => model.frontierTied.includes(a.strategyId));
   const better = model.contrasts.filter((c) => c.verdict === 'better');
 
-  const head = `On ${modelShortName(model.model)}, the mean frontier runs through ${joinList(
+  const head = `On ${modelShortName(model.model)}, the frontier runs through ${joinList(
     frontier.map((a) => architectureName(a.strategyId)),
   )}, starting at ${formatUsd(cheapest.costUsd.mean)} a run.`;
+  const trailing =
+    tied.length > 0
+      ? ` ${joinList(tied.map((a) => architectureName(a.strategyId)))} ${tied.length === 1 ? 'trails' : 'trail'} another point on means, but the paired comparison does not separate ${tied.length === 1 ? 'it' : 'them'}, so ${tied.length === 1 ? 'it stays' : 'they stay'}.`
+      : '';
   const off =
     dominated.length > 0
-      ? ` ${joinList(dominated.map((a) => architectureName(a.strategyId)))} ${dominated.length === 1 ? 'is' : 'are'} dominated on means: something on the frontier scores at least as well for no more money.`
+      ? ` ${joinList(dominated.map((a) => architectureName(a.strategyId)))} ${dominated.length === 1 ? 'is' : 'are'} beaten: something on the frontier is shown to do better on one axis and as well on the other.`
       : '';
   const pay =
     better.length > 0
       ? ` Only ${joinList(better.map((c) => architectureName(c.strategyId)))} ${better.length === 1 ? 'scores' : 'score'} reliably above a single agent, so ${better.length === 1 ? 'it is' : 'those are'} the only extra spend these intervals support.`
       : ' No architecture scores reliably above a single agent here, so these intervals support no extra spend.';
-  return `${head}${off}${pay}`;
+  return `${head}${trailing}${off}${pay}`;
 }

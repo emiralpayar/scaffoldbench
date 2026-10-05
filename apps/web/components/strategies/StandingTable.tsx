@@ -1,6 +1,15 @@
 
 import type { PairedVerdict } from '../../lib/analysis';
-import { formatDelta, formatMultiple, formatPercent, formatScore, formatUsd } from '../../lib/format';
+import {
+  caveatText,
+  formatBracket,
+  formatDelta,
+  formatMultiple,
+  formatPercent,
+  formatRange,
+  formatScore,
+  formatUsd,
+} from '../../lib/format';
 import type { LeaderRow } from '../../lib/leaderboard';
 import { rankLabel } from '../../lib/leaderboard';
 import { modelShortName } from '../../lib/models';
@@ -59,9 +68,7 @@ function StandingCards({ standings, verified }: { standings: readonly Standing[]
               <dt className="eyebrow !text-[0.6875rem]">Score</dt>
               <dd className="num mt-1 text-ink">{formatScore(row.score.mean)}</dd>
               {verified ? (
-                <dd className="num text-[0.6875rem] text-muted">
-                  {formatScore(row.score.low)}–{formatScore(row.score.high)}
-                </dd>
+                <dd className="num text-[0.6875rem] text-muted">{formatRange(row.score, formatScore)}</dd>
               ) : null}
             </div>
             <div>
@@ -84,7 +91,8 @@ function StandingCards({ standings, verified }: { standings: readonly Standing[]
                 <span className={VERDICT[row.verdict].className}>{VERDICT[row.verdict].text}</span>
                 {row.delta ? (
                   <span className="num mt-1.5 block text-[0.75rem] text-ink-2">
-                    {formatDelta(row.delta.mean)} [{formatDelta(row.delta.low)}, {formatDelta(row.delta.high)}]
+                    {formatDelta(row.delta.mean)} {formatBracket(row.delta, formatDelta)}
+                    {row.caveat ? <span className="block text-muted">{caveatText(row.caveat)}</span> : null}
                   </span>
                 ) : null}
               </>
@@ -139,9 +147,7 @@ function StandingGrid({ standings, verified }: { standings: readonly Standing[];
                 <td className="px-4 py-3.5 text-right">
                   <span className="num block text-ink">{formatScore(row.score.mean)}</span>
                   {verified ? (
-                    <span className="num block text-[0.75rem] text-muted">
-                      {formatScore(row.score.low)}–{formatScore(row.score.high)}
-                    </span>
+                    <span className="num block text-[0.75rem] text-muted">{formatRange(row.score, formatScore)}</span>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5 text-right">
@@ -156,7 +162,8 @@ function StandingGrid({ standings, verified }: { standings: readonly Standing[];
                       <span className={VERDICT[row.verdict].className}>{VERDICT[row.verdict].text}</span>
                       {row.delta ? (
                         <span className="num mt-1 block text-[0.75rem] text-ink-2">
-                          {formatDelta(row.delta.mean)} [{formatDelta(row.delta.low)}, {formatDelta(row.delta.high)}]
+                          {formatDelta(row.delta.mean)} {formatBracket(row.delta, formatDelta)}
+                          {row.caveat ? <span className="block text-muted">{caveatText(row.caveat)}</span> : null}
                         </span>
                       ) : null}
                     </>

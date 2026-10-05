@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import type { ForestRow } from '../../lib/chartData';
 import { linearTicks, niceDomain } from '../../lib/charts';
-import { formatScore } from '../../lib/format';
+import { boundsOf, formatRange, formatScore } from '../../lib/format';
 
 /**
  * Mean and interval per architecture on one shared, zoomed axis.
@@ -79,15 +79,12 @@ export function ForestPlot({
             </span>
             <span className="num whitespace-nowrap text-right text-[0.8125rem] text-ink-2 sm:order-last">
               <span className="text-ink">{formatScore(row.estimate.mean)}</span>
-              <span className="ml-2 text-muted">
-                {formatScore(row.estimate.low)}–{formatScore(row.estimate.high)}
-              </span>
+              <span className="ml-2 text-muted">{formatRange(row.estimate, formatScore)}</span>
             </span>
             <span className="relative col-span-full mt-2 block h-6 sm:col-span-1 sm:mt-0 sm:h-9">
               {gridlines}
               <Whisker
-                left={pct(row.estimate.low)}
-                right={pct(row.estimate.high)}
+                {...(row.estimate.ci ? { left: pct(row.estimate.ci.low), right: pct(row.estimate.ci.high) } : {})}
                 mean={pct(row.estimate.mean)}
                 color={row.color}
               />
@@ -119,26 +116,31 @@ export function ForestPlot({
   );
 }
 
+/** The interval ends are omitted where there is no interval: only the mean is drawn. */
 function Whisker({
   left,
   right,
   mean,
   color,
 }: {
-  left: string;
-  right: string;
+  left?: string;
+  right?: string;
   mean: string;
   color: string;
 }) {
   const cap: CSSProperties = { background: color };
   return (
     <span aria-hidden className="absolute inset-0">
-      <span
-        className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full"
-        style={{ left, width: `calc(${right} - ${left})`, background: color, opacity: 0.9 }}
-      />
-      <span className="absolute top-1/2 h-2.5 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ ...cap, left }} />
-      <span className="absolute top-1/2 h-2.5 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ ...cap, left: right }} />
+      {left !== undefined && right !== undefined ? (
+        <>
+          <span
+            className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full"
+            style={{ left, width: `calc(${right} - ${left})`, background: color, opacity: 0.9 }}
+          />
+          <span className="absolute top-1/2 h-2.5 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ ...cap, left }} />
+          <span className="absolute top-1/2 h-2.5 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ ...cap, left: right }} />
+        </>
+      ) : null}
       <span
         className="absolute top-1/2 h-[14px] w-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--surface)]"
         style={{ left: mean, background: color }}
@@ -149,8 +151,8 @@ function Whisker({
 
 /** Zoom to the data, rounded outward, clamped to the 0–1 score range. */
 export function forestDomain(rows: readonly ForestRow[]): [number, number] {
-  const lows = rows.map((row) => row.estimate.low);
-  const highs = rows.map((row) => row.estimate.high);
+  const lows = rows.map((row) => boundsOf(row.estimate)[0]);
+  const highs = rows.map((row) => boundsOf(row.estimate)[1]);
   const [lo, hi] = niceDomain(Math.min(...lows), Math.max(...highs), 4);
   return [Math.max(0, lo), Math.min(1, hi)];
 }

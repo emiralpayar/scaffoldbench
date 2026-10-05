@@ -3,43 +3,60 @@
  * summaries, paired contrasts against the `single` control, "scaffold or
  * scale" contrasts across model tiers, and a health summary.
  *
- * INTERIM IMPLEMENTATION. The contract (PLAN §3) puts this analysis in
- * `@arena/core` as `analyzeRunSet`, owned by the stats stream. Until it lands,
- * `analyzeForSite` computes the same quantities with the same design — paired
- * by task and repeat, bootstrapped over tasks so repeats of one task stay
- * together — so the site can be built against real shapes. When core exports
- * it, this file should become a thin adapter from its output to `SiteAnalysis`,
- * and `method` should be taken from core's documentation of what it did.
- * Each family of verdicts is adjusted for multiplicity with Bonferroni,
- * which is more conservative than the Holm step-down core specifies: a
- * verdict this version draws, core's would draw too.
+ * A thin adapter over `analyzeRunSet` in `@arena/core` (method:
+ * docs/STATISTICS.md). Nothing is computed here that core does not compute:
+ * the intervals, the paired contrasts, the Holm adjustment, the verdicts and
+ * the uncertainty-aware frontier are core's, reshaped into what the pages
+ * read. What stays here is bookkeeping: canonical architecture and model
+ * order, ranks read off the verdicts, and the health counts.
+ *
+ * An interval is `null` where core withheld it (one task, or every task moved
+ * by the same amount), and a `caveat` says why a verdict was withheld or
+ * limited. Neither is ever replaced by a zero-width interval.
  *
  * Pure: no filesystem, safe anywhere.
  */
 
-import { makeRng, paretoFrontier } from '@arena/core';
+import { analyzeRunSet, paretoFrontier } from '@arena/core';
+import type {
+  AnalysisOptions as CoreAnalysisOptions,
+  AnalysisSettings,
+  Contrast,
+  ContrastCaveat,
+  ContrastVerdict,
+  Estimate as CoreEstimate,
+  ModelAnalysis as CoreModelAnalysis,
+  StrategyAnalysis,
+} from '@arena/core';
 
 import { BASELINE_ID, compareArchitectures } from './architectures';
 import { compareModels } from './models';
 import type { RunRecord } from './records';
 import { hasIntegrity, isRankable } from './records';
 
-export interface Estimate {
-  mean: number;
+export type { ContrastCaveat };
+
+export interface Interval {
   low: number;
   high: number;
 }
 
-export type PairedVerdict = 'better' | 'worse' | 'equivalent' | 'inconclusive';
+/** A point estimate and its interval; `ci` is null where the data cannot support one. */
+export interface Estimate {
+  mean: number;
+  ci: Interval | null;
+}
+
+export type PairedVerdict = ContrastVerdict;
 
 export interface ArchitectureSummary {
   strategyId: string;
-  /** Rankable runs (integrity intact, no infrastructure failure). */
+  /** Rankable runs, one per (task, repeat) cell. */
   runs: number;
   tasks: number;
   /** Mean of per-task mean scores, task-clustered bootstrap interval. */
   score: Estimate;
-  /** Share of runs that passed, Wilson score interval. */
+  /** Mean of per-task pass rates, Wilson interval on the effective run count. */
   passRate: Estimate;
   costUsd: Estimate;
   latencyMs: Estimate;
@@ -48,24 +65,29 @@ export interface ArchitectureSummary {
 export interface BaselineContrast {
   strategyId: string;
   baselineId: string;
-  /** Matched (task, repeat) pairs the contrast is computed over. */
+  /** Matched (task, repeat) cells the score contrast is computed over. */
   pairs: number;
   tasks: number;
-  /**
-   * Mean paired score difference, architecture minus baseline. The interval
-   * is widened for the number of comparisons with the baseline on the model.
-   */
+  /** Mean paired score difference, architecture minus baseline. */
   scoreDelta: Estimate;
-  /** Architecture mean cost divided by the baseline's, over the same pairs. */
+  /** Geometric mean of per-cell cost ratios, architecture over baseline. */
   costRatio: Estimate;
   latencyRatio: Estimate;
+  /** On score, Holm-adjusted within the family of contrasts with the baseline. */
   verdict: PairedVerdict;
+  /** What the data withheld from the score verdict, if anything. */
+  caveat?: ContrastCaveat;
+  /** For cost and latency `better` means cheaper or faster. */
+  costVerdict: PairedVerdict;
+  latencyVerdict: PairedVerdict;
+  /** Holm-adjusted p for "no score difference"; null where no test was possible. */
+  pAdjusted: number | null;
 }
 
 /**
- * Two architectures on the same model, paired by task and repeat. The
- * interval is widened for the number of pairs compared on the model
- * (Bonferroni), because the ranking reads all of them at once.
+ * Two architectures on the same model, paired by task and repeat, on score.
+ * `winner` follows the verdict: `a` when it is better, `b` when it is worse,
+ * `tie` for equivalent and inconclusive alike.
  */
 export interface PairContrast {
   a: string;
@@ -74,7 +96,8 @@ export interface PairContrast {
   tasks: number;
   /** Mean paired score difference, a minus b. */
   scoreDelta: Estimate;
-  /** Which side scores reliably higher, or `tie` when the interval spans zero. */
+  verdict: PairedVerdict;
+  caveat?: ContrastCaveat;
   winner: 'a' | 'b' | 'tie';
 }
 
@@ -104,8 +127,20 @@ export interface ModelAnalysis {
   pairwise: PairContrast[];
   /** In rank order; within a rank, by mean score. */
   ranks: RankEntry[];
-  /** Non-dominated on (mean score, mean cost). Means only; see the intervals. */
+  /**
+   * Not shown to be beaten: no other architecture is significantly better on
+   * one of score and cost and at least equivalent on the other. Includes
+   * `frontierTied`.
+   */
   frontier: string[];
+  /** Behind another architecture on point estimates, but nothing separates them. */
+  frontierTied: string[];
+  /**
+   * The frontier of mean score and mean cost alone, ignoring the evidence. It
+   * is all a run set without fidelity checks can show: a description of what
+   * ran, which supports no verdict about the designs.
+   */
+  meanFrontier: string[];
   health: RunSetHealth;
 }
 
@@ -123,6 +158,9 @@ export interface ScaleContrast {
   scoreDelta: Estimate;
   costRatio: Estimate;
   verdict: PairedVerdict;
+  caveat?: ContrastCaveat;
+  /** `better` means cheaper than the baseline on the larger model. */
+  costVerdict: PairedVerdict;
 }
 
 export interface CheckFailureCount {
@@ -150,236 +188,210 @@ export interface RunSetHealth {
 
 export interface SiteAnalysis {
   baselineId: string;
+  /** 1 − alpha: the level of every interval. */
   confidence: number;
   /** Half-width of the equivalence band on score differences. */
   margin: number;
-  /** One sentence a chart caption can quote verbatim. */
+  /** The options core ran with, for citing. */
+  settings: AnalysisSettings;
+  /** A paragraph a chart caption can quote verbatim; describes what core did. */
   method: string;
   models: ModelAnalysis[];
   scale: ScaleContrast[];
   health: RunSetHealth;
 }
 
-export interface AnalysisOptions {
-  baselineId?: string;
-  margin?: number;
-  iterations?: number;
-  confidence?: number;
-}
-
-const DEFAULTS = { baselineId: BASELINE_ID, margin: 0.05, iterations: 2000, confidence: 0.95 };
+/** Core's options: `baseline`, `margins`, `alpha`, `iterations`, `seed`, `minTasks`, … */
+export type AnalysisOptions = CoreAnalysisOptions;
 
 export function analyzeForSite(
   records: readonly RunRecord[],
   options: AnalysisOptions = {},
 ): SiteAnalysis {
-  const { baselineId, margin, iterations, confidence } = { ...DEFAULTS, ...options };
-  // A canonical order makes the result independent of how the records were
-  // read: floating-point sums depend on order, and a published interval must
-  // not change in its last digit because a directory listing did.
-  const rankable = [...records].filter(isRankable).sort(compareRecords);
-  const models = [...new Set(rankable.map((record) => record.model))].sort(compareModels);
+  const modelOrder = [...new Set(records.map((record) => record.model))].sort(compareModels);
+  // Core does the excluding (failed integrity, API errors) and counts what it
+  // left out; `summarizeHealth` below counts the same records for the pages.
+  const core = analyzeRunSet(records, { baseline: BASELINE_ID, modelOrder, ...options });
+  const { settings } = core;
 
-  const perModel: ModelAnalysis[] = models.map((model) => {
-    const scoped = rankable.filter((record) => record.model === model);
-    const strategies = [...new Set(scoped.map((record) => record.strategyId))].sort(
-      compareArchitectures,
-    );
-    const architectures = strategies.map((strategyId) =>
-      summarizeArchitecture(
-        scoped.filter((record) => record.strategyId === strategyId),
-        strategyId,
-        { iterations, confidence, seedKey: `${model}/${strategyId}` },
-      ),
-    );
+  const models = core.models
+    // A model whose every run was excluded has nothing to show.
+    .filter((model) => model.strategies.length > 0)
+    .map((model) => modelAnalysis(model, records, settings));
 
-    const baseline = scoped.filter((record) => record.strategyId === baselineId);
-    const candidates = strategies
-      .filter((strategyId) => strategyId !== baselineId)
-      .map((strategyId) => ({
-        strategyId,
-        paired: pairRuns(
-          scoped.filter((record) => record.strategyId === strategyId),
-          baseline,
-        ),
-      }))
-      .filter(({ paired }) => paired.pairs > 0);
-    // One family: every comparison with the control on this model.
-    const familyConfidence = adjusted(confidence, candidates.length);
-    const contrasts = candidates
-      .map(({ strategyId, paired }) => {
-        const stats = pairedStatistics(paired, {
-          iterations: drawsFor(iterations, familyConfidence),
-          confidence: familyConfidence,
-          seedKey: `${model}/${strategyId}-vs-${baselineId}`,
-        });
-        return {
-          strategyId,
-          baselineId,
-          pairs: paired.pairs,
-          tasks: paired.tasks.length,
-          scoreDelta: stats.scoreDelta,
-          costRatio: stats.costRatio,
-          latencyRatio: stats.latencyRatio,
-          verdict: verdictFor(stats.scoreDelta, margin),
-        };
-      })
-      .filter((contrast): contrast is BaselineContrast => contrast !== null);
-
-    const frontier = paretoFrontier(
-      architectures,
-      (a) => a.score.mean,
-      (a) => a.costUsd.mean,
-    ).map((a) => a.strategyId);
-
-    const pairwise = comparePairs(scoped, strategies, { iterations, confidence, seedKey: model });
-    const ranks = rankArchitectures(architectures, pairwise);
-
-    return {
-      model,
-      architectures,
-      contrasts,
-      pairwise,
-      ranks,
-      frontier,
-      health: summarizeHealth(records.filter((record) => record.model === model)),
-    };
-  });
-
-  const scaleCandidates: { strategyId: string; model: string; nextModel: string; paired: PairedRuns }[] = [];
-  for (let i = 0; i + 1 < models.length; i++) {
-    const model = models[i] as string;
-    const nextModel = models[i + 1] as string;
-    const nextBaseline = rankable.filter(
-      (record) => record.model === nextModel && record.strategyId === baselineId,
-    );
-    if (nextBaseline.length === 0) continue;
-    const strategies = [
-      ...new Set(rankable.filter((r) => r.model === model).map((r) => r.strategyId)),
-    ].sort(compareArchitectures);
-    for (const strategyId of strategies) {
-      const paired = pairRuns(
-        rankable.filter((record) => record.model === model && record.strategyId === strategyId),
-        nextBaseline,
-      );
-      if (paired.pairs > 0) scaleCandidates.push({ strategyId, model, nextModel, paired });
-    }
-  }
-  // One family: every scaffold-or-scale contrast in the run set.
-  const scaleConfidence = adjusted(confidence, scaleCandidates.length);
-  const scale: ScaleContrast[] = scaleCandidates.map(({ strategyId, model, nextModel, paired }) => {
-    const stats = pairedStatistics(paired, {
-      iterations: drawsFor(iterations, scaleConfidence),
-      confidence: scaleConfidence,
-      seedKey: `${model}/${strategyId}-vs-${nextModel}/${baselineId}`,
-    });
-    return {
-      strategyId,
-      model,
-      nextModel,
-      pairs: paired.pairs,
-      tasks: paired.tasks.length,
-      scoreDelta: stats.scoreDelta,
-      costRatio: stats.costRatio,
-      verdict: verdictFor(stats.scoreDelta, margin),
-    };
-  });
-
-  const pct = Math.round(confidence * 100);
   return {
-    baselineId,
-    confidence,
-    margin,
-    method:
-      `Each architecture's own numbers carry ${pct}% percentile intervals from a bootstrap of at least ` +
-      `${iterations.toLocaleString('en-US')} draws that resamples tasks, keeping each task's repeats together. ` +
-      'Differences are paired by task and repeat, and each family of verdicts is adjusted for the comparisons ' +
-      'it makes at once (Bonferroni): the comparisons with single on a model, the pairs behind its ranks, and ' +
-      `the scaffold-or-scale contrasts each keep a ${100 - pct}% chance of any false call, so their intervals ` +
-      `are wider than ${pct}%. "Equivalent" means the whole interval sits within ±${margin.toFixed(2)}.`,
-    models: perModel,
-    scale,
+    baselineId: settings.baseline,
+    confidence: 1 - settings.alpha,
+    margin: settings.margins.score,
+    settings,
+    method: describeMethod(settings),
+    models,
+    scale: scaleContrasts(core.scaffoldOrScale),
     health: summarizeHealth(records),
   };
 }
 
-// ---------------------------------------------------------------------------
-// Verdicts
-// ---------------------------------------------------------------------------
-
 /**
- * Four-way verdict on a difference interval. Equivalence is checked first: a
- * tight interval inside the margin is "equivalent" even if it excludes zero,
- * because a real but negligible difference is not a reason to pay for
- * structure.
+ * What core did, in plain words and with this run's settings, for the
+ * methodology page and every chart caption.
  */
-export function verdictFor(delta: Estimate, margin: number): PairedVerdict {
-  if (delta.low >= -margin && delta.high <= margin) return 'equivalent';
-  if (delta.low > 0) return 'better';
-  if (delta.high < 0) return 'worse';
-  return 'inconclusive';
+export function describeMethod(settings: AnalysisSettings): string {
+  const pct = Math.round((1 - settings.alpha) * 100);
+  const { margins } = settings;
+  return (
+    `Every number is a mean over tasks, not runs: whole tasks are resampled (a cluster bootstrap of ` +
+    `${settings.iterations.toLocaleString('en-US')} replicates), so a task's repeats stay together and the ${pct}% ` +
+    `intervals are as wide as the tasks make them. Architectures are compared in pairs on the cells both ran, the ` +
+    `same task and the same repeat: score differences are differences of means, cost and latency are ` +
+    `geometric-mean ratios, and for them “better” means cheaper or faster. Each verdict comes from tests, not ` +
+    `from whether two intervals overlap, and is Holm-adjusted within its family (one kind of contrast on one ` +
+    `metric, across every model) to hold the chance of any false call in a family at ${100 - pct}%; so a verdict ` +
+    `can read “not separable” while the unadjusted interval excludes zero. “Equivalent” means two one-sided ` +
+    `tests show the difference within ±${margins.score.toFixed(2)} of score (×/÷${margins.cost} for cost and ` +
+    `latency). With fewer than ${settings.minTasks} tasks no verdict is drawn, and where every task moved by ` +
+    `the same amount there is no interval, which the table says instead of printing a zero-width one.`
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Pairs and ranks
+// From core to the site's shapes
 // ---------------------------------------------------------------------------
 
-/**
- * The confidence each of `m` intervals needs for the whole family to hold
- * at `confidence` (Bonferroni).
- */
-export function adjusted(confidence: number, m: number): number {
-  return 1 - (1 - confidence) / Math.max(1, m);
+const estimateOf = (estimate: CoreEstimate): Estimate => ({ mean: estimate.value, ci: estimate.ci });
+
+/** A contrast core could not form (say, no positive costs to take a ratio of). */
+const NONE: Estimate = { mean: Number.NaN, ci: null };
+
+const contrastEstimate = (contrast: Contrast | undefined): Estimate =>
+  contrast ? { mean: contrast.estimate, ci: contrast.ci } : NONE;
+
+function summarize(strategy: StrategyAnalysis): ArchitectureSummary {
+  return {
+    strategyId: strategy.strategyId,
+    runs: strategy.runs,
+    tasks: strategy.tasks,
+    score: estimateOf(strategy.score),
+    passRate: estimateOf(strategy.passRate),
+    costUsd: estimateOf(strategy.costUsd),
+    latencyMs: estimateOf(strategy.latencyMs),
+  };
 }
 
-/**
- * Enough draws that a widened interval's tails rest on at least 20 draws
- * each, rather than on two or three.
- */
-function drawsFor(iterations: number, confidence: number): number {
-  return Math.max(iterations, Math.ceil(20 / ((1 - confidence) / 2)));
-}
-
-function comparePairs(
+function modelAnalysis(
+  model: CoreModelAnalysis,
   records: readonly RunRecord[],
-  strategies: readonly string[],
-  config: BootstrapConfig,
-): PairContrast[] {
-  const pairs = (strategies.length * (strategies.length - 1)) / 2;
-  const pairConfidence = adjusted(config.confidence, pairs);
-  const out: PairContrast[] = [];
-  for (let i = 0; i < strategies.length; i++) {
-    for (let j = i + 1; j < strategies.length; j++) {
-      const a = strategies[i] as string;
-      const b = strategies[j] as string;
-      const paired = pairRuns(
-        records.filter((record) => record.strategyId === a),
-        records.filter((record) => record.strategyId === b),
+  settings: AnalysisSettings,
+): ModelAnalysis {
+  // Canonical architecture order: the reading order does not move with the scores.
+  const architectures = model.strategies.map(summarize).sort((a, b) => compareArchitectures(a.strategyId, b.strategyId));
+
+  const contrasts = model.vsBaseline
+    .filter((contrast) => contrast.metric === 'score')
+    .map((score): BaselineContrast => {
+      const same = (metric: 'cost' | 'latency') =>
+        model.vsBaseline.find((c) => c.metric === metric && c.a.strategyId === score.a.strategyId);
+      const cost = same('cost');
+      const latency = same('latency');
+      return {
+        strategyId: score.a.strategyId,
+        baselineId: settings.baseline,
+        pairs: score.cells,
+        tasks: score.tasks,
+        scoreDelta: contrastEstimate(score),
+        costRatio: contrastEstimate(cost),
+        latencyRatio: contrastEstimate(latency),
+        verdict: score.verdict,
+        ...(score.caveat ? { caveat: score.caveat } : {}),
+        costVerdict: cost?.verdict ?? 'inconclusive',
+        latencyVerdict: latency?.verdict ?? 'inconclusive',
+        pAdjusted: score.pAdjusted,
+      };
+    })
+    .sort((a, b) => compareArchitectures(a.strategyId, b.strategyId));
+
+  const pairwise = model.pairwise
+    .filter((contrast) => contrast.metric === 'score')
+    .map(pairContrast)
+    .sort((a, b) => compareArchitectures(a.a, b.a) || compareArchitectures(a.b, b.b));
+
+  const onFrontier = model.frontier.filter((entry) => entry.status !== 'dominated');
+
+  return {
+    model: model.model,
+    architectures,
+    contrasts,
+    pairwise,
+    ranks: rankArchitectures(architectures, pairwise),
+    frontier: onFrontier.map((entry) => entry.arm.strategyId),
+    frontierTied: onFrontier.filter((entry) => entry.status === 'tied').map((entry) => entry.arm.strategyId),
+    meanFrontier: paretoFrontier(
+      architectures,
+      (a) => a.score.mean,
+      (a) => a.costUsd.mean,
+    ).map((a) => a.strategyId),
+    health: summarizeHealth(records.filter((record) => record.model === model.model)),
+  };
+}
+
+/** A pair in canonical order, so `a` is the architecture listed first on the site. */
+function pairContrast(contrast: Contrast): PairContrast {
+  const flip = compareArchitectures(contrast.a.strategyId, contrast.b.strategyId) > 0;
+  const verdict = flip ? mirror(contrast.verdict) : contrast.verdict;
+  return {
+    a: flip ? contrast.b.strategyId : contrast.a.strategyId,
+    b: flip ? contrast.a.strategyId : contrast.b.strategyId,
+    pairs: contrast.cells,
+    tasks: contrast.tasks,
+    scoreDelta: flip
+      ? {
+          mean: contrast.estimate === 0 ? 0 : -contrast.estimate,
+          ci: contrast.ci && { low: -contrast.ci.high, high: -contrast.ci.low },
+        }
+      : contrastEstimate(contrast),
+    verdict,
+    ...(contrast.caveat ? { caveat: contrast.caveat } : {}),
+    winner: verdict === 'better' ? 'a' : verdict === 'worse' ? 'b' : 'tie',
+  };
+}
+
+function mirror(verdict: PairedVerdict): PairedVerdict {
+  return verdict === 'better' ? 'worse' : verdict === 'worse' ? 'better' : verdict;
+}
+
+function scaleContrasts(contrasts: readonly Contrast[]): ScaleContrast[] {
+  return contrasts
+    .filter((contrast) => contrast.metric === 'score')
+    .map((score): ScaleContrast => {
+      const cost = contrasts.find(
+        (c) =>
+          c.metric === 'cost' &&
+          c.a.model === score.a.model &&
+          c.a.strategyId === score.a.strategyId &&
+          c.b.model === score.b.model,
       );
-      if (paired.pairs === 0) continue;
-      const deltas = paired.tasks.map((task) => mean(task.score.map(([x, y]) => x - y)));
-      const scoreDelta = clusterMean(deltas, {
-        iterations: drawsFor(config.iterations, pairConfidence),
-        confidence: pairConfidence,
-        seedKey: `${config.seedKey}/${a}-vs-${b}/rank`,
-      });
-      out.push({
-        a,
-        b,
-        pairs: paired.pairs,
-        tasks: paired.tasks.length,
-        scoreDelta,
-        winner: scoreDelta.low > 0 ? 'a' : scoreDelta.high < 0 ? 'b' : 'tie',
-      });
-    }
-  }
-  return out;
+      return {
+        strategyId: score.a.strategyId,
+        model: score.a.model,
+        nextModel: score.b.model,
+        pairs: score.cells,
+        tasks: score.tasks,
+        scoreDelta: contrastEstimate(score),
+        costRatio: contrastEstimate(cost),
+        verdict: score.verdict,
+        ...(score.caveat ? { caveat: score.caveat } : {}),
+        costVerdict: cost?.verdict ?? 'inconclusive',
+      };
+    })
+    .sort(
+      (a, b) =>
+        compareModels(a.model, b.model) || compareArchitectures(a.strategyId, b.strategyId),
+    );
 }
 
 /** Rank = 1 + the number of architectures reliably above; ties share a rank. */
 export function rankArchitectures(
   architectures: readonly Pick<ArchitectureSummary, 'strategyId' | 'score'>[],
-  pairwise: readonly PairContrast[],
+  pairwise: readonly Pick<PairContrast, 'a' | 'b' | 'winner'>[],
 ): RankEntry[] {
   const below = new Map<string, string[]>();
   const above = new Map<string, string[]>();
@@ -408,164 +420,6 @@ export function rankArchitectures(
     below: below.get(entry.strategyId) ?? [],
     above: above.get(entry.strategyId) ?? [],
   }));
-}
-
-// ---------------------------------------------------------------------------
-// Single-architecture summaries
-// ---------------------------------------------------------------------------
-
-interface BootstrapConfig {
-  iterations: number;
-  confidence: number;
-  seedKey: string;
-}
-
-function summarizeArchitecture(
-  records: readonly RunRecord[],
-  strategyId: string,
-  config: BootstrapConfig,
-): ArchitectureSummary {
-  const byTask = groupByTask(records);
-  const tasks = [...byTask.values()];
-  const taskMean = (pick: (r: RunRecord) => number) => tasks.map((runs) => mean(runs.map(pick)));
-
-  const scores = taskMean((r) => r.score);
-  const costs = taskMean((r) => r.costUsd);
-  const latencies = taskMean((r) => r.latencyMs);
-  const passed = records.filter((r) => r.passed).length;
-
-  return {
-    strategyId,
-    runs: records.length,
-    tasks: tasks.length,
-    score: clusterMean(scores, { ...config, seedKey: `${config.seedKey}/score` }),
-    passRate: wilson(passed, records.length, config.confidence),
-    costUsd: clusterMean(costs, { ...config, seedKey: `${config.seedKey}/cost` }),
-    latencyMs: clusterMean(latencies, { ...config, seedKey: `${config.seedKey}/latency` }),
-  };
-}
-
-/** Bootstrap the mean of per-task values by resampling tasks. */
-function clusterMean(values: readonly number[], config: BootstrapConfig): Estimate {
-  const point = mean(values);
-  if (values.length < 2) return { mean: point, low: point, high: point };
-  const rng = makeRng(seedFrom(config.seedKey));
-  const draws = new Array<number>(config.iterations);
-  for (let i = 0; i < config.iterations; i++) {
-    let total = 0;
-    for (let j = 0; j < values.length; j++) {
-      total += values[Math.floor(rng() * values.length)] as number;
-    }
-    draws[i] = total / values.length;
-  }
-  return { mean: point, ...percentiles(draws, config.confidence) };
-}
-
-/** Wilson score interval for a binomial proportion. */
-export function wilson(successes: number, n: number, confidence = 0.95): Estimate {
-  if (n === 0) return { mean: 0, low: 0, high: 0 };
-  const z = zFor(confidence);
-  const p = successes / n;
-  const denom = 1 + (z * z) / n;
-  const centre = (p + (z * z) / (2 * n)) / denom;
-  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
-  return { mean: p, low: Math.max(0, centre - half), high: Math.min(1, centre + half) };
-}
-
-function zFor(confidence: number): number {
-  // The site only ever asks for 90/95/99%; a table beats an inverse-erf here.
-  if (confidence >= 0.99) return 2.5758;
-  if (confidence >= 0.95) return 1.96;
-  return 1.6449;
-}
-
-// ---------------------------------------------------------------------------
-// Paired contrasts
-// ---------------------------------------------------------------------------
-
-interface TaskPairs {
-  taskId: string;
-  /** Per matched repeat: [architecture, baseline]. */
-  score: [number, number][];
-  cost: [number, number][];
-  latency: [number, number][];
-}
-
-interface PairedRuns {
-  pairs: number;
-  tasks: TaskPairs[];
-}
-
-/** Match runs to the baseline by task and repeat; unmatched runs are left out. */
-export function pairRuns(
-  candidate: readonly RunRecord[],
-  baseline: readonly RunRecord[],
-): PairedRuns {
-  const baseByKey = new Map<string, RunRecord>();
-  for (const record of baseline) baseByKey.set(`${record.taskId}#${record.repeat}`, record);
-
-  const byTask = new Map<string, TaskPairs>();
-  let pairs = 0;
-  for (const record of candidate) {
-    const base = baseByKey.get(`${record.taskId}#${record.repeat}`);
-    if (!base) continue;
-    let bucket = byTask.get(record.taskId);
-    if (!bucket) {
-      bucket = { taskId: record.taskId, score: [], cost: [], latency: [] };
-      byTask.set(record.taskId, bucket);
-    }
-    bucket.score.push([record.score, base.score]);
-    bucket.cost.push([record.costUsd, base.costUsd]);
-    bucket.latency.push([record.latencyMs, base.latencyMs]);
-    pairs += 1;
-  }
-
-  const tasks = [...byTask.values()].sort((a, b) => a.taskId.localeCompare(b.taskId));
-  return { pairs, tasks };
-}
-
-function pairedStatistics(
-  paired: PairedRuns,
-  config: BootstrapConfig,
-): { scoreDelta: Estimate; costRatio: Estimate; latencyRatio: Estimate } {
-  const deltas = paired.tasks.map((task) => mean(task.score.map(([a, b]) => a - b)));
-  const costA = paired.tasks.map((task) => mean(task.cost.map(([a]) => a)));
-  const costB = paired.tasks.map((task) => mean(task.cost.map(([, b]) => b)));
-  const latA = paired.tasks.map((task) => mean(task.latency.map(([a]) => a)));
-  const latB = paired.tasks.map((task) => mean(task.latency.map(([, b]) => b)));
-
-  return {
-    scoreDelta: clusterMean(deltas, { ...config, seedKey: `${config.seedKey}/delta` }),
-    costRatio: clusterRatio(costA, costB, { ...config, seedKey: `${config.seedKey}/cost` }),
-    latencyRatio: clusterRatio(latA, latB, { ...config, seedKey: `${config.seedKey}/latency` }),
-  };
-}
-
-/** Ratio of means, bootstrapped by resampling tasks for numerator and denominator together. */
-function clusterRatio(
-  numerator: readonly number[],
-  denominator: readonly number[],
-  config: BootstrapConfig,
-): Estimate {
-  const ratio = (num: number, den: number) => (den > 0 ? num / den : Number.NaN);
-  const point = ratio(mean(numerator), mean(denominator));
-  const n = numerator.length;
-  if (n < 2) return { mean: point, low: point, high: point };
-  const rng = makeRng(seedFrom(config.seedKey));
-  const draws: number[] = [];
-  for (let i = 0; i < config.iterations; i++) {
-    let num = 0;
-    let den = 0;
-    for (let j = 0; j < n; j++) {
-      const k = Math.floor(rng() * n);
-      num += numerator[k] as number;
-      den += denominator[k] as number;
-    }
-    const value = ratio(num, den);
-    if (Number.isFinite(value)) draws.push(value);
-  }
-  if (draws.length === 0) return { mean: point, low: point, high: point };
-  return { mean: point, ...percentiles(draws, config.confidence) };
 }
 
 // ---------------------------------------------------------------------------
@@ -612,53 +466,4 @@ export function summarizeHealth(records: readonly RunRecord[]): RunSetHealth {
       compareArchitectures(a.strategyId, b.strategyId),
     ),
   };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function compareRecords(a: RunRecord, b: RunRecord): number {
-  return (
-    a.model.localeCompare(b.model) ||
-    a.strategyId.localeCompare(b.strategyId) ||
-    a.taskId.localeCompare(b.taskId) ||
-    a.repeat - b.repeat ||
-    a.runId.localeCompare(b.runId)
-  );
-}
-
-function groupByTask(records: readonly RunRecord[]): Map<string, RunRecord[]> {
-  const map = new Map<string, RunRecord[]>();
-  for (const record of [...records].sort((a, b) => a.taskId.localeCompare(b.taskId))) {
-    const bucket = map.get(record.taskId);
-    if (bucket) bucket.push(record);
-    else map.set(record.taskId, [record]);
-  }
-  return map;
-}
-
-function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  let total = 0;
-  for (const value of values) total += value;
-  return total / values.length;
-}
-
-function percentiles(draws: number[], confidence: number): { low: number; high: number } {
-  draws.sort((a, b) => a - b);
-  const alpha = (1 - confidence) / 2;
-  const lowIdx = Math.max(0, Math.floor(alpha * draws.length));
-  const highIdx = Math.min(draws.length - 1, Math.ceil((1 - alpha) * draws.length) - 1);
-  return { low: draws[lowIdx] as number, high: draws[highIdx] as number };
-}
-
-/** FNV-1a: a stable seed per quantity, so intervals do not depend on iteration order. */
-function seedFrom(key: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < key.length; i++) {
-    hash ^= key.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
 }

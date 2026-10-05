@@ -1,6 +1,6 @@
 import type { PairedVerdict, SiteAnalysis } from '../../lib/analysis';
 import { architectureName } from '../../lib/architectures';
-import { formatDelta, formatMultiple } from '../../lib/format';
+import { caveatShort, caveatText, formatDelta, formatMultiple, formatRange } from '../../lib/format';
 import { modelShortName } from '../../lib/models';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
 import { ScrollRegion } from '../ScrollRegion';
@@ -73,18 +73,24 @@ export function ScaleTable({ analysis, verified }: { analysis: SiteAnalysis; ver
                         <td className="num px-3 py-2.5 text-right">
                           <span className="text-ink">{formatDelta(row.scoreDelta.mean)}</span>
                           <span className="block text-[0.6875rem] text-muted">
-                            {formatDelta(row.scoreDelta.low)} to {formatDelta(row.scoreDelta.high)}
+                            {formatRange(row.scoreDelta, formatDelta, ' to ')}
                           </span>
                         </td>
                         <td className="num px-3 py-2.5 text-right">
                           <span className="text-ink-2">{formatMultiple(row.costRatio.mean)}</span>
                           <span className="block text-[0.6875rem] text-muted">
-                            {formatMultiple(row.costRatio.low)}–{formatMultiple(row.costRatio.high)}
+                            {formatRange(row.costRatio, formatMultiple)}
+                            {row.costVerdict === 'better' ? ' · cheaper' : row.costVerdict === 'worse' ? ' · costlier' : ''}
                           </span>
                         </td>
                         <td className="num px-3 py-2.5 text-right text-ink-2">{row.pairs}</td>
                         <td className="px-4 py-2.5 text-right sm:px-5">
                           <span className={verdict.className}>{verdict.text}</span>
+                          {verified && row.caveat ? (
+                            <span className="mt-1 block text-[0.6875rem] text-muted" title={caveatText(row.caveat)}>
+                              {caveatShort(row.caveat)}
+                            </span>
+                          ) : null}
                         </td>
                       </tr>
                     );

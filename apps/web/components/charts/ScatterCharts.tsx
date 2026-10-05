@@ -9,7 +9,7 @@ import {
   niceDomain,
   placeLabels,
 } from '../../lib/charts';
-import { formatUsd } from '../../lib/format';
+import { boundsOf, formatRange, formatUsd } from '../../lib/format';
 import { ChartSvg, DataTable, FONT, Labels, LegendItem, Marker, Responsive, Whisker } from './parts';
 
 interface Frame {
@@ -29,8 +29,8 @@ function frame(width: number, height: number): Frame {
 }
 
 function extentOf(points: readonly IntervalPoint[]): { x: [number, number]; y: [number, number] } {
-  const xs = points.flatMap((p) => [p.x.low, p.x.high, p.x.mean]).filter((v) => v > 0);
-  const ys = points.flatMap((p) => [p.y.low, p.y.high, p.y.mean]);
+  const xs = points.flatMap((p) => [...boundsOf(p.x), p.x.mean]).filter((v) => v > 0);
+  const ys = points.flatMap((p) => [...boundsOf(p.y), p.y.mean]);
   const [x0, x1] = logPad(Math.min(...xs), Math.max(...xs), 1.2);
   const [y0, y1] = niceDomain(Math.min(...ys), Math.max(...ys), 5);
   return { x: [x0, x1], y: [Math.max(0, y0), Math.min(1, y1)] };
@@ -97,18 +97,24 @@ function IntervalMark({
   return (
     <g>
       <title>{point.note}</title>
-      <Whisker x1={sx(point.x.low)} y1={cy} x2={sx(point.x.high)} y2={cy} color={point.color} opacity={0.5} cap={5} />
-      <Whisker x1={cx} y1={sy(point.y.low)} x2={cx} y2={sy(point.y.high)} color={point.color} />
+      {point.x.ci ? (
+        <Whisker x1={sx(point.x.ci.low)} y1={cy} x2={sx(point.x.ci.high)} y2={cy} color={point.color} opacity={0.5} cap={5} />
+      ) : null}
+      {point.y.ci ? <Whisker x1={cx} y1={sy(point.y.ci.low)} x2={cx} y2={sy(point.y.ci.high)} color={point.color} /> : null}
       <Marker x={cx} y={cy} color={point.color} hollow={point.hollow ?? false} />
     </g>
   );
 }
 
 function whiskerObstacles(points: readonly IntervalPoint[], sx: (v: number) => number, sy: (v: number) => number): Rect[] {
-  return points.flatMap((point) => [
-    { x: sx(point.x.mean) - 1.5, y: sy(point.y.high), width: 3, height: sy(point.y.low) - sy(point.y.high) },
-    { x: sx(point.x.low), y: sy(point.y.mean) - 1.5, width: sx(point.x.high) - sx(point.x.low), height: 3 },
-  ]);
+  return points.flatMap((point) => {
+    const rects: Rect[] = [];
+    // A point with no interval has no whisker for a label to keep off.
+    const { x, y } = point;
+    if (y.ci) rects.push({ x: sx(x.mean) - 1.5, y: sy(y.ci.high), width: 3, height: sy(y.ci.low) - sy(y.ci.high) });
+    if (x.ci) rects.push({ x: sx(x.ci.low), y: sy(y.mean) - 1.5, width: sx(x.ci.high) - sx(x.ci.low), height: 3 });
+    return rects;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,18 +122,32 @@ function whiskerObstacles(points: readonly IntervalPoint[], sx: (v: number) => n
 // ---------------------------------------------------------------------------
 
 /**
- * Score against cost with intervals on both axes and the mean frontier drawn
- * as a step (a straight segment would imply in-between points exist). Points
- * off the frontier are rings. Where the intervals overlap, the frontier is a
- * statement about means only, and the caption says so.
+ * Score against cost with intervals on both axes and the frontier drawn as a
+ * step (a straight segment would imply in-between points exist). The frontier
+ * is the paired verdicts' reading, not the means': a point is a ring only when
+ * another architecture is shown to beat it on one axis and match it on the
+ * other, so a point that trails on means but cannot be separated stays on it.
  */
-export function ParetoPlot({ points, model }: { points: IntervalPoint[]; model: string }) {
+export function ParetoPlot({
+  points,
+  model,
+  basis = 'evidence',
+}: {
+  points: IntervalPoint[];
+  model: string;
+  /** `means`: a run set without fidelity checks, whose frontier is read off the means alone. */
+  basis?: 'evidence' | 'means';
+}) {
   if (points.length === 0) return null;
   return (
     <figure>
       <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-[0.8125rem] text-ink-2">
-        <LegendItem color="var(--ink-2)" label="on the mean frontier" />
-        <LegendItem color="var(--ink-2)" label="dominated on means" hollow />
+        <LegendItem color="var(--ink-2)" label={basis === 'means' ? 'on the mean frontier' : 'on the frontier: not shown to be beaten'} />
+        <LegendItem
+          color="var(--ink-2)"
+          label={basis === 'means' ? 'dominated on means' : 'beaten on one axis, matched on the other'}
+          hollow
+        />
       </div>
       <Responsive
         wide={<ParetoSvg points={points} model={model} width={680} height={420} />}
@@ -138,10 +158,10 @@ export function ParetoPlot({ points, model }: { points: IntervalPoint[]; model: 
         rows={points.map((p) => [
           p.label,
           p.y.mean.toFixed(3),
-          `${p.y.low.toFixed(3)}–${p.y.high.toFixed(3)}`,
+          formatRange(p.y, (v) => v.toFixed(3)),
           formatUsd(p.x.mean),
-          `${formatUsd(p.x.low)}–${formatUsd(p.x.high)}`,
-          p.hollow ? 'dominated' : 'frontier',
+          formatRange(p.x, formatUsd),
+          p.hollow ? (basis === 'means' ? 'dominated' : 'beaten') : 'frontier',
         ])}
       />
     </figure>
@@ -225,7 +245,7 @@ export function ScaffoldScaleChart({ groups }: { groups: ScaffoldScaleGroup[] })
         rows={usable.flatMap((group) =>
           [group.baseline, ...group.points]
             .filter((p): p is IntervalPoint => !!p)
-            .map((p) => [group.title, p.label, p.y.mean.toFixed(3), `${p.y.low.toFixed(3)}–${p.y.high.toFixed(3)}`, formatUsd(p.x.mean)]),
+            .map((p) => [group.title, p.label, p.y.mean.toFixed(3), formatRange(p.y, (v) => v.toFixed(3)), formatUsd(p.x.mean)]),
         )}
       />
     </figure>
@@ -325,7 +345,9 @@ function ScaffoldScaleSvg({
         return (
           <g key={point.id}>
             <title>{point.note}</title>
-            <Whisker x1={cx} y1={sy(point.y.low)} x2={cx} y2={sy(point.y.high)} color={point.color} opacity={0.35} cap={5} />
+            {point.y.ci ? (
+              <Whisker x1={cx} y1={sy(point.y.ci.low)} x2={cx} y2={sy(point.y.ci.high)} color={point.color} opacity={0.35} cap={5} />
+            ) : null}
             <Marker x={cx} y={sy(point.y.mean)} color={point.color} r={4.5} />
           </g>
         );

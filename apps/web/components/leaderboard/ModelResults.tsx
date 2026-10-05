@@ -61,7 +61,7 @@ export function ModelResults({
         }
         lede={
           verified
-            ? 'Ranked by paired comparison: an architecture ranks below another only when, task by task and repeat by repeat, it scores reliably lower. Ties are shown as ties. Every number carries an interval bootstrapped over tasks.'
+            ? 'Ranked by paired comparison: an architecture ranks below another only when, task by task and repeat by repeat, it scores reliably lower. Ties are shown as ties. Every number carries an interval bootstrapped over tasks, or says why it has none.'
             : 'The numbers each architecture produced on this model, with intervals bootstrapped over tasks. This run set carries no fidelity checks, so nothing is ranked and no verdict is drawn.'
         }
       />
@@ -123,8 +123,9 @@ export function ModelResults({
             </h2>
             <p className="prose-serif mt-4">
               Each cell is the paired score difference, row minus column, over the tasks and repeats both ran. ▲ and ▼
-              mark the pairs whose interval, widened for the {scoped.pairwise.length} comparisons made at once,
-              excludes zero. Everything else is a tie.
+              mark the pairs the paired test separates, adjusted for the {scoped.pairwise.length} comparisons made at
+              once; ≈ marks a pair shown to lie within the equivalence margin. Everything else is a tie. A * says the
+              data withheld an interval or a verdict from that pair: hover for why.
             </p>
           </div>
           <PairMatrix model={scoped} order={rows.map((row) => row.strategyId)} />
@@ -149,7 +150,11 @@ export function ModelResults({
             </div>
           ) : null}
           <div className="card min-w-0 p-5 sm:p-6">
-            <ParetoPlot points={paretoPoints(scoped)} model={modelShortName(model)} />
+            <ParetoPlot
+              points={paretoPoints(scoped, { verdicts: verified })}
+              model={modelShortName(model)}
+              basis={verified ? 'evidence' : 'means'}
+            />
           </div>
         </div>
       </section>

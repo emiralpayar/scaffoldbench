@@ -1,7 +1,7 @@
 import type { PayoffData, PayoffPanel } from '../../lib/chartData';
 import { payoffDomains } from '../../lib/chartData';
 import { linearScale, linearTicks, logScale, logTicks, niceDomain, placeLabels } from '../../lib/charts';
-import { formatDelta, formatMultiple } from '../../lib/format';
+import { caveatText, formatDelta, formatMultiple, formatRange } from '../../lib/format';
 import { ChartSvg, DataTable, FONT, Labels, LegendItem, Marker, Whisker } from './parts';
 
 const WIDTH = 344;
@@ -62,7 +62,8 @@ export function PayoffSmallMultiples({
 
       <figcaption className="mt-5 max-w-3xl text-[0.8125rem] leading-relaxed text-muted">
         Vertical whiskers: interval on the score difference. Horizontal whiskers: interval on the
-        cost multiple. Grey band: ±{data.margin.toFixed(2)}, the equivalence margin. {method}
+        cost multiple. A point without a whisker has no interval, and the table says why. Grey band: ±
+        {data.margin.toFixed(2)}, the equivalence margin. {method}
       </figcaption>
 
       <DataTable
@@ -72,10 +73,10 @@ export function PayoffSmallMultiples({
             panel.title,
             point.label,
             formatDelta(point.y.mean),
-            `${formatDelta(point.y.low)} to ${formatDelta(point.y.high)}`,
+            formatRange(point.y, formatDelta, ' to '),
             formatMultiple(point.x.mean),
-            `${formatMultiple(point.x.low)}–${formatMultiple(point.x.high)}`,
-            point.verdict ?? '—',
+            formatRange(point.x, formatMultiple),
+            point.verdict ? `${point.verdict}${point.caveat ? ` (${caveatText(point.caveat)})` : ''}` : '—',
           ]),
         )}
       />
@@ -116,8 +117,12 @@ function PayoffPanelChart({
     { x: plot.x + 2, y: plot.y + 2, width: plot.width - 4, height: plot.height - 4 },
     // Labels keep off the whiskers too, not just the dots.
     panel.points.flatMap((point) => [
-      { x: sx(point.x.mean) - 1.5, y: sy(point.y.high), width: 3, height: sy(point.y.low) - sy(point.y.high) },
-      { x: sx(point.x.low), y: sy(point.y.mean) - 1.5, width: sx(point.x.high) - sx(point.x.low), height: 3 },
+      ...(point.y.ci
+        ? [{ x: sx(point.x.mean) - 1.5, y: sy(point.y.ci.high), width: 3, height: sy(point.y.ci.low) - sy(point.y.ci.high) }]
+        : []),
+      ...(point.x.ci
+        ? [{ x: sx(point.x.ci.low), y: sy(point.y.mean) - 1.5, width: sx(point.x.ci.high) - sx(point.x.ci.low), height: 3 }]
+        : []),
     ]),
   );
 
@@ -183,8 +188,12 @@ function PayoffPanelChart({
           return (
             <g key={point.id}>
               <title>{point.note}</title>
-              <Whisker x1={sx(point.x.low)} y1={cy} x2={sx(point.x.high)} y2={cy} color={point.color} opacity={0.45} cap={5} />
-              <Whisker x1={cx} y1={sy(point.y.low)} x2={cx} y2={sy(point.y.high)} color={point.color} opacity={0.95} />
+              {point.x.ci ? (
+                <Whisker x1={sx(point.x.ci.low)} y1={cy} x2={sx(point.x.ci.high)} y2={cy} color={point.color} opacity={0.45} cap={5} />
+              ) : null}
+              {point.y.ci ? (
+                <Whisker x1={cx} y1={sy(point.y.ci.low)} x2={cx} y2={sy(point.y.ci.high)} color={point.color} opacity={0.95} />
+              ) : null}
               <Marker x={cx} y={cy} color={point.color} />
             </g>
           );

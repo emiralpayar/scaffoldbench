@@ -4,9 +4,19 @@
  * the analysis itself.
  */
 
-import type { Estimate, ModelAnalysis, PairedVerdict, SiteAnalysis } from './analysis';
+import type { ContrastCaveat, Estimate, ModelAnalysis, PairedVerdict, SiteAnalysis } from './analysis';
 import { architectureColor, architectureName, compareArchitectures } from './architectures';
-import { formatDelta, formatMultiple, formatScore, formatUsd, joinList } from './format';
+import {
+  boundsOf,
+  caveatText,
+  formatBracket,
+  formatDelta,
+  formatMultiple,
+  formatRange,
+  formatScore,
+  formatUsd,
+  joinList,
+} from './format';
 import { modelShortName } from './models';
 
 export interface IntervalPoint {
@@ -20,6 +30,8 @@ export interface IntervalPoint {
   /** Full sentence for the native tooltip and the data table. */
   note: string;
   verdict?: PairedVerdict;
+  /** What the data withheld from the verdict, when it withheld anything. */
+  caveat?: ContrastCaveat;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,12 +75,15 @@ export function payoffData(analysis: SiteAnalysis): PayoffData {
           x: contrast.costRatio,
           y: contrast.scoreDelta,
           verdict: contrast.verdict,
+          ...(contrast.caveat ? { caveat: contrast.caveat } : {}),
           note:
             `${architectureName(contrast.strategyId)} on ${modelShortName(model.model)}: ` +
             `${formatDelta(contrast.scoreDelta.mean)} score ` +
-            `[${formatDelta(contrast.scoreDelta.low)}, ${formatDelta(contrast.scoreDelta.high)}] ` +
-            `at ${formatMultiple(contrast.costRatio.mean)} the cost of single, ` +
-            `${VERDICT_WORDS[contrast.verdict]} (${contrast.pairs} paired runs).`,
+            `${formatBracket(contrast.scoreDelta, formatDelta)} ` +
+            `at ${formatMultiple(contrast.costRatio.mean)} the cost of single ` +
+            `${formatBracket(contrast.costRatio, formatMultiple)}, ` +
+            `${VERDICT_WORDS[contrast.verdict]} (${contrast.pairs} paired runs)` +
+            (contrast.caveat ? `; ${caveatText(contrast.caveat)}.` : '.'),
         })),
     }));
   return { panels, margin: analysis.margin };
@@ -83,8 +98,8 @@ function pairsText(counts: readonly number[]): string {
 /** Shared axes for small multiples: one scale across panels, or they cannot be compared. */
 export function payoffDomains(data: PayoffData): { x: [number, number]; y: [number, number] } {
   const points = data.panels.flatMap((panel) => panel.points);
-  const xs = points.flatMap((p) => [p.x.low, p.x.high]).filter((v) => Number.isFinite(v) && v > 0);
-  const ys = points.flatMap((p) => [p.y.low, p.y.high]).filter(Number.isFinite);
+  const xs = points.flatMap((p) => boundsOf(p.x)).filter((v) => Number.isFinite(v) && v > 0);
+  const ys = points.flatMap((p) => boundsOf(p.y)).filter(Number.isFinite);
   const xMin = Math.min(1, ...xs);
   const xMax = Math.max(1, ...xs);
   const yMin = Math.min(-data.margin, ...ys);
@@ -111,10 +126,10 @@ export function forestRows(model: ModelAnalysis): ForestRow[] {
     label: architectureName(arch.strategyId),
     color: architectureColor(arch.strategyId),
     estimate: arch.score,
-    valueText: `${formatScore(arch.score.mean)}  ${formatScore(arch.score.low)}–${formatScore(arch.score.high)}`,
+    valueText: `${formatScore(arch.score.mean)}  ${formatRange(arch.score, formatScore)}`,
     note:
       `${architectureName(arch.strategyId)} on ${modelShortName(model.model)}: mean score ` +
-      `${formatScore(arch.score.mean)}, interval ${formatScore(arch.score.low)}–${formatScore(arch.score.high)}, ` +
+      `${formatScore(arch.score.mean)}, interval ${formatRange(arch.score, formatScore)}, ` +
       `${arch.runs} runs on ${arch.tasks} tasks.`,
   }));
 }
@@ -123,8 +138,15 @@ export function forestRows(model: ModelAnalysis): ForestRow[] {
 // Score against cost (one model), with intervals on both axes
 // ---------------------------------------------------------------------------
 
-export function paretoPoints(model: ModelAnalysis): IntervalPoint[] {
-  const frontier = new Set(model.frontier);
+/**
+ * With `verdicts` false (a run set without fidelity checks) the frontier is
+ * the one of the means alone, described as such; nothing is claimed from the
+ * evidence.
+ */
+export function paretoPoints(model: ModelAnalysis, options: { verdicts?: boolean } = {}): IntervalPoint[] {
+  const verdicts = options.verdicts ?? true;
+  const frontier = new Set(verdicts ? model.frontier : model.meanFrontier);
+  const tied = new Set(verdicts ? model.frontierTied : []);
   return model.architectures.map((arch) => ({
     id: arch.strategyId,
     label: architectureName(arch.strategyId),
@@ -134,9 +156,17 @@ export function paretoPoints(model: ModelAnalysis): IntervalPoint[] {
     hollow: !frontier.has(arch.strategyId),
     note:
       `${architectureName(arch.strategyId)}: score ${formatScore(arch.score.mean)} ` +
-      `[${formatScore(arch.score.low)}–${formatScore(arch.score.high)}] at ${formatUsd(arch.costUsd.mean)} a run ` +
-      `[${formatUsd(arch.costUsd.low)}–${formatUsd(arch.costUsd.high)}]` +
-      (frontier.has(arch.strategyId) ? ', on the mean frontier.' : ', dominated on means.'),
+      `${formatBracket(arch.score, formatScore)} at ${formatUsd(arch.costUsd.mean)} a run ` +
+      `${formatBracket(arch.costUsd, formatUsd)}` +
+      (!verdicts
+        ? frontier.has(arch.strategyId)
+          ? ', on the mean frontier.'
+          : ', dominated on means.'
+        : tied.has(arch.strategyId)
+          ? ', on the frontier: behind another architecture on means, but the paired comparison does not separate them.'
+          : frontier.has(arch.strategyId)
+            ? ', on the frontier.'
+            : ', shown to be beaten on score or cost, and no better on the other.'),
   }));
 }
 
@@ -165,7 +195,7 @@ export function scaffoldScaleGroups(analysis: SiteAnalysis): ScaffoldScaleGroup[
         hollow: strategyId === analysis.baselineId,
         note:
           `${architectureName(strategyId)} on ${modelShortName(model.model)}: score ${formatScore(arch.score.mean)} ` +
-          `[${formatScore(arch.score.low)}–${formatScore(arch.score.high)}] at ${formatUsd(arch.costUsd.mean)} a run.`,
+          `${formatBracket(arch.score, formatScore)} at ${formatUsd(arch.costUsd.mean)} a run.`,
       };
     };
     return {
@@ -227,7 +257,7 @@ export function scaleHeadline(analysis: SiteAnalysis): string | null {
   const scaffolds = analysis.scale.filter((s) => s.strategyId !== analysis.baselineId);
   if (scaffolds.length === 0) return null;
   const wins = scaffolds.filter((s) => s.verdict === 'better');
-  const cheaper = wins.filter((s) => s.costRatio.high < 1);
+  const cheaper = wins.filter((s) => s.costVerdict === 'better');
   if (wins.length === 0) {
     return `In none of the ${scaffolds.length} comparisons did an architecture on a smaller model score reliably above a single agent on the next model up.`;
   }
@@ -276,14 +306,12 @@ export function modelTableRows(model: ModelAnalysis, baselineId: string): ModelT
       color: architectureColor(arch.strategyId),
       runs: arch.runs,
       score: formatScore(arch.score.mean),
-      scoreInterval: `${formatScore(arch.score.low)}–${formatScore(arch.score.high)}`,
+      scoreInterval: formatRange(arch.score, formatScore),
       passRate: `${Math.round(arch.passRate.mean * 100)}%`,
       cost: formatUsd(arch.costUsd.mean),
       latency: `${(arch.latencyMs.mean / 1000).toFixed(1)}s`,
       delta: contrast ? formatDelta(contrast.scoreDelta.mean) : '',
-      deltaInterval: contrast
-        ? `${formatDelta(contrast.scoreDelta.low)} to ${formatDelta(contrast.scoreDelta.high)}`
-        : '',
+      deltaInterval: contrast ? formatRange(contrast.scoreDelta, formatDelta, ' to ') : '',
       costMultiple: contrast ? formatMultiple(contrast.costRatio.mean) : isBaseline ? '1.0×' : '',
       verdict: isBaseline ? 'control' : (contrast?.verdict ?? '—'),
       onFrontier: frontier.has(arch.strategyId),
@@ -325,7 +353,11 @@ export function describeModel(model: ModelAnalysis): string {
   if (equivalent.length > 0) {
     parts.push(`${names(equivalent)} ${equivalent.length === 1 ? 'is' : 'are'} equivalent to it within the margin.`);
   }
-  const rest = model.contrasts.length - better.length - worse.length - equivalent.length;
-  if (rest > 0) parts.push(`${rest === 1 ? 'One is' : `${rest} are`} not separable from it at this sample size.`);
+  const rest = model.contrasts.filter((c) => c.verdict === 'inconclusive');
+  // Too few tasks is a limit of the run set, not a finding about the pair.
+  const untested = rest.filter((c) => c.caveat === 'too-few-tasks').length;
+  const open = rest.length - untested;
+  if (open > 0) parts.push(`${open === 1 ? 'One is' : `${open} are`} not separable from it at this sample size.`);
+  if (untested > 0) parts.push(`${untested === 1 ? 'One has' : `${untested} have`} too few tasks for any verdict.`);
   return parts.join(' ');
 }

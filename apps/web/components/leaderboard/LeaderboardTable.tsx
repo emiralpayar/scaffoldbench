@@ -3,7 +3,18 @@ import type { ReactNode } from 'react';
 import type { Estimate, PairedVerdict } from '../../lib/analysis';
 import { architectureName } from '../../lib/architectures';
 import { linearTicks } from '../../lib/charts';
-import { formatDelta, formatDuration, formatMultiple, formatScore, formatUsd, joinList } from '../../lib/format';
+import {
+  NO_INTERVAL,
+  caveatShort,
+  caveatText,
+  formatDelta,
+  formatDuration,
+  formatMultiple,
+  formatRange,
+  formatScore,
+  formatUsd,
+  joinList,
+} from '../../lib/format';
 import type { LeaderRow } from '../../lib/leaderboard';
 import { rankLabel } from '../../lib/leaderboard';
 import { ArchitectureGlyph } from '../ArchitectureGlyph';
@@ -88,8 +99,19 @@ export function LeaderboardTable({
                       <span className="flex flex-col items-start gap-1">
                         <span className="whitespace-nowrap text-ink group-hover:underline">{row.label}</span>
                         {row.onFrontier ? (
-                          <span className="chip-quiet" title="On the mean score-against-cost frontier for this model">
+                          <span
+                            className="chip-quiet"
+                            title={
+                              ranked
+                                ? 'On the score-against-cost frontier for this model: no other architecture is shown to beat it on one axis and match it on the other'
+                                : 'On the mean score-against-cost frontier for this model: nothing else has a higher mean score for the same mean cost or less'
+                            }
+                          >
                             frontier
+                          </span>
+                        ) : row.frontierTied ? (
+                          <span className="chip-quiet" title="Behind another architecture on means, but the paired comparison does not separate them, so it stays on the frontier">
+                            tied for frontier
                           </span>
                         ) : null}
                       </span>
@@ -99,16 +121,16 @@ export function LeaderboardTable({
                     <Track estimate={row.score} domain={domain} color={row.color} ticks={ticks} {...(reference !== undefined ? { reference } : {})} />
                   </td>
                   <td className="px-3 py-3 text-right align-middle">
-                    <Value main={formatScore(row.score.mean)} sub={`${formatScore(row.score.low)}–${formatScore(row.score.high)}`} strong />
+                    <Value main={formatScore(row.score.mean)} sub={formatRange(row.score, formatScore)} strong />
                   </td>
                   <td className="px-3 py-3 text-right align-middle">
-                    <Value main={pct(row.passRate.mean)} sub={`${pct(row.passRate.low)}–${pct(row.passRate.high)}`} />
+                    <Value main={pct(row.passRate.mean)} sub={formatRange(row.passRate, pct)} />
                   </td>
                   <td className="px-3 py-3 text-right align-middle">
-                    <Value main={formatUsd(row.costUsd.mean)} sub={`${formatUsd(row.costUsd.low)}–${formatUsd(row.costUsd.high)}`} />
+                    <Value main={formatUsd(row.costUsd.mean)} sub={formatRange(row.costUsd, formatUsd)} />
                   </td>
                   <td className="px-3 py-3 text-right align-middle">
-                    <Value main={formatDuration(row.latencyMs.mean)} sub={`${seconds(row.latencyMs.low)}–${formatDuration(row.latencyMs.high)}`} />
+                    <Value main={formatDuration(row.latencyMs.mean)} sub={latencyRange(row.latencyMs)} />
                   </td>
                   <td className="px-3 py-3 text-right align-middle">
                     <VersusSingle row={row} ranked={ranked} />
@@ -135,9 +157,7 @@ export function LeaderboardTable({
               </Link>
               <span className="text-right">
                 <span className="num block text-[1.375rem] leading-none text-ink">{formatScore(row.score.mean)}</span>
-                <span className="num text-[0.6875rem] text-muted">
-                  {formatScore(row.score.low)}–{formatScore(row.score.high)}
-                </span>
+                <span className="num text-[0.6875rem] text-muted">{formatRange(row.score, formatScore)}</span>
               </span>
             </div>
             <div className="mt-3">
@@ -145,16 +165,14 @@ export function LeaderboardTable({
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-rule pt-3 text-[0.8125rem] sm:grid-cols-4">
               <Small label="Pass">
-                {pct(row.passRate.mean)} <span className="text-muted">({pct(row.passRate.low)}–{pct(row.passRate.high)})</span>
+                {pct(row.passRate.mean)} <span className="text-muted">({formatRange(row.passRate, pct)})</span>
               </Small>
               <Small label="Cost / run">
-                {formatUsd(row.costUsd.mean)} <span className="text-muted">({formatUsd(row.costUsd.low)}–{formatUsd(row.costUsd.high)})</span>
+                {formatUsd(row.costUsd.mean)} <span className="text-muted">({formatRange(row.costUsd, formatUsd)})</span>
               </Small>
               <Small label="Latency">
                 {formatDuration(row.latencyMs.mean)}{' '}
-                <span className="text-muted">
-                  ({seconds(row.latencyMs.low)}–{formatDuration(row.latencyMs.high)})
-                </span>
+                <span className="text-muted">({latencyRange(row.latencyMs)})</span>
               </Small>
               <Small label="Runs">
                 <RunsCell row={row} />
@@ -218,8 +236,9 @@ function Track({
   ticks: number[];
   reference?: number;
 }) {
-  const left = pos(estimate.low, domain);
-  const right = pos(estimate.high, domain);
+  const ci = estimate.ci;
+  const left = ci ? pos(ci.low, domain) : '';
+  const right = ci ? pos(ci.high, domain) : '';
   return (
     <span aria-hidden className="relative block h-7">
       {ticks.map((tick) => (
@@ -228,12 +247,17 @@ function Track({
       {reference !== undefined ? (
         <span className="absolute inset-y-0 w-px bg-ink-2/60" style={{ left: pos(reference, domain) }} />
       ) : null}
-      <span
-        className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full"
-        style={{ left, width: `calc(${right} - ${left})`, background: color, opacity: 0.85 }}
-      />
-      <span className="absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left, background: color }} />
-      <span className="absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: right, background: color }} />
+      {/* No interval, no whisker: the dot stands alone rather than pretending to a width of zero. */}
+      {ci ? (
+        <>
+          <span
+            className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full"
+            style={{ left, width: `calc(${right} - ${left})`, background: color, opacity: 0.85 }}
+          />
+          <span className="absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left, background: color }} />
+          <span className="absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: right, background: color }} />
+        </>
+      ) : null}
       <span
         className="absolute top-1/2 h-[15px] w-[15px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-[var(--surface)]"
         style={{ left: pos(estimate.mean, domain), background: color }}
@@ -260,11 +284,19 @@ function VersusSingle({ row, ranked, inline = false }: { row: LeaderRow; ranked:
       className={`inline-flex whitespace-nowrap ${inline ? 'flex-wrap items-center gap-x-2.5 gap-y-1' : 'flex-col items-end gap-1'}`}
     >
       <span className="flex items-center gap-2">
-        <span className="num text-ink" title={`${formatDelta(row.delta.low)} to ${formatDelta(row.delta.high)}`}>
+        <span className="num text-ink" title={formatRange(row.delta, formatDelta, ' to ')}>
           {formatDelta(row.delta.mean)}
         </span>
         <span className={verdict.className}>{verdict.text}</span>
       </span>
+      {/* An interval or a verdict the data withheld is said, not left to look like a measured zero. */}
+      {ranked && (row.caveat || row.delta.ci === null) ? (
+        <span className="text-[0.6875rem] text-muted" title={row.caveat ? caveatText(row.caveat) : undefined}>
+          {row.delta.ci === null ? NO_INTERVAL : ''}
+          {row.delta.ci === null && row.caveat ? ': ' : ''}
+          {row.caveat ? caveatShort(row.caveat) : ''}
+        </span>
+      ) : null}
       {row.costRatio ? (
         <span className="num text-[0.6875rem] text-muted">{formatMultiple(row.costRatio.mean)} the cost</span>
       ) : null}
@@ -311,4 +343,8 @@ function pct(value: number): string {
 
 function seconds(ms: number): string {
   return ms < 60_000 ? `${(ms / 1000).toFixed(1)}` : formatDuration(ms);
+}
+
+function latencyRange(estimate: Estimate): string {
+  return estimate.ci ? `${seconds(estimate.ci.low)}–${formatDuration(estimate.ci.high)}` : NO_INTERVAL;
 }

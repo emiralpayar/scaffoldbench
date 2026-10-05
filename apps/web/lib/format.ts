@@ -74,3 +74,60 @@ export function joinList(items: readonly string[]): string {
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
+
+// ---------------------------------------------------------------------------
+// Intervals
+// ---------------------------------------------------------------------------
+
+/** What the page prints where core withheld an interval. */
+export const NO_INTERVAL = 'no interval';
+
+/**
+ * `0.612–0.847`, or "no interval" where the data cannot support one. An
+ * interval is never faked from the point estimate: a zero-width range reads
+ * as certainty.
+ */
+export function formatRange(
+  estimate: { ci: { low: number; high: number } | null },
+  format: (value: number) => string,
+  separator = '–',
+): string {
+  return estimate.ci ? `${format(estimate.ci.low)}${separator}${format(estimate.ci.high)}` : NO_INTERVAL;
+}
+
+/** `[0.612, 0.847]` with a comma, or "no interval": the form a sentence or tooltip quotes. */
+export function formatBracket(
+  estimate: { ci: { low: number; high: number } | null },
+  format: (value: number) => string,
+): string {
+  return estimate.ci ? `[${format(estimate.ci.low)}, ${format(estimate.ci.high)}]` : NO_INTERVAL;
+}
+
+/** The lower and upper end of an interval for drawing, or the point itself when there is none. */
+export function boundsOf(estimate: { mean: number; ci: { low: number; high: number } | null }): [number, number] {
+  return estimate.ci ? [estimate.ci.low, estimate.ci.high] : [estimate.mean, estimate.mean];
+}
+
+/** Why a verdict was withheld or limited, in a phrase for a caption or tooltip. */
+export function caveatText(caveat: 'too-few-tasks' | 'no-variation' | 'few-informative-tasks'): string {
+  switch (caveat) {
+    case 'too-few-tasks':
+      return 'too few tasks for a verdict';
+    case 'no-variation':
+      return 'every task moved by the same amount, so there is no interval';
+    case 'few-informative-tasks':
+      return 'too few tasks carry the spread to show equivalence';
+  }
+}
+
+/** The same, in two or three words for a table cell; `caveatText` goes in the tooltip. */
+export function caveatShort(caveat: 'too-few-tasks' | 'no-variation' | 'few-informative-tasks'): string {
+  switch (caveat) {
+    case 'too-few-tasks':
+      return 'too few tasks';
+    case 'no-variation':
+      return 'no variation';
+    case 'few-informative-tasks':
+      return 'few informative tasks';
+  }
+}
