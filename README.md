@@ -5,15 +5,17 @@ verifier pay for itself? Is fanning work out to parallel subagents worth the coo
 The arguments are made from anecdote, and almost nobody publishes a number. ScaffoldBench is a
 benchmark lab for exactly that question: it runs **six agent harness architectures** over the
 **same task set**, on the same model, through the same instrumentation, and reports score, cost
-and latency with bootstrap confidence intervals. The tasks are held constant so that a difference
+and latency with intervals from a paired, task-clustered analysis. The tasks are held constant so that a difference
 in the leaderboard is a difference in the *architecture* — not in the model, the prompt, the
 toolset or how carefully somebody measured.
 
-The first real run set is in. Its headline is not a winner but a ceiling: on Claude Sonnet 5 the
-nine sandbox tasks are too easy to separate the five architectures, every pairwise comparison comes
-back `inconclusive`, and the cheapest architecture does the same work at a fifth the price. That
-is reported as it stands, in [Results](#results) and [Limitations](#limitations), rather than
-dressed up as a ranking — a benchmark that cannot admit a null result is not measuring anything.
+The one run set recorded so far is a post-mortem, not a result. It scored five architectures
+between 0.980 and 1.000, and its traces then showed that four of them had never run as designed
+(see [What running it actually surfaced](#what-running-it-actually-surfaced) and the site's
+post-mortem page). Since then every run has to prove its architecture ran, or it is not ranked;
+the task set has grown to 25 tasks with an expert tier; and the first campaign is
+[pre-registered](docs/PREREGISTRATION.md). Its numbers are not in yet. The [Results](#results) below
+are the legacy run set, kept for the record; this README will be rewritten around the campaign.
 
 ---
 
@@ -52,22 +54,16 @@ machines would not have been comparable. Every call now pins `tools` as well as 
 the model is shown exactly the task's toolset and nothing else.
 ([`runQuery.ts`](packages/core/src/runQuery.ts))
 
-**Record/replay fixtures for the research half.** The research tasks reach the web through two
-tools of our own, `search` and `fetch_page`, backed by a content-addressed fixture store. `record`
-mode performs real requests and writes them to disk; `replay` mode — the default for CI and for
-the weekly benchmark — never touches the network. Two strategies compared on a live web are
-compared on two different webs.
-
-Replay matches on more than the exact request, and it has to. Keying strictly on the query string
-looked correct and was unusable: a recording answers only the wording that produced it, and no two
-runs word a search the same way. Replaying a *freshly recorded* research task missed on all sixteen
-of its searches and scored 0.08 — a number about fixture bookkeeping, not about the architecture.
-A miss now falls back to the closest recorded query by content-word overlap, then to the recorded
-pages themselves, so any sensible phrasing reaches sources that were captured. `fetch_page` is
-held to a stricter rule — same host, and a match on the path tail that names the page — because a
-substituted page reads to the agent as a real source, where an off-target search result is merely
-ignored. The same task then scored 1.00.
-([`webTools.ts`](packages/tasks/src/research/webTools.ts), [`fixtureStore.ts`](packages/tasks/src/research/fixtureStore.ts))
+**A frozen web for the research half.** The research tasks reach the web through two tools of our
+own, `search` and `fetch_page`, over `fixtures/corpus`: a committed snapshot of 26 public documents,
+verified against checksums on every load. `search` is local BM25 over the documents a task names,
+so the same query gets the same ranking in every run; `fetch_page` serves exactly the page a URL
+addresses and 404s anything else, with no closest-match substitution; and no run touches the
+network. Two strategies compared on a live web are compared on two different webs. An earlier
+design recorded real requests and replayed them, and it was abandoned: a recording answers only the
+wording that produced it, and a replay of a freshly recorded task missed all sixteen of its
+searches. ([`fixtures/README.md`](fixtures/README.md),
+[`webTools.ts`](packages/tasks/src/research/webTools.ts), [`corpus.ts`](packages/tasks/src/research/corpus.ts))
 
 **Bootstrap confidence intervals, and an explicit `inconclusive`.** Every estimate carries a
 task-clustered bootstrap interval from a seeded PRNG, so the intervals are reproducible across
@@ -118,9 +114,13 @@ ranked.
 
 ### Tool-use tasks — scored deterministically
 
-Three hand-built sandbox worlds, each with an easy, a medium and a hard task. Each world is a
+Three hand-built sandbox worlds, each with an easy, a medium and a hard task, and an **expert tier**
+of ten longer tasks on top of them (four airline, three e-commerce, three support). Each world is a
 plain in-memory object with integer-cent money and fixed dates, seeded identically for every
-repeat.
+repeat. The expert tasks run against a back office of many records, carry documented traps and a
+written hypothesis, take their expectations from an oracle, and have records that arrive while the
+agent works; [docs/ADDING-A-TASK.md](docs/ADDING-A-TASK.md) describes them. The table lists the
+nine base tasks.
 
 | World | Tasks |
 | --- | --- |
@@ -146,35 +146,39 @@ The hard tasks are deliberately adversarial about the *user*, not the model: `ai
 for a cash refund the fare rules do not permit, and `support-hard` asks to close a ticket that
 should be escalated. The correct behaviour is to refuse and explain.
 
-### Research tasks — scored by rubric plus citation integrity
+### Research tasks — a frozen corpus, grounded citations
 
-Three questions whose correct answers do not drift (HTTP 301 vs 308; `async` vs `defer` on
-`<script>`; OWASP vs NIST on password hashing). The last is a deliberate source-disagreement task:
-the two authorities give different answers, and the rubric rewards naming and explaining the
-conflict rather than silently picking one.
+Six tasks whose correct answers do not drift, all answered from the frozen corpus: three judged
+questions (HTTP 301 vs 308; `async` vs `defer` on `<script>`; OWASP vs NIST on password hashing)
+and three breadth tasks (twelve HTTP status codes by the book; where ten header fields are defined;
+the current NIST SP 800-63B password rules). The OWASP-vs-NIST task is a deliberate
+source-disagreement task: the two authorities give different answers, and the rubric rewards naming
+and explaining the conflict rather than silently picking one. Where a standard was replaced,
+the task's web keeps the old one (RFC 7231 beside RFC 9110), so confusing them is a real failure.
 
 Scoring has two halves:
 
-1. **Rubric (model-graded).** Every rubric item is a pre-declared, checkable statement. A tool-less
-   structured-output judge marks each `met` / `partial` / `missing` over several independent
-   samples, reduced by median. A source-coverage item, worth 20% of the rubric weight, checks that
-   the expected domains were actually opened.
-2. **Citation integrity (deterministic, no model).** Because every retrieval went through our own
-   `fetch_page` tool, the trace and the tool journal say exactly which URLs the agent opened. Any
-   URL cited in the final answer that is not in that set is a fabrication. The audit applies a
-   penalty multiplier of `0.5 + 0.5 x integrity`, so a half-fabricated bibliography costs a quarter
-   of the score, and the run record keeps the offending URLs.
+1. **The answer.** A judged task is graded against a rubric of pre-declared, checkable statements by
+   a tool-less structured-output judge, which marks each `met` / `partial` / `missing` over several
+   independent samples, reduced by median. A breadth task is graded field by field against a gold
+   key with no model in the loop.
+2. **Grounding (deterministic, no model).** Every retrieval went through our own tools, so the tool
+   journal says exactly which pages the agent opened and which passages it was shown. A quote counts
+   only if it is at least six consecutive words, is word for word in the page it cites, that page was
+   opened, and a tool call displayed that passage; a claim without a verified quote keeps a quarter of
+   its credit. Any cited URL that was never opened is a fabrication, penalised by a multiplier of
+   `0.5 + 0.5 x integrity`, and the run record keeps the offending URLs.
 
 This is the single most common research-agent failure — a plausible citation to a page the agent
-never opened — and catching it requires no judgement call at all.
+never opened, or a quote recalled from memory — and catching it requires no judgement call at all.
 
 ---
 
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd scaffoldbench
-npm install            # Node 22+
+git clone https://github.com/emiralpayar/scaffoldbench && cd scaffoldbench
+npm ci                 # Node 22+ (see .nvmrc)
 cp .env.example .env   # then put a real key in ANTHROPIC_API_KEY
 ```
 
@@ -193,25 +197,14 @@ npm run bench -- run \
   --strategies single,plan-execute \
   --tasks airline-easy \
   --repeats 1 \
-  --model claude-sonnet-5
+  --model claude-sonnet-5-5
 ```
 
 `--tasks` accepts ids, whole worlds, categories and globs — `--tasks airline-*`, `--tasks research`,
-`--tasks support,ecommerce-hard` — so you rarely have to type twelve ids.
+`--tasks support,ecommerce-hard` — so you rarely have to type twenty-five ids.
 
-> **Record the research fixtures before you run the research half.** Runs default to `--replay`,
-> which reads recorded pages and never touches the network. On a fresh clone `fixtures/` is empty,
-> so every `search` and `fetch_page` returns *"no recording exists"* and all three research tasks
-> score near zero — for every architecture, which looks like a finding and is not one. Populate it
-> once, with any single architecture, then commit what it captured:
->
-> ```bash
-> npm run bench -- run --strategies single --tasks research --repeats 1 --record
-> git add fixtures && git commit -m "Record research fixtures"
-> ```
->
-> Every later run replays those pages, so the research half is then free, offline and identical
-> between runs. The tool-use half needs none of this — its worlds are in-memory and always ready.
+The research half needs nothing downloaded or recorded: its web is the frozen corpus in
+`fixtures/corpus`, which is committed. The tool-use half's worlds are in-memory and always ready.
 
 Then aggregate and read it:
 
@@ -261,9 +254,9 @@ interface can be reviewed. They are not results.
 
 ## Cost control
 
-A full matrix is six strategies x twelve tasks x N repeats, and several of the architectures make
-four or more model calls per run. Left unchecked that gets expensive quickly, so there are four
-brakes:
+A full matrix is six strategies x 25 tasks x N repeats (per model), and several of the architectures
+make four or more model calls per run. Left unchecked that gets expensive quickly, so there are
+three brakes:
 
 - **Per-run ceiling** — `--max-cost` (default $1.00, or `SCAFFOLDBENCH_MAX_COST_USD`) and `--max-seconds`
   (default 600). `BudgetTracker` enforces both across every model call a single run makes, and
@@ -273,17 +266,13 @@ brakes:
 - **Total budget** — `--total-budget` (default $25) caps the whole matrix. Once reached, remaining
   cells are skipped and the manifest records `Stopped early: total budget reached.` You get a
   partial run set, not a surprise bill.
-- **Replay mode** — `--replay` (the default) serves every research retrieval from committed
-  fixtures. Free, offline, and identical between runs. Record once with `--record`, commit the
-  fixtures, then replay forever. `--live` fetches without persisting, for checking whether a page
-  has moved.
-- **Model choice** — sweep and iterate with `--model claude-sonnet-5`; publish headline numbers
-  with `claude-opus-5` (the default). Results are model-specific either way (see Limitations), so a
-  sonnet sweep tells you which comparisons are worth paying opus to settle — not what the opus
-  answer is.
+- **Model choice** — the default model is `claude-sonnet-5-5`. Sweep and iterate on a cheaper one
+  (`--model claude-haiku-4-5-20251001`), or give `--models` a comma-separated list to run several in
+  one run set. Results are model-specific either way (see Limitations), so a cheap sweep tells you
+  which comparisons are worth paying a stronger model to settle, not what that model's answer is.
 
 Grading is billed separately and kept cheap on purpose: `--judge-model` defaults to
-`claude-sonnet-5` even when the model under test is opus, and `--judge-samples` (default 3) is the
+`claude-sonnet-5-5` even when the model under test is a larger one, and `--judge-samples` (default 3) is the
 number of independent gradings reduced by median. Use `--no-persist` to score a matrix without
 writing anything to `results/`.
 
@@ -292,9 +281,13 @@ writing anything to `results/`.
 ## Results
 
 First real run set: **`2026-07-25T20-18-35Z-3fs5`** — five architectures over the nine sandbox
-tasks, two repeats, Claude Sonnet 5 at `effort: high`, replay fixtures. 90 of 90 runs completed in
-23 minutes for $9.11, with zero harness errors and zero sandbox-guard violations. Regenerate or
-extend it with `scaffoldbench report --markdown`, which writes `results/<runSetId>/REPORT.md`.
+tasks, two repeats, one model (recorded as `claude-sonnet-5`) at `effort: high`. 90 of 90 runs
+completed in 23 minutes for $9.11. **This run set predates the fidelity and integrity checks, and
+it is not a result about architectures:** its traces show that four of the five never ran as
+designed (the post-mortem is on the site), so `scaffoldbench report` renders it as ranked but
+unverified. The table and the reading beneath it describe the data as it was recorded, kept for the
+record. Render it again with `scaffoldbench report 2026-07-25T20-18-35Z-3fs5 --markdown`, which writes
+`REPORT.md` beside it.
 
 | Strategy | n | Mean score (95% CI) | Pass rate | Mean cost | Mean latency | Score per $ |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -304,18 +297,17 @@ extend it with `scaffoldbench report --markdown`, which writes `results/<runSetI
 | `plan-execute-verify` | 18 | 0.990 [0.970, 1.000] | 94% | $0.109 | 52s | 9.1 |
 | `orchestrator-workers` | 18 | 0.980 [0.950, 1.000] | 89% | $0.089 | 44s | 11.0 |
 
-**All ten pairwise comparisons come back `inconclusive`, and that is the correct answer.** The
+**All ten pairwise comparisons came back `inconclusive` under the analysis of the time.** The
 task set saturates: eight of the nine tasks score 1.00 for every architecture. The only cell with
 any spread is `ecommerce-hard` — whether returned units get restocked while cancelled ones do —
 and there the miss moves *within* a strategy between repeats rather than between strategies
 (`single` gets it on repeat 1 and misses on repeat 2; `plan-execute` does the reverse). That is
 noise, not an architectural difference.
 
-Read honestly: **on this task set and this model, none of the extra architectural layers earns its
-cost back.** `single` does the same work at a fifth the price of `debate-select` and in a third of
-the wall-clock time. That is a real finding, and it is simultaneously a limit of the task set
-rather than a verdict on the architectures — see [Limitations](#limitations). The remedy is harder
-tasks, not a ranking.
+Read with the post-mortem in mind: the tie says the base task set was too easy to separate anything,
+not that the extra architectural layers fail to earn their cost, because four of the five did not
+run as designed. The remedy was harder tasks, a harness that proves each design ran, and a
+pre-registered analysis, not a ranking.
 
 The report also emits the per-cell matrix, the failure-mode breakdown, the pairwise verdicts
 (including every `inconclusive` one) and the score/cost Pareto frontier.
@@ -339,7 +331,9 @@ an agent harness will meet some of them.
 2. **Exact-key replay was unusable.** A recording answers only the wording that produced it, and
    no two runs word a search the same way. Replaying a *freshly recorded* research task missed on
    all sixteen of its searches and scored 0.08 — a number about fixture bookkeeping, not about the
-   architecture. Fixed with corpus near-matching; the same task then scored 1.00.
+   architecture. First patched with near-matching (the same task then scored 1.00), then removed
+   altogether: a recording of a changing web is the wrong foundation, so the research half now runs
+   against a frozen corpus.
 
 3. **A truncated turn discarded the whole run.** Hitting the turn cap or the budget returned an
    error result with no text, so a dozen genuine page fetches scored zero for want of a closing
@@ -376,15 +370,15 @@ packages/strategies/  the six harness architectures, plus the shared phase runne
 packages/tasks/       the task factories and the task set:
                         defineToolUseTask.ts   deterministic sandbox tasks
                         worlds/{airline,ecommerce,support}/  world, tools, tasks
-                        research/              web tools, fixture store, research tasks
+                        research/              corpus, BM25 search, web tools, citation audit, tasks
 apps/cli/             the `scaffoldbench` command (run · report · tasks · strategies)
 apps/web/             Next.js site rendering a stored run set — leaderboard, per-cell
                       matrix, score/cost frontier, run detail, traces, and the
                       /live page that runs one task on the visitor's own key
 results/              run sets — manifest, catalog, one RunRecord per cell, traces
-fixtures/             recorded web responses for replay mode (created by a record run)
+fixtures/             the frozen research corpus (documents, checksums, licence notice)
 scripts/              demo data generator, MCP wiring canary
-docs/                 ARCHITECTURE.md, ADDING-A-TASK.md
+docs/                 ARCHITECTURE.md, STATISTICS.md, ADDING-A-TASK.md, PREREGISTRATION.md
 ```
 
 `results/runs/` and the manifests are committed, so a result is reviewable in a diff and citable by
@@ -422,11 +416,11 @@ This is an honest list. Read it before quoting anything from this repository.
   written as flat checkable statements rather than quality judgements, but it does not eliminate
   it. This is precisely why the other half of the research score — citation integrity — is fully
   deterministic, and why the tool-use half of the benchmark has no model in the loop at all.
-- **The sandbox worlds are hand-built and cannot represent every domain.** Three worlds, nine
-  tasks, written by one person. They are designed to require multi-hop lookups, ordering
+- **The sandbox worlds are hand-built and cannot represent every domain.** Three worlds, nineteen
+  tool-use tasks, written by one person. They are designed to require multi-hop lookups, ordering
   discipline, and occasionally refusing the user — but they are not a random sample of real agent
   work, they contain no genuinely ambiguous requirements, and their tools always behave. A harness
-  that wins here has won on these twelve tasks.
+  that wins here has won on these tasks.
 - **Prompt wording inside each strategy is a confound.** Every architecture needs phase-specific
   instructions, and the wording of those instructions affects the score. The mitigation is to keep
   the phases symmetric: all six build on the identical base system prompt, quote the user's
@@ -448,7 +442,7 @@ available "fix" is a major-version downgrade that would be worse than the adviso
 
 | Advisory path | Reported fix | Why it is declined |
 | --- | --- | --- |
-| `@anthropic-ai/claude-agent-sdk` → `@modelcontextprotocol/sdk` → `@hono/node-server` | downgrade the Agent SDK to 0.2.85 | Rolling the SDK back across a major version to patch a Windows path-traversal bug in a transitive HTTP adapter we never serve traffic from. The pinned `0.3.220` is the version this harness is written against. |
+| `@anthropic-ai/claude-agent-sdk` → `@modelcontextprotocol/sdk` → `@hono/node-server` | downgrade the Agent SDK to 0.2.85 | Rolling the SDK back across a major version to patch a Windows path-traversal bug in a transitive HTTP adapter we never serve traffic from. The pinned `0.3.287` is the version this harness is written against. |
 | `vitest` → `vite` → `esbuild` | change vitest major | esbuild's dev-server advisory applies to a dev server we do not run; vitest is a devDependency and never ships. |
 | `next` → `postcss` / `sharp` | downgrade `next` to 9.3.3 | Downgrading Next.js by six major versions to patch build-time-only CSS and image tooling. The site is statically rendered from committed JSON and accepts no user input. |
 

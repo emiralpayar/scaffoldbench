@@ -1,7 +1,7 @@
 # Adding a task
 
 Tasks own both their environment and their scorer, so a new task can be added without touching the
-runner, the strategies or the site. There are two kinds, and they are added in different ways.
+runner, the strategies or the site. There are three kinds, and they are added in different ways.
 
 - [A new sandbox world](#part-1--a-new-sandbox-world): deterministic, no model in the grading loop.
 - [An expert task](#part-2--an-expert-task): a long, trap-laden sandbox task with a pre-registered
@@ -474,74 +474,114 @@ mid-run. A new expert task should lean on a lever of another kind.
 
 ## Part 3 — a new research task
 
-Research tasks need no new tools: they all share `search` and `fetch_page`. A task is one call to
-`defineResearchTask` in
-[`packages/tasks/src/research/tasks.ts`](../packages/tasks/src/research/tasks.ts), added to the
-`researchTasks` array at the bottom of that file — the registry already spreads it.
+Research tasks need no new tools: they all share `search` and `fetch_page` over a **frozen corpus** of
+public documents ([`fixtures/README.md`](../fixtures/README.md) explains how it is built and checked).
+Nothing is recorded or replayed, and a run never touches the network. There are two kinds of task:
+
+- **Judged** (`defineResearchTask`, in
+  [`packages/tasks/src/research/tasks.ts`](../packages/tasks/src/research/tasks.ts)): an open
+  question graded by a rubric, with a deterministic audit of the citations.
+- **Breadth** (`defineBreadthTask`, in
+  [`breadthTasks.ts`](../packages/tasks/src/research/breadthTasks.ts)): many small, independent facts,
+  each graded against a gold key with no model in the loop. These are the tasks where fanning the work
+  out should pay.
+
+A spec is added to `judgedResearchSpecs` or `breadthResearchSpecs` at the bottom of its file; the
+registry already spreads both. A judged one looks like this:
 
 ```ts
-const httpRedirects = defineResearchTask({
+export const httpRedirectsSpec: ResearchTaskSpec = {
   id: 'research-http-redirects',
   title: 'HTTP 301 vs 308',
   question:
     'What is the difference between HTTP status codes 301 and 308? Explain what each one means, ' +
     'how a client is expected to treat the request method and body when following each, whether ' +
-    'each is cacheable, and where each is specified.',
+    'each is cacheable, and where each is currently specified.',
   difficulty: 'easy',
   tags: ['http', 'specifications', 'comparison'],
-  maxTurns: 14,
-  requiredSources: ['rfc-editor.org', 'developer.mozilla.org'],
+  maxTurns: 22,
+  // The task's whole web. `search` ranks only these, and fetch_page serves only these.
+  corpus: {
+    primary: ['rfc9110'],                                   // where the gold answer comes from
+    secondary: ['mdn-status-301', 'mdn-status-308'],         // reliable restatements
+    superseded: ['rfc7538', 'rfc7231'],                      // earlier versions: the version trap
+    distractor: ['mdn-status-307'],                          // plausible but off target
+  },
+  hypothesis: 'Near the ceiling for every architecture; a verify phase earns its cost only on the MDN trap.',
+  traps: [
+    {
+      id: 'rfc7538-current',
+      description: 'Citing RFC 7538 as the current definition of 308; RFC 9110 obsoletes it.',
+      caughtBy: ['rubric:specifications'],
+    },
+  ],
   rubric: [
     {
       id: 'method-preserved-308',
       claim:
-        'States that 308 requires the client to reuse the original request method and body when following the redirect.',
+        'States that a client following a 308 must not change the request method: a POST is repeated as a POST, with its body.',
       weight: 1.5,
+      // Passages that establish the claim. Not used for scoring; the sufficiency test checks each
+      // one is in the corpus, which proves the claim can be answered, and quoted, from this web.
+      support: [{ doc: 'rfc7538', quote: 'except that it does not allow changing the request method from POST to GET' }],
     },
     // …
   ],
-});
+};
 ```
 
-Four constraints:
+Constraints:
 
-- **The answer must not drift.** Specifications, standards, long-settled semantics. Anything that
-  moves with a release cycle — prices, benchmarks, "current best practice" — makes a task that
-  stops measuring the harness the moment it changes.
+- **Use the documents the corpus has.** A task names documents by id (`fixtures/corpus/manifest.json`
+  lists them). If the question needs a document that is not there, add it (below) rather than
+  pointing the task at the live web. Give the task the *wrong* pages as well as the right ones:
+  a `superseded` document the current standard replaced, or a `distractor`, is what turns "found a
+  source" into "found the right source".
+- **The answer must not drift.** Specifications, standards, long-settled semantics. Anything that moves
+  with a release cycle makes a task that stops measuring the harness the moment it changes, and the
+  corpus is a snapshot, so the gold answer is whatever the snapshot says.
 - **Every rubric item is a flat, checkable statement,** phrased so a grader decides whether the
   answer *says* it, not whether the answer is *good*. Quality judgements are where judges disagree.
-- **`requiredSources` are domains a thorough answer should have opened.** They become a
-  source-coverage item worth 20% of the rubric weight, scored from the URLs actually fetched.
-- **`allowedDomains`, if set, makes `fetch_page` refuse everything else.** Use it when a task
-  should be confined to primary sources.
+- **Quotes are checked, not trusted.** The agent is told to cite the URL it relied on and to quote word
+  for word. The scorer replays the tool journal against the corpus: a quote counts only if it is in
+  the page it cites, the page was opened, and a tool call displayed that passage. A claim with no
+  verified quote earns a quarter credit, and citing a page that was never opened is a penalty. You
+  write none of this; the sufficiency tests make sure your task can be answered within it.
 
 Weight the items that separate a real answer from a plausible one. In the OWASP-vs-NIST task the
 heaviest item (weight 2) is `names-the-conflict` — *explicitly says the two sources disagree* —
 because presenting a single confident recommendation is exactly the failure the task exists to
 detect.
 
-### Record the fixtures
+A breadth task takes the same `corpus` selection, a `key` and `fields` for the answer's shape, and a
+list of `items`: each has the expected value per field, a `source` span in the corpus the quote must
+come from, and a `goldQuote` that the sufficiency test checks lies inside it. Read one of the three in
+[`breadthTasks.ts`](../packages/tasks/src/research/breadthTasks.ts) before writing a fourth.
 
-A new research task has no recordings, and in `replay` mode its searches will all miss. Record once
-and commit:
+### Add the documents to the corpus
 
-```bash
-npm run bench -- run --strategies single --tasks research-my-task --repeats 1 \
-  --model claude-sonnet-5-5 --record
-git add fixtures && git commit -m "Record fixtures for research-my-task"
-```
+Skip this if the task's documents are already in `fixtures/corpus`. Otherwise:
 
-Then verify the task runs offline before you rely on it (`--replay` is the default, but say it):
+1. Add an entry to `CORPUS_SOURCES` in
+   [`sources.ts`](../packages/tasks/src/research/sources.ts): an id, the canonical URL, any aliases,
+   title, publisher, licence and credit line, and how to extract the text. Prefer a source that may be
+   redistributed (see the licensing section of the fixtures README).
+2. Fetch just that document and write the notice (network access is needed for this step only):
 
-```bash
-npm run bench -- run --strategies single --tasks research-my-task --repeats 1 \
-  --model claude-sonnet-5-5 --replay
-```
+   ```bash
+   npx tsx scripts/build-corpus.ts --only my-document
+   ```
 
-Fixtures are keyed on the normalized request text, so a strategy that phrases a query differently
-will still miss. Record with a couple of different strategies if you want broad coverage — or
-accept the misses, since the replay-mode error message tells the agent it is offline and to
-continue with what it has, which is itself a legitimate thing to measure.
+3. Commit `fixtures/corpus/manifest.json`, the new `fixtures/corpus/docs/my-document.txt` and
+   `fixtures/NOTICE.md` together. Never edit an existing document by hand: `Corpus.load` checks every
+   document against its checksum and refuses a changed file.
+4. Run `npm run check`. `researchCorpus.test.ts` checks that the manifest matches the source list, that
+   every document is credited in the notice, and that every `support` and `goldQuote` passage is in the
+   corpus of the task that names it.
+
+A document added to the corpus does not change what existing tasks see, since each task's recorded
+corpus hash covers only the documents it names. Re-fetching existing ones is a new snapshot and can
+change the answers graded against it; leave that to `--verify` and to an issue.
 
 ---
 
@@ -680,9 +720,13 @@ the task. A red-team pass over the current tier found the following, so look for
 - **Tool error handling**: unknown ids and impossible operations report errors instead of
   throwing, and the world is unchanged afterwards.
 
-For research tasks, use a fake `Judge` returning canned verdicts, plus a `fetchImpl` stub for the
-web tools. See the fixtures, rubric-scoring, citation-integrity and source-coverage suites in
-[`packages/tasks/test/research.test.ts`](../packages/tasks/test/research.test.ts).
+For research tasks, write a small corpus to a temporary directory (`writeCorpus` in
+[`researchHelpers.ts`](../packages/tasks/test/researchHelpers.ts)), drive the real `search` and
+`fetch_page` tools over it (`callTool`), and use a fake `Judge` that returns canned verdicts. The
+suites to read are [`research.test.ts`](../packages/tasks/test/research.test.ts) (rubric and gold-key
+scoring), [`researchCitations.test.ts`](../packages/tasks/test/researchCitations.test.ts) (which quotes
+count) and [`researchCorpus.test.ts`](../packages/tasks/test/researchCorpus.test.ts) (the corpus, the
+tools, and the "shipped corpus sufficiency" tests that every new spec is checked against).
 
 ---
 

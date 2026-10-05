@@ -433,28 +433,51 @@ instead: a harness failure, then the run's caps, then a model stop, then turns. 
 `budget_exceeded`, `timeout` and `model_stop` are the run's own limits, so those runs are ranked
 like any other.
 
-## 9. The fixture layer
+## 9. The research corpus
 
+[`corpus.ts`](../packages/tasks/src/research/corpus.ts) ·
+[`bm25.ts`](../packages/tasks/src/research/bm25.ts) ·
 [`webTools.ts`](../packages/tasks/src/research/webTools.ts) ·
-[`fixtureStore.ts`](../packages/tasks/src/research/fixtureStore.ts)
+[`citations.ts`](../packages/tasks/src/research/citations.ts) ·
+[`fixtures/README.md`](../fixtures/README.md)
 
 Research agents get exactly two tools, `search` and `fetch_page`, and the built-in `WebSearch`/
 `WebFetch` are denied. Routing every retrieval through our own tools buys three things at once:
-replay determinism, a per-task domain allowlist, and — most importantly — a provable record of
-which pages were opened, which is what makes the citation audit possible at all.
+every architecture sees the same web, the tools can say exactly which pages were opened and which
+passages were shown, and that record is what makes the citation audit possible at all.
 
-`FixtureStore` is a content-addressed cache, one JSON file per key. The key hashes the
-whitespace-and-case-normalized request, so `RFC  7538` and `rfc 7538` share a recording instead of
-missing and silently penalising the strategy.
+The web is a **frozen corpus**: a snapshot of public documents in `fixtures/corpus/` (one text
+file per document, and a manifest with its URL, aliases, licence, retrieval time and sha256).
+Nothing is recorded or replayed: no run touches the network, and the only code that does is
+`scripts/build-corpus.ts`, which builds the snapshot once.
 
-| Mode | Behaviour |
-| --- | --- |
-| `replay` | Fixtures only. A miss returns an explanatory error telling the agent it is offline, so it continues with what it has instead of hallucinating. CI and the weekly benchmark default. |
-| `record` | Real requests, written to the store. Run once, commit, replay forever. |
-| `live` | Real requests, nothing persisted. For probing whether a page has changed. |
+- **The task's web.** Each research task names the documents it may see, by role (`primary`,
+  `secondary`, `superseded`, `distractor`). `search` ranks only those, so a superseded RFC can sit
+  next to the current one exactly as it can on the real web, and an obsolete page is a trap rather
+  than an accident.
+- **`search` is local BM25** over passage-sized chunks of those documents: plain lexical ranking
+  with no authority or recency prior, the same ranking for the same query in every run, and no
+  results when nothing matches.
+- **`fetch_page` returns exactly the document a URL addresses**: its canonical URL or a listed alias.
+  Anything else is a 404; there is no closest-match substitution, so an agent reads the page it asked
+  for or knows it did not. Long documents are read a window at a time, by `offset` or by jumping to a
+  phrase with `find`. No error mentions that the web is a fixture.
+- **The corpus cannot drift.** `Corpus.load` verifies every document against its manifest checksum
+  and refuses a hand-edited file, because every research run records the hash of the documents its
+  task could see (`scoreMetadata.corpus.hash`), and that hash has to describe the text the run read.
 
-Fixtures store more text than the model is shown (60k vs 6k chars), so raising the render cap does
-not require re-recording.
+**Quote grounding.** The deterministic half of research scoring replays the tool journal against the
+corpus. A quote counts as evidence only if it is at least six consecutive words, occurs word for word
+in the page it cites, that page was opened by a successful `fetch_page`, and one of the run's calls
+*displayed* that passage (a window it read, a `find` context or a search snippet; at most five words
+may run past the edge of what was shown). A sentence recalled from memory does not count, even from a
+page the run opened. The judge then grades the rubric over evidence that is already verified; it
+never decides whether a page was read.
+
+`fixtureMode` (`--replay`, `--record`, `--live`) is still carried on the environment and the manifest,
+but research environments ignore it: the corpus is the only web there is.
+
+---
 
 ## 10. Statistics
 

@@ -236,9 +236,9 @@ const RUN_FLAGS: FlagSpec[] = [
     help: 'Independent grades per run, reduced by median',
     fallback: String(DEFAULT_JUDGE_SAMPLES),
   },
-  { name: 'replay', kind: 'boolean', help: 'Research tasks read only recorded fixtures', fallback: 'on' },
-  { name: 'record', kind: 'boolean', help: 'Research tasks fetch the web and record fixtures' },
-  { name: 'live', kind: 'boolean', help: 'Research tasks fetch the web without recording' },
+  { name: 'replay', kind: 'boolean', help: 'Fixture mode kept in the manifest; research tasks always read the frozen corpus', fallback: 'on' },
+  { name: 'record', kind: 'boolean', help: 'Like --replay: the frozen corpus is the only web, so there is nothing to record' },
+  { name: 'live', kind: 'boolean', help: 'Like --replay: no run touches the network' },
   { name: 'run-set', kind: 'value', value: '<id>', help: 'Name the new run set instead of a timestamp' },
   { name: 'resume', kind: 'value', value: '<id>', help: 'Run only the cells a stored run set is missing' },
   {
