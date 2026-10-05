@@ -1,0 +1,24 @@
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Trailing spaces are a hard line break in Markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+# Recorded data and the frozen corpus are byte-for-byte what a run or the
+# corpus build wrote; an editor must not reformat them.
+[{results,fixtures/corpus}/**]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+end_of_line = unset
+charset = unset

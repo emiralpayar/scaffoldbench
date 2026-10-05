@@ -1,0 +1,40 @@
+name: Architecture proposal
+description: Propose a new agent harness architecture to put on the benchmark.
+labels: [architecture]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An architecture here is orchestration and nothing else: how many model calls, in what order, with which tools, and what happens when a phase fails. Its prompts and tools are held equal to every other architecture's. See "Adding an architecture" in `CONTRIBUTING.md`.
+  - type: textarea
+    id: design
+    attributes:
+      label: The design
+      description: The phases, who sees what, and how the final answer is chosen. A diagram or a pseudo-trace helps.
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: The question it answers
+      description: What does it cost over a single agent, and what would it have to buy for that to pay off? Which tasks should it win or lose, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: fidelity
+    attributes:
+      label: How a run proves it ran as designed
+      description: The observable facts a trace must show (calls made, tools withheld, a review that actually read the state). A design with no such facts cannot be told from a single agent.
+    validations:
+      required: true
+  - type: textarea
+    id: prior
+    attributes:
+      label: Prior work
+      description: Papers, products or posts that describe it, if any.
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Willing to write it?
+      options:
+        - label: I would like to implement this myself.

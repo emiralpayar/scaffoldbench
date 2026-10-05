@@ -1,0 +1,49 @@
+name: Task proposal
+description: Propose a task that would separate agent architectures better than the current set.
+labels: [task]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read `docs/ADDING-A-TASK.md` first: it says what a task is made of and what it must prove before it merges. A proposal here is the cheap step before writing one.
+  - type: textarea
+    id: question
+    attributes:
+      label: The question it answers
+      description: What does a harness have to do well to pass, and why would one architecture beat another on it? Name the hypothesis.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Tool use in a sandbox world (existing world)
+        - Tool use in a new world
+        - Expert tier (long, with hidden traps)
+        - Research (against the frozen corpus)
+    validations:
+      required: true
+  - type: textarea
+    id: scoring
+    attributes:
+      label: How it is scored
+      description: What is checked, and how a wrong-but-plausible answer is told from a right one. Scoring should be deterministic where it can be.
+    validations:
+      required: true
+  - type: textarea
+    id: traps
+    attributes:
+      label: Traps and failure modes
+      description: The mistakes a careless agent makes here, and how the score tells.
+  - type: textarea
+    id: calibration
+    attributes:
+      label: Difficulty
+      description: If you tried it with a single agent, what happened? A task every architecture solves, or none does, cannot tell them apart.
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Willing to write it?
+      options:
+        - label: I would like to implement this myself.

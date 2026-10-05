@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in the harness, the CLI or the site does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. A security problem goes through a private advisory instead; see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead. Paste the exact error text.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: The command or page, and the run set id if one is involved. A free repro (`--dry-run`, `report`, a test) is ideal; say so if it cost money to reach.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version output
+      description: Paste the output of `npm run bench -- --version` and `npm run bench -- doctor`. Neither prints an API key, but doctor shows file paths and a masked login, so skim it before you paste.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it is
+      options:
+        - CLI (run, report, doctor)
+        - Harness or runner (packages/core)
+        - Scoring, integrity checks or statistics
+        - A task
+        - An architecture
+        - The site
+        - Docs
+        - Not sure
+    validations:
+      required: true
