@@ -23,7 +23,9 @@ results/
 - **`runs/`** holds everything the leaderboard, the analysis and the integrity checks need. The run
   summaries and manifests are committed, so results are reviewable in a diff and citable by commit.
 - **`traces/`** is gitignored by default: traces are large and the run summary carries what the
-  numbers need. Commit a trace deliberately when it illustrates something worth pointing at.
+  numbers need. Commit a trace deliberately when it illustrates something worth pointing at. The
+  legacy run set below is the exception: all 90 of its traces are committed, because they are the
+  evidence for [`docs/POSTMORTEM.md`](../docs/POSTMORTEM.md).
 
 Run set ids look like `2026-07-25T20-18-35Z-3fs5`: the UTC start time and four random characters.
 A run id names the cell it measured, so a file name says what is inside it.
@@ -38,7 +40,7 @@ dry run or a partial run therefore cannot change what the website shows.
 
 | Run set | What it is |
 | :--- | :--- |
-| `2026-07-25T20-18-35Z-3fs5` | The first full run set: 5 architectures x 9 tasks x 2 repeats on one model (90 runs, $9.11), recorded before the fidelity and integrity checks existed. Its five architectures scored between 0.980 and 1.000, and the traces showed four of them had not run as designed. It is kept as the evidence for the site's post-mortem page, not as a result: `report` renders it as ranked but unverified. |
+| `2026-07-25T20-18-35Z-3fs5` | The first full run set: 5 architectures x 9 tasks x 2 repeats on one model (90 runs, $9.11), recorded before the fidelity and integrity checks existed. Its five architectures scored between 0.980 and 1.000, and the traces showed four of them had not run as designed. It is kept, with all 90 traces, as the evidence for [`docs/POSTMORTEM.md`](../docs/POSTMORTEM.md) and the site's post-mortem page, not as a result: `report` renders it as ranked but unverified. |
 
 Run sets from the pre-registered campaign (see [`docs/PREREGISTRATION.md`](../docs/PREREGISTRATION.md))
 are committed here once they have finished, and `latest.json` is moved to the one the site should

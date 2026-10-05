@@ -75,7 +75,8 @@ describe('derivePostmortem', () => {
 
 /**
  * The landing page states these numbers as fact, so they are pinned against
- * the committed evidence. Skipped only in a checkout whose results/ was cleared.
+ * the committed evidence: the run records and the traces beside them. Skipped
+ * only in a checkout whose results/ was cleared.
  */
 const evidence = path.join(resultsRoot(), POSTMORTEM_RUN_SET_ID);
 
@@ -125,7 +126,7 @@ describe.skipIf(!existsSync(evidence))('the committed post-mortem run set', () =
     expect(byId['orchestrator-workers']?.receipts[1]).toMatchObject({ count: ACT_ONE.orchestratorRuns - ACT_ONE.fannedOut });
   });
 
-  it.skipIf(!tracesPresent())('supports the counts that only the traces show', async () => {
+  it('supports the counts that only the traces show, from the committed traces', async () => {
     const data = await readRunSet(resultsRoot(), POSTMORTEM_RUN_SET_ID);
     if (!data) throw new Error('evidence run set unreadable');
     const traces = [];
@@ -145,12 +146,6 @@ describe.skipIf(!existsSync(evidence))('the committed post-mortem run set', () =
     expect(facts.structuredOutputDenials).toBe(ACT_ONE.deniedToolCalls);
   });
 });
-
-/** The traces are gitignored, so most checkouts do not have them. */
-function tracesPresent(): boolean {
-  const dir = path.join(evidence, 'traces');
-  return existsSync(dir) && existsSync(path.join(dir, 'single__airline-easy__r1.jsonl'));
-}
 
 describe('derivePostmortem totals', () => {
   it('counts phases that errored or ran blind as wasted, once, with their cost', () => {

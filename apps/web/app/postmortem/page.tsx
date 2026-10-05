@@ -358,8 +358,8 @@ jq -s '[.[] | select(.strategyId == "debate-select") | .phases[] | select((.phas
           {tracesPresent ? ', which this build carries under ' : ', which are not in this checkout. '}
           {tracesPresent ? <code className="code-inline">{PUBLISHED_HERE}/{POSTMORTEM_RUN_SET_ID}/traces/</code> : null}
           {tracesPresent ? '. ' : null}
-          <code className="code-inline">apps/web/test/postmortem.test.ts</code> re-derives them whenever a checkout has the
-          traces, and fails if a number on this page is wrong. The run set was recorded at{' '}
+          <code className="code-inline">apps/web/test/postmortem.test.ts</code> re-derives them from those traces on every
+          test run, and fails if a number on this page is wrong. The run set was recorded at{' '}
           <code className="code-inline">164f958</code>, where {ACT_ONE.tests} tests passed.
         </p>
       </section>

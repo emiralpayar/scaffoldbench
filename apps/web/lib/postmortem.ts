@@ -5,8 +5,9 @@
  * Every receipt is a count over `runs/*.json` — phase errors, worker counts,
  * tool calls per proposer, revision phases — so the claim on the page is
  * re-derived on every build from files anyone can open, not typed into copy.
- * The traces that first exposed the failure are not committed; nothing here
- * depends on them.
+ * What a record cannot show — the plan an executor was handed, the tools and
+ * servers a session started with — comes from the run set's committed traces
+ * through `deriveTraceFacts` below.
  */
 
 import { compareArchitectures } from './architectures';
@@ -284,9 +285,9 @@ export function runReceipts(record: RunRecord): string[] {
  * The counts that cannot be read off a run record, because the record keeps
  * a phase's cost and error but not what the phase was shown: the plan the
  * executor received, the tools each session started with, the servers it
- * connected to. They come from the traces, which the first run set's
- * repository does not carry; `ACT_ONE` states them, and `test/postmortem.
- * test.ts` re-derives them from the traces whenever a checkout has them.
+ * connected to. They come from the run set's traces, committed under
+ * `results/<runSetId>/traces/`; `ACT_ONE` states them, and
+ * `test/postmortem.test.ts` re-derives them from those traces on every run.
  */
 export interface TraceFacts {
   /** Executor calls that were handed a plan, and the ones whose plan was empty. */
@@ -353,9 +354,8 @@ export function deriveTraceFacts(traces: readonly (readonly TraceEvent[])[]): Tr
  * The first run set, in numbers, as the post-mortem page states them. Fixed
  * on purpose: the set is closed evidence, and a sentence that says "72 of 72"
  * should not move because a page's code changed. `test/postmortem.test.ts`
- * re-derives every one from the committed run records (and, where the
- * traces are present, from those), so a number here that the evidence does
- * not support fails the build.
+ * re-derives every one from the committed run records and traces, so a
+ * number here that the evidence does not support fails the build.
  */
 export const ACT_ONE = {
   runs: 90,
