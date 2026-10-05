@@ -55,3 +55,11 @@ can run a long-lived Node process.
 ## Supported versions
 
 The latest commit on `main` is the only supported version. There are no backports.
+
+## Known advisories
+
+`npm audit` reports one advisory family that is deliberately left open: PostCSS ≤ 8.5.22, which
+Next.js 15 bundles for its own CSS build step (GHSA: XSS via an unescaped `</style>` in CSS
+stringify, and a file-read issue). Next.js runs it at build time over this repository's own
+stylesheets, which contain no untrusted input, and the published site is static HTML. The fix
+requires Next.js 16, a major upgrade that will be made on its own.
