@@ -524,10 +524,42 @@ still renders with the task prompts and strategy descriptions *as they were when
 dimension omit the model) and `runSetId` is an ISO timestamp with a random suffix, so both sort
 meaningfully and neither collides. Every JSON file is written to a temporary name and renamed into
 place, so a reader never sees half a manifest. Run records are committed; traces are gitignored by
-default because they are large. `latest.json` is tracked, so the runner moves it only when asked
+default because they are large. The legacy run set's 90 traces are the exception: they are the
+evidence for [POSTMORTEM.md](POSTMORTEM.md). `latest.json` is tracked, so the runner moves it only when asked
 (`updateLatestPointer`).
 
 The manifest's optional `synthetic: true` flag is set by exactly one thing —
 `scripts/generate-demo-data.ts` — and the site renders an unmissable banner when it sees it.
 Fabricated data exists so the interface can be built without spending money, and it must never be
 mistakable for a measurement.
+
+## 12. What live runs surfaced
+
+The four bugs behind the first run set's false tie are written up in [POSTMORTEM.md](POSTMORTEM.md).
+Six smaller defects got through a green test suite, a clean typecheck and a passing wiring canary in
+the same way, and only showed up against a live model. Each is fixed, and each is a class of bug
+that any agent harness can have.
+
+1. **The tool surface leaked, and differed by host.** `settingSources: []` was not enough: init
+   messages showed Claude Code's own agent tools (`Task`, `Skill`, `ToolSearch`, the scheduling
+   tools) in every session. The permission mode kept them uncallable, but they took up prompt space
+   and their set depended on the machine. `tools` is now pinned alongside `allowedTools`, and
+   `harness.builtin-tools` fails any run whose session was offered one.
+2. **Exact-key replay of recorded searches was unusable.** A recording answers only the wording that
+   produced it. Replaying a freshly recorded research task missed all sixteen of its searches and
+   scored 0.08. Replay was removed, and the research tasks now run against the frozen corpus (§9).
+3. **A truncated turn threw away the whole run.** Hitting the turn cap or the budget returned an
+   error result with no text, so real work scored zero for lack of a closing message. `runQuery` now
+   recovers the last assistant text. A truncated run is a valid data point.
+4. **Resolving the repository root broke under the site's bundler.** A module-scope
+   `import.meta.url` reached `fileURLToPath` as a `URL` from another realm and failed the web build.
+   [`paths.ts`](../packages/core/src/paths.ts) now tries an override, then the module path, then
+   walks up from the working directory looking for the workspace's `package.json`.
+5. **The live demo could have billed the operator.** Spreading `process.env` and adding a visitor's
+   key let the SDK fall back to the host's own credentials. `visitorEnv`
+   ([`credentials.ts`](../packages/core/src/credentials.ts)) removes every other credential source
+   first. On a host with an ambient login, an invalid visitor key now fails with a 401 instead of
+   running on the operator's account. See [SECURITY.md](../SECURITY.md).
+6. **The CLI rejected a working credential setup.** It required `ANTHROPIC_API_KEY`, although a
+   Claude Code login is a valid credential. `doctor` and `run` now report which account will be
+   billed and leave the decision to the request.

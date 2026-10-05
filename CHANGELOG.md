@@ -34,6 +34,9 @@ and the project was called Agent Arena until this release.
   verdict, and a "Scaffold or Scale?" analysis that
   contrasts each architecture on a smaller model with the plain single agent on the next model up. A contrast with no usable interval says so instead of printing one. See
   `docs/STATISTICS.md`.
+- **The Act 1 post-mortem** (`docs/POSTMORTEM.md`): how the first run set's tie came from four
+  architectures that never ran as designed, with the root causes, the fixes and commands that
+  re-derive every count. The run set's 90 traces are committed as its evidence.
 - **Pre-registration** of the first campaign (`docs/PREREGISTRATION.md`), the frozen description of what is
   measured and how it is analysed.
 - **A command line**, `scaffoldbench` (`npm run bench -- <command>` in the repository): `run` with a
@@ -72,3 +75,6 @@ reported as ranked but unverified.
   `scaffoldbench`, and environment variables are `SCAFFOLDBENCH_*`. There are no fallbacks to the old names.
 - The five development run sets were removed from `results/`; the first full run set stays as post-mortem
   evidence.
+- The README leads with the two-act story and a results placeholder for the pre-registered run set.
+  The legacy results prose is gone, and the list of defects found by live runs moved to
+  `docs/ARCHITECTURE.md`.
