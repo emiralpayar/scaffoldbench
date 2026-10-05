@@ -266,6 +266,12 @@ export function healthSummary(
       text: `${plural(health.retried, 'run')} needed a retry after a transient API failure; only the last attempt is recorded.`,
     });
   }
+  if (health.duplicates > 0) {
+    lines.push({
+      level: 'warn',
+      text: `${health.duplicates} healthy ${health.duplicates === 1 ? 'run fills' : 'runs fill'} a (task, repeat) cell that another healthy run already filled; the analysis keeps the later run of each.`,
+    });
+  }
   return lines;
 }
 

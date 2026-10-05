@@ -569,6 +569,22 @@ describe('against the baseline, and across models', () => {
     expect(publicationProblems(buildReportView(runSetOf(legacy, { manifest: manifest() })))).toContain('32 runs predate integrity checks');
   });
 
+  it('says when a cell holds more than one healthy run, and analyses one of them', () => {
+    const grid = gridRecords({
+      strategies: {
+        single: { score: (t, r) => 0.5 + t * 0.04 + jitter(t, r) },
+        scaffold: { score: (t, r) => 0.6 + t * 0.04 + jitter(t, r, 1) },
+      },
+    });
+    const again = { ...grid[0]!, runId: 'rerun', finishedAt: '2026-10-01T13:00:00.000Z', score: 0.1 };
+    const view = buildReportView(runSetOf([...grid, again]));
+    expect(view.health.duplicates).toBe(1);
+    expect(plain(formatHealth(view.health))).toMatch(/1 healthy run fills a \(task, repeat\) cell that another healthy run already filled/);
+    // Sixteen cells per strategy, not seventeen runs.
+    expect(view.models[0]?.arms.map((arm) => arm.runs)).toEqual([16, 16]);
+    expect(buildReportView(runSetOf(grid)).health.duplicates).toBe(0);
+  });
+
   it('measures against the strategy the caller names, and skips the table when the model never ran it', () => {
     const named = buildReportView(runSetOf(records), { baseline: 'scaffold' });
     expect(named.models[0]?.vsBaseline.map((row) => row.strategyId)).toEqual(['single']);

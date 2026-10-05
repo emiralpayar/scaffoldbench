@@ -158,6 +158,11 @@ export interface HealthView {
   /** Runs that needed more than one attempt because of transient API failures. */
   retried: number;
   /**
+   * Healthy runs of a (task, repeat) cell that already had one. The analysis
+   * keeps the later run, so these are ranked in the counts but not analysed.
+   */
+  duplicates: number;
+  /**
    * Calls that ended because the model could not finish the turn (out of
    * room, a refusal). The run's own limit, not a harness fault: these runs
    * stay ranked, so this is where they are counted.
@@ -231,7 +236,7 @@ export function buildReportView(
     runSetId: runSet.runSetId,
     manifest,
     synthetic: manifest?.synthetic === true,
-    health: healthView(runSet),
+    health: healthView(runSet, analysis.health.duplicates),
     models,
     scale: scaleViews(analysis, models),
     method:
@@ -414,7 +419,7 @@ export function orderModels(declared: readonly string[], present: readonly strin
 // Health
 // ---------------------------------------------------------------------------
 
-function healthView(runSet: Pick<LoadedRunSet, 'records' | 'audits' | 'deniedTools'>): HealthView {
+function healthView(runSet: Pick<LoadedRunSet, 'records' | 'audits' | 'deniedTools'>, duplicates: number): HealthView {
   const { records } = runSet;
   let integrityFailed = 0;
   let apiErrors = 0;
@@ -490,6 +495,7 @@ function healthView(runSet: Pick<LoadedRunSet, 'records' | 'audits' | 'deniedToo
     denied: { total: deniedTotal, byStrategy: deniedByStrategy, byTool: deniedByTool },
     phaseIssues: phaseIssues(records),
     retried: records.filter((record) => (record.attempts ?? 1) > 1).length,
+    duplicates,
     modelStops: { runs: stopRuns, calls: stopCalls, byReason: stopsByReason, byCategory: stopsByCategory },
   };
 }
