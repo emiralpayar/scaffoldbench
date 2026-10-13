@@ -4,6 +4,8 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/emiralpayar/scaffoldbench/ci.yml?branch=main&label=CI)](https://github.com/emiralpayar/scaffoldbench/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/emiralpayar/scaffoldbench)](LICENSE)
+[![Runs: 900 of 900 healthy](https://img.shields.io/badge/runs-900%2F900%20healthy-2f9a57)](docs/RESULTS.md)
+[![Pre-registered](https://img.shields.io/badge/pre--registered-prereg--v1-5a3db0)](docs/PREREGISTRATION.md)
 
 ScaffoldBench is an open benchmark of agent-harness architectures built on the Claude Agent SDK.
 It runs six scaffolds on the same 25 tasks: plan first, fan out to workers, verify, propose in
@@ -11,6 +13,12 @@ parallel, review each action, and a plain single agent as the control. Models, t
 budgets are held fixed, so the architecture is the only thing that differs between two rows. Each
 comparison is paired, clustered by task, and reported with an interval. A run whose trace does not
 show that its architecture ran as designed is excluded from the rankings.
+
+> **Scale beat scaffold.** In 900 pre-registered runs on Claude Haiku 4.5, Sonnet 5.5 and Opus 5.5,
+> no scaffold measurably beat a plain single agent on any model, and every one cost 1.3 to 4.8 times
+> as much. One step up in model bought more score than any scaffold did. [Results ↓](#results)
+
+![Scaffold or Scale? Mean score with 95% task-clustered intervals for six architectures on three Claude models](docs/figures/hero.svg)
 
 **[Site](https://emiralpayar.github.io/scaffoldbench)** ·
 **[Results](docs/RESULTS.md)** ·
@@ -47,8 +55,6 @@ single agent: all 15 score contrasts against `single` were inconclusive after Ho
 Every scaffold cost more on every model, ×1.34 to ×4.77 per run. One model step, Haiku 4.5 to
 Sonnet 5.5, raised the single agent's score by +0.129 at $0.116 per run instead of $0.091. The
 best Haiku scaffold gained +0.038 over Haiku's single agent, not significant, at ×4.34 the cost.
-
-![Scaffold or Scale? Mean score with 95% task-clustered intervals for six architectures on three Claude models](docs/figures/hero.svg)
 
 | Mean score (cost per run) | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 |
 | :--- | ---: | ---: | ---: |
