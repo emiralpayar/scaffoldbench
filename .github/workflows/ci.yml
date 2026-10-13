@@ -74,11 +74,12 @@ jobs:
           npm run --silent bench -- strategies
 
       - name: Report the committed run sets
-        # Whatever state a committed run set is in (the first predates the
-        # integrity checks and renders with a health warning), it must render.
+        # Whatever state a committed run set is in (the legacy one predates the
+        # integrity checks and renders with a health warning), it must render,
+        # and the flagship must stay fit to publish.
         run: |
-          npm run --silent bench -- report
-          npm run --silent bench -- report demo-synthetic > /dev/null
+          npm run --silent bench -- report scaffold-or-scale-v1 --strict > /dev/null
+          npm run --silent bench -- report 2026-07-25T20-18-35Z-3fs5 > /dev/null
 
       - name: Plan a matrix without running it
         run: npm run --silent bench -- run --tasks airline --strategies single,plan-execute --dry-run
