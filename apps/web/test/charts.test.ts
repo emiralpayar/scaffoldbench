@@ -134,6 +134,7 @@ function analysis(models: ModelAnalysis[]): SiteAnalysis {
     method: 'method',
     models,
     scale: [],
+    interactions: [],
     health: EMPTY_HEALTH,
   };
 }

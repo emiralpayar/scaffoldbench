@@ -16,6 +16,8 @@ import { buildPhaseRows, findRun } from '../../../../lib/derive';
 import { formatDuration, formatFailureMode, formatInt, formatScore, formatUsd } from '../../../../lib/format';
 import { modelShortName } from '../../../../lib/models';
 import { pageMetadata } from '../../../../lib/pageMetadata';
+import type { FeaturedEntry } from '../../../../lib/server/featured';
+import { featuredRuns, tracedCount } from '../../../../lib/server/featured';
 import { EMPTY_PARAM, loadRunSet, loadTrace } from '../../../../lib/server/runSet';
 import { normalizeError, timelineFromPhases, timelineFromTrace } from '../../../../lib/timeline';
 import { buildViewGroups } from '../../../../lib/traceView';
@@ -180,7 +182,14 @@ export default async function RunPage({ params }: Params) {
             label={`Timeline of ${name} on ${record.taskTitle}: one row per model call.`}
           />
         ) : (
-          <NoTrace record={record} phaseTimeline={phaseTimeline} color={color} />
+          <NoTrace
+            record={record}
+            phaseTimeline={phaseTimeline}
+            color={color}
+            traced={tracedCount(data)}
+            total={data.records.length}
+            featured={featuredRuns(data, record.runId)}
+          />
         )}
       </section>
 
@@ -214,10 +223,16 @@ function NoTrace({
   record,
   phaseTimeline,
   color,
+  traced,
+  total,
+  featured,
 }: {
   record: Parameters<typeof buildPhaseRows>[0];
   phaseTimeline: ReturnType<typeof timelineFromPhases> | null;
   color: string;
+  traced: number;
+  total: number;
+  featured: FeaturedEntry[];
 }) {
   return (
     <div className="card overflow-hidden">
@@ -238,15 +253,36 @@ function NoTrace({
       </div>
       <div className="border-t border-rule px-5 py-4 text-[0.875rem] leading-relaxed text-ink-2">
         <p>
-          This run&apos;s trace is not in the repository, so the call-by-call replay is not available.
+          The call-by-call replay is not published for this run. Traces are large, so the repository
+          keeps {traced > 0 ? `${traced} of this run set’s ${formatInt(total)}` : 'none of this run set’s'}{' '}
+          and leaves the rest out; the score, phases and final answer on this page come from the
+          committed run record.
           {!record.integrity
             ? ' Its phase records come from the runner before the fidelity gate, which did not time parallel phases by when they started, so they are listed rather than drawn on a clock.'
             : ''}
         </p>
-        <p className="mt-2 text-muted">
-          Re-run this cell to produce one:{' '}
-          <code className="code-inline">
-            npm run bench -- run --strategies {record.strategyId} --tasks {record.taskId} --models {record.model} --repeats 1 --update-latest
+        {featured.length > 0 ? (
+          <div className="mt-4">
+            <p className="eyebrow">Runs you can replay</p>
+            <ul className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {featured.map((entry) => (
+                <li key={entry.runId} className="flex min-w-0 items-baseline gap-2">
+                  <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: architectureColor(entry.record.strategyId) }} />
+                  <Link href={`/runs/${entry.runId}/`} className="link truncate">
+                    {entry.title}
+                  </Link>
+                  <span className="shrink-0 text-[0.8125rem] text-muted">
+                    {architectureName(entry.record.strategyId)} · {modelShortName(entry.record.model)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <p className="mt-4 text-[0.8125rem] text-muted">
+          Record this cell yourself:{' '}
+          <code className="code-inline [overflow-wrap:anywhere]">
+            npm run bench -- run --strategies {record.strategyId} --tasks {record.taskId} --models {record.model} --repeats 1
           </code>
         </p>
       </div>

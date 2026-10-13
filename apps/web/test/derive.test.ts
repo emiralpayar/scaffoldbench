@@ -391,6 +391,7 @@ describe('formatting', () => {
     expect(formatDuration(840)).toBe('0.8s');
     expect(formatDuration(21_379)).toBe('21.4s');
     expect(formatDuration(125_000)).toBe('2m 5s');
+    expect(formatDuration(35_269_741)).toBe('9h 48m');
   });
 });
 

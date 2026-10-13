@@ -25,6 +25,7 @@ import type {
   ContrastCaveat,
   ContrastVerdict,
   Estimate as CoreEstimate,
+  InteractionContrast as CoreInteraction,
   ModelAnalysis as CoreModelAnalysis,
   StrategyAnalysis,
 } from '@scaffoldbench/core';
@@ -163,6 +164,20 @@ export interface ScaleContrast {
   costVerdict: PairedVerdict;
 }
 
+/**
+ * Does an architecture's gain over `single` differ between two models? The
+ * estimate is (gain on the first model) minus (gain on the second).
+ */
+export interface InteractionContrast {
+  strategyId: string;
+  models: [string, string];
+  pairs: number;
+  tasks: number;
+  delta: Estimate;
+  verdict: PairedVerdict;
+  caveat?: ContrastCaveat;
+}
+
 export interface CheckFailureCount {
   id: string;
   count: number;
@@ -198,6 +213,8 @@ export interface SiteAnalysis {
   method: string;
   models: ModelAnalysis[];
   scale: ScaleContrast[];
+  /** Score interactions, cheapest model against the most capable. */
+  interactions: InteractionContrast[];
   health: RunSetHealth;
 }
 
@@ -227,6 +244,10 @@ export function analyzeForSite(
     method: describeMethod(settings),
     models,
     scale: scaleContrasts(core.scaffoldOrScale),
+    interactions: core.interactions
+      .filter((contrast) => contrast.metric === 'score')
+      .map(interactionContrast)
+      .sort((a, b) => compareArchitectures(a.strategyId, b.strategyId)),
     health: summarizeHealth(records),
   };
 }
@@ -351,6 +372,18 @@ function pairContrast(contrast: Contrast): PairContrast {
     verdict,
     ...(contrast.caveat ? { caveat: contrast.caveat } : {}),
     winner: verdict === 'better' ? 'a' : verdict === 'worse' ? 'b' : 'tie',
+  };
+}
+
+function interactionContrast(contrast: CoreInteraction): InteractionContrast {
+  return {
+    strategyId: contrast.strategyId,
+    models: contrast.models,
+    pairs: contrast.cells,
+    tasks: contrast.tasks,
+    delta: { mean: contrast.estimate, ci: contrast.ci },
+    verdict: contrast.verdict,
+    ...(contrast.caveat ? { caveat: contrast.caveat } : {}),
   };
 }
 

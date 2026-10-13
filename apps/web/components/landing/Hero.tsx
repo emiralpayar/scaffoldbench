@@ -4,9 +4,10 @@ import Link from '../Link';
 import type { RaceLane } from './TraceRace';
 import { TraceRace } from './TraceRace';
 
-export interface HeroFact {
-  label: string;
+export interface HeroStat {
   value: string;
+  label: string;
+  detail: ReactNode;
 }
 
 export interface HeroRace {
@@ -18,39 +19,62 @@ export interface HeroRace {
   note: ReactNode;
 }
 
+export interface HeroCopy {
+  eyebrow: ReactNode;
+  /** The headline; the `<em>` part is set in italic. */
+  title: ReactNode;
+  lede: ReactNode;
+}
+
 /**
  * The first screen. Always on the dark stage, in both themes: it is the
- * brand moment. Under the question, the same task run by every architecture,
- * replayed side by side: the designs explained without a word.
+ * brand moment. The answer first, in a line and four numbers, then the same
+ * task run by every architecture, replayed side by side.
  */
-export function Hero({ facts, note, race }: { facts: HeroFact[]; note?: string; race: HeroRace }) {
+export function Hero({
+  copy,
+  stats,
+  note,
+  race,
+}: {
+  copy: HeroCopy;
+  stats: HeroStat[];
+  note?: string;
+  race: HeroRace;
+}) {
   return (
     <section className="stage theme-dark border-b border-rule">
       <div className="container-page pb-16 pt-14 sm:pb-24 sm:pt-20">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-end lg:gap-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-end lg:gap-16">
           <div className="min-w-0">
-            <p className="eyebrow">An open benchmark of agent harness architectures</p>
-            <h1 className="display mt-6 text-ink">
-              Does your agent scaffold <em className="italic text-ink">pay for itself?</em>
-            </h1>
+            <p className="eyebrow">{copy.eyebrow}</p>
+            <h1 className="display mt-6 text-ink">{copy.title}</h1>
           </div>
-          <div className="min-w-0 lg:pb-2">
-            <p className="lede">
-              Planners, verifiers, worker pools, selectors and gates all cost tokens and time.
-              ScaffoldBench runs six harness architectures on the same Claude models, tools and tasks,
-              checks that each design actually ran, and reports what the extra structure buys, with an
-              interval on every number.
-            </p>
+          <div className="min-w-0 lg:pb-3">
+            <div className="lede">{copy.lede}</div>
             <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
-              <Link href="/results/" className="btn btn-primary">
+              <Link href="/results/scale/" className="btn btn-primary">
                 See the results <span aria-hidden>→</span>
               </Link>
-              <Link href="/postmortem/" className="btn btn-secondary">
-                What went wrong <span aria-hidden>→</span>
-              </Link>
+              <a href="#scorecard" className="btn btn-secondary">
+                Pre-registration scorecard <span aria-hidden>↓</span>
+              </a>
             </div>
           </div>
         </div>
+
+        {stats.length > 0 ? (
+          <dl className="mt-14 grid gap-px overflow-hidden rounded-[16px] border border-rule bg-rule sm:mt-16 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="flex min-w-0 flex-col bg-plane/95 p-5 sm:p-6">
+                <dt className="order-2 mt-3 text-[0.9375rem] font-medium leading-snug text-ink">{stat.label}</dt>
+                <dd className="order-1 num text-[2.25rem] leading-none tracking-[-0.03em] text-ink sm:text-[2.5rem]">{stat.value}</dd>
+                <dd className="order-3 mt-1.5 text-[0.8125rem] leading-relaxed text-muted">{stat.detail}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {note ? <p className="mt-5 text-[0.8125rem] text-muted">{note}</p> : null}
 
         <div className="relative mt-14 sm:mt-16">
           <div
@@ -69,20 +93,6 @@ export function Hero({ facts, note, race }: { facts: HeroFact[]; note?: string; 
             <TraceRace lanes={race.lanes} speed={race.speed} recorded={race.recorded} />
           </figure>
         </div>
-
-        {facts.length > 0 ? (
-          <dl className="mt-12 grid max-w-[40rem] grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-            {facts.map((fact) => (
-              <div key={fact.label}>
-                <dt className="eyebrow">{fact.label}</dt>
-                <dd className="mt-1.5 text-[1.625rem] font-[460] leading-none tracking-[-0.02em] text-ink">
-                  {fact.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
-        {note ? <p className="mt-5 text-[0.8125rem] text-muted">{note}</p> : null}
       </div>
     </section>
   );

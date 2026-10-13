@@ -24,7 +24,7 @@ export function ActOne({ postmortem, createdAt }: { postmortem: Postmortem | nul
     <section id="act-1" aria-labelledby="act-1-title" className="section">
       <div className="container-page">
         <div className="max-w-[54rem]">
-          <p className="eyebrow">Act 1 · The harness that lied</p>
+          <p className="eyebrow">How we got here · Act 1: the harness that lied</p>
           <h2 id="act-1-title" className="h1 mt-4 text-ink">
             The leaderboard said five architectures tied. The traces said four of them never ran as designed.
           </h2>

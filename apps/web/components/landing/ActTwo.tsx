@@ -10,14 +10,23 @@ import Link from '../Link';
  * section says so and plots nothing; a chart of numbers that do not exist
  * yet would be the opposite of the point.
  */
-export function ActTwo({ analysis, synthetic }: { analysis: SiteAnalysis | null; synthetic: boolean }) {
+export function ActTwo({
+  analysis,
+  synthetic,
+  showScale = true,
+}: {
+  analysis: SiteAnalysis | null;
+  synthetic: boolean;
+  /** The landing page draws the scale comparison above, in the result chart. */
+  showScale?: boolean;
+}) {
   return (
     <section id="act-2" aria-labelledby="act-2-title" className="section border-t border-rule bg-surface/50">
       <div className="container-page">
         <div className="max-w-[46rem]">
-          <p className="eyebrow">Act 2 · Scaffold or scale?</p>
+          <p className="eyebrow">The evidence, model by model</p>
           <h2 id="act-2-title" className="h1 mt-4 text-ink">
-            Does the extra structure pay for itself<span className="kern-q">?</span>
+            Each scaffold against its own single agent: what it gained, and what it cost.
           </h2>
           <p className="lede mt-6">
             Every architecture against a plain single agent on the same model, the same tasks and the
@@ -37,13 +46,13 @@ export function ActTwo({ analysis, synthetic }: { analysis: SiteAnalysis | null;
           </div>
         ) : null}
 
-        {analysis ? <Charts analysis={analysis} /> : <Pending />}
+        {analysis ? <Charts analysis={analysis} showScale={showScale} /> : <Pending />}
       </div>
     </section>
   );
 }
 
-function Charts({ analysis }: { analysis: SiteAnalysis }) {
+function Charts({ analysis, showScale }: { analysis: SiteAnalysis; showScale: boolean }) {
   const payoff = payoffData(analysis);
   const groups = scaffoldScaleGroups(analysis);
   const scale = scaleHeadline(analysis);
@@ -57,7 +66,7 @@ function Charts({ analysis }: { analysis: SiteAnalysis }) {
         <PayoffSmallMultiples data={payoff} method={analysis.method} />
       </div>
 
-      {analysis.models.length > 1 ? (
+      {showScale && analysis.models.length > 1 ? (
         <div className="mt-20 grid gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
           <div>
             <h3 className="h2 text-ink">
