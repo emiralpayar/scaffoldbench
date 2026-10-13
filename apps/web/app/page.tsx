@@ -109,7 +109,15 @@ function heroCopy(analysis: SiteAnalysis | null, headline: Headline | null, runs
   const models = analysis.models.map((m) => modelShortName(m.model));
   const scaled = headline.scaffoldsBetter === 0 && headline.step !== null && headline.step.scoreGain > 0;
   return {
-    eyebrow: `${formatInt(runs)} pre-registered runs · ${architectureCount(analysis)} architectures · ${models.length} models`,
+    eyebrow: (
+      <>
+        {formatInt(runs)} pre-registered runs
+        <span className="max-sm:hidden">
+          {' '}
+          · {architectureCount(analysis)} architectures · {models.length} models
+        </span>
+      </>
+    ),
     title: scaled ? (
       <>
         Scale beat <em className="italic text-ink">scaffold.</em>

@@ -48,7 +48,7 @@ export function Hero({
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-end lg:gap-16">
           <div className="min-w-0">
             <p className="eyebrow">{copy.eyebrow}</p>
-            <h1 className="display mt-6 text-ink">{copy.title}</h1>
+            <h1 className="display mt-6 text-ink max-sm:text-[3.75rem]">{copy.title}</h1>
           </div>
           <div className="min-w-0 lg:pb-3">
             <div className="lede">{copy.lede}</div>

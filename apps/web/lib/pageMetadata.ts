@@ -19,7 +19,7 @@ export const SOCIAL_CARD = {
   url: absoluteUrl('/og.png'),
   width: 1200,
   height: 630,
-  alt: `${SITE_NAME}: ${TAGLINE}`,
+  alt: `${SITE_NAME}: ${TAGLINE} The headline result and every architecture's score, model by model.`,
 };
 
 export interface PageMetadataInput {
