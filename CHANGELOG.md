@@ -4,10 +4,11 @@ All notable changes to ScaffoldBench are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/) once it has a release.
 
-## [Unreleased]
+## [1.0.0] — 2026-10-13
 
-Everything below is the content of the planned 1.0.0, the first release. Nothing has been tagged yet,
-and the project was called Agent Arena until this release.
+The first release. The project was called Agent Arena until this release. It ships the
+`scaffold-or-scale-v1` run set: 900 pre-registered runs, every one passing its integrity checks
+([results](docs/RESULTS.md)).
 
 ### Added
 

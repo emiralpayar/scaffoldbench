@@ -25,7 +25,9 @@ results/
 - **`traces/`** is gitignored by default: traces are large and the run summary carries what the
   numbers need. Commit a trace deliberately when it illustrates something worth pointing at. The
   legacy run set below is the exception: all 90 of its traces are committed, because they are the
-  evidence for [`docs/POSTMORTEM.md`](../docs/POSTMORTEM.md).
+  evidence for [`docs/POSTMORTEM.md`](../docs/POSTMORTEM.md). Of `scaffold-or-scale-v1`'s 900
+  traces (106 MB), the 9 the site replays are committed; `npm run bench -- run` with the same cell
+  reproduces any other.
 
 Run set ids look like `2026-07-25T20-18-35Z-3fs5`: the UTC start time and four random characters.
 A run id names the cell it measured, so a file name says what is inside it.

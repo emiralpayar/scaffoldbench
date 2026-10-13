@@ -16,7 +16,7 @@
 export const SITE_NAME = 'ScaffoldBench';
 export const TAGLINE = 'Does your agent scaffold pay for itself?';
 export const SITE_DESCRIPTION =
-  'An open benchmark of agent harness architectures on the Claude Agent SDK. Every design gets the same models, tools and tasks, a fidelity gate proves it ran, and every number carries an interval.';
+  '900 pre-registered runs of six agent architectures on Claude Haiku 4.5, Sonnet 5.5 and Opus 5.5: no scaffold measurably beat a single agent, and every one cost 1.3 to 4.8 times as much. An open benchmark where a fidelity gate proves each design ran and every number carries an interval.';
 
 function normalizeBasePath(value: string | undefined): string {
   if (!value || value === '/') return '';
