@@ -1,0 +1,278 @@
+{
+  "runId": "claude-opus-5-5__plan-execute-verify__research-header-fields__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-header-fields",
+  "taskTitle": "Where ten HTTP header fields are defined",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "hard",
+  "strategyId": "plan-execute-verify",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:41:57.195Z",
+  "finishedAt": "2026-10-05T21:43:37.877Z",
+  "latencyMs": 100544,
+  "setupMs": 0,
+  "gradingMs": 135,
+  "attempts": 1,
+  "score": 0.8333,
+  "passed": false,
+  "failureMode": "hallucinated_citation",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "plan-execute-verify.plan",
+        "ok": true,
+        "detail": "a 8-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.verdicts",
+        "ok": true,
+        "detail": "1 verdict, each read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.loop",
+        "ok": true,
+        "detail": "0 revisions, each called for by a verdict"
+      },
+      {
+        "id": "plan-execute-verify.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "Age",
+      "label": "header field Age",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Cache-Control",
+      "label": "header field Cache-Control",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Expires",
+      "label": "header field Expires",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Last-Modified",
+      "label": "header field Last-Modified",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "ETag",
+      "label": "header field ETag",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Location",
+      "label": "header field Location",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Retry-After",
+      "label": "header field Retry-After",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Vary",
+      "label": "header field Vary",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Strict-Transport-Security",
+      "label": "header field Strict-Transport-Security",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc6797"
+    },
+    {
+      "id": "Link",
+      "label": "header field Link",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc8288"
+    }
+  ],
+  "penalties": [
+    {
+      "id": "citation-integrity",
+      "label": "Cited pages that were never opened",
+      "kind": "hallucinated_citation",
+      "multiplier": 0.8333333333333333,
+      "detail": "2 of 6 cited URLs were never opened: https://www.rfc-editor.org/info/rfc6797, https://www.iana.org/assignments/http-fields/http-fields.xhtml"
+    }
+  ],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "86bd1bd14f66db67ec5c7686f5e47663ee99f16c49edb5b9384b8668854857dc",
+      "documents": 9
+    },
+    "openedDocuments": [
+      "rfc9111",
+      "rfc9110",
+      "rfc6797",
+      "rfc8288"
+    ],
+    "openedByRole": {
+      "primary": [
+        "rfc9111",
+        "rfc9110",
+        "rfc6797",
+        "rfc8288"
+      ]
+    },
+    "displayedShare": {
+      "rfc9111": 0.2947,
+      "rfc9110": 0.0661,
+      "rfc6797": 0.1493,
+      "rfc8288": 0.3347,
+      "mdn-header-strict-transport-security": 0.0269,
+      "rfc7231": 0.0013
+    },
+    "citedCount": 6,
+    "verifiedCount": 4,
+    "hallucinatedCount": 2,
+    "citationIntegrity": 0.6666666666666666,
+    "hallucinatedUrls": [
+      "https://www.rfc-editor.org/info/rfc6797",
+      "https://www.iana.org/assignments/http-fields/http-fields.xhtml"
+    ],
+    "answerBlock": true,
+    "answerBlockRepaired": false,
+    "itemsAnswered": 10,
+    "itemCount": 10,
+    "fieldAccuracy": 1,
+    "groundedItems": 10,
+    "fieldMisses": {}
+  },
+  "costUsd": 0.716304,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 6485,
+    "outputTokens": 9152,
+    "cacheReadInputTokens": 251310,
+    "cacheCreationInputTokens": 59631
+  },
+  "turns": 43,
+  "toolCalls": 38,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1791236517196,
+      "durationMs": 19771,
+      "costUsd": 0.03591640000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 8,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1791236536967,
+      "durationMs": 55865,
+      "costUsd": 0.506299,
+      "turns": 27,
+      "toolCalls": 26,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "verify-1",
+      "label": "Verify",
+      "callId": "call-3",
+      "startedAtMs": 1791236592832,
+      "durationMs": 24908,
+      "costUsd": 0.17408859999999998,
+      "turns": 14,
+      "toolCalls": 12,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "approved": true,
+        "severity": "none",
+        "issues": 0,
+        "decision": "approve",
+        "source": "schema"
+      }
+    }
+  ],
+  "finalText": "All ten fields are defined in four RFCs. For each one I opened the RFC on rfc-editor.org, took the section number from the heading on the page, and copied a sentence from that section.\n\n**RFC 9111 (HTTP Caching)** – https://www.rfc-editor.org/rfc/rfc9111.html\n- Its header says \"Obsoletes: 7234\".\n- **Age** is in section 5.1, **Cache-Control** in 5.2 and **Expires** in 5.3.\n- RFC 9111's own IANA registration table gives the same sections for Age (5.1) and Cache-Control (5.2).\n\n**RFC 9110 (HTTP Semantics)** – https://www.rfc-editor.org/rfc/rfc9110.html\n- Its header says \"Obsoletes: 2818, 7230, 7231, 7232, 7233, 7235, 7538, 7615, 7694\".\n- **Last-Modified** is in section 8.8.2 and **ETag** in 8.8.3.\n- **Location** is in section 10.2.2 and **Retry-After** in 10.2.3.\n- **Vary** is in section 12.5.5.\n\n**RFC 6797 (HSTS)** – https://www.rfc-editor.org/rfc/rfc6797.html\n- **Strict-Transport-Security** is in section 6.1, \"Strict-Transport-Security HTTP Response Header Field\".\n\n**RFC 8288 (Web Linking)** – https://www.rfc-editor.org/rfc/rfc8288.html\n- Its header says \"Obsoletes: 5988\".\n- **Link** is in section 3, \"Link Serialisation in HTTP Headers\". That section begins \"The Link header field provides a means for serialising one or more links into HTTP headers.\"\n\n**What I couldn't confirm**\n- None of the four RFC pages shows an \"Obsoleted by\" line. However, an RFC's text isn't updated when a later RFC replaces it, so that alone doesn't prove the RFC is still current.\n- I tried to confirm current status in two other places, and both returned \"404 Not Found\":\n  - the RFC Editor status pages (https://www.rfc-editor.org/info/rfc6797 and the matching pages for 8288, 9110 and 9111)\n  - the IANA field name registry (https://www.iana.org/assignments/http-fields/http-fields.xhtml)\n\n  I can't cite those pages, so I couldn't cross-check the answers against IANA.\n- Searches for a newer RFC replacing 6797 or 8288 found nothing. On the sources I could open, all four RFCs appear to be current, but that isn't fully confirmed.\n\n**About the quotes**\n- In the RFC pages, sentences wrap over several lines. I joined each sentence's lines with single spaces, so a check that compares whitespace exactly may not match.\n- The ETag quote contains \"W/\" in double quotes, which are escaped as \\\" in the JSON.\n\n```json\n{\"answers\":[\n{\"field\":\"Age\",\"rfc\":\"9111\",\"section\":\"5.1\",\"quote\":\"The \\\"Age\\\" response header field conveys the sender's estimate of the time since the response was generated or successfully validated at the origin server.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Cache-Control\",\"rfc\":\"9111\",\"section\":\"5.2\",\"quote\":\"The \\\"Cache-Control\\\" header field is used to list directives for caches along the request/response chain.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Expires\",\"rfc\":\"9111\",\"section\":\"5.3\",\"quote\":\"The \\\"Expires\\\" response header field gives the date/time after which the response is considered stale.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Last-Modified\",\"rfc\":\"9110\",\"section\":\"8.8.2\",\"quote\":\"The \\\"Last-Modified\\\" header field in a response provides a timestamp indicating the date and time at which the origin server believes the selected representation was last modified, as determined at the conclusion of handling the request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"ETag\",\"rfc\":\"9110\",\"section\":\"8.8.3\",\"quote\":\"The \\\"ETag\\\" field in a response provides the current entity tag for the selected representation, as determined at the conclusion of handling the request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Location\",\"rfc\":\"9110\",\"section\":\"10.2.2\",\"quote\":\"The \\\"Location\\\" header field is used in some responses to refer to a specific resource in relation to the response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Retry-After\",\"rfc\":\"9110\",\"section\":\"10.2.3\",\"quote\":\"Servers send the \\\"Retry-After\\\" header field to indicate how long the user agent ought to wait before making a follow-up request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Vary\",\"rfc\":\"9110\",\"section\":\"12.5.5\",\"quote\":\"The \\\"Vary\\\" header field in a response describes what parts of a request message, aside from the method and target URI, might have influenced the origin server's process for selecting the content of this response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Strict-Transport-Security\",\"rfc\":\"6797\",\"section\":\"6.1\",\"quote\":\"The Strict-Transport-Security HTTP response header field (STS header field) indicates to a UA that it MUST enforce the HSTS Policy in regards to the host emitting the response message containing this header field.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc6797.html\"},\n{\"field\":\"Link\",\"rfc\":\"8288\",\"section\":\"3\",\"quote\":\"The Link header field provides a means for serialising one or more links into HTTP headers.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc8288.html\"}\n]}\n```",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__plan-execute-verify__research-header-fields__r1.jsonl"
+}

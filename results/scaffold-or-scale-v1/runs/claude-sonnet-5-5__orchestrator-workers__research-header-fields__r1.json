@@ -1,0 +1,299 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__research-header-fields__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-header-fields",
+  "taskTitle": "Where ten HTTP header fields are defined",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:40:56.985Z",
+  "finishedAt": "2026-10-05T21:41:37.861Z",
+  "latencyMs": 40736,
+  "setupMs": 0,
+  "gradingMs": 138,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "4 subtasks, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "4 workers ran in parallel"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "6 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "Age",
+      "label": "header field Age",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Cache-Control",
+      "label": "header field Cache-Control",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Expires",
+      "label": "header field Expires",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Last-Modified",
+      "label": "header field Last-Modified",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "ETag",
+      "label": "header field ETag",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Location",
+      "label": "header field Location",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Retry-After",
+      "label": "header field Retry-After",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Vary",
+      "label": "header field Vary",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Strict-Transport-Security",
+      "label": "header field Strict-Transport-Security",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc6797"
+    },
+    {
+      "id": "Link",
+      "label": "header field Link",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc8288"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "86bd1bd14f66db67ec5c7686f5e47663ee99f16c49edb5b9384b8668854857dc",
+      "documents": 9
+    },
+    "openedDocuments": [
+      "rfc6797",
+      "rfc8288",
+      "rfc9110",
+      "rfc9111"
+    ],
+    "openedByRole": {
+      "primary": [
+        "rfc6797",
+        "rfc8288",
+        "rfc9110",
+        "rfc9111"
+      ]
+    },
+    "displayedShare": {
+      "rfc6797": 0.1055,
+      "rfc8288": 0.1871,
+      "rfc9110": 0.061,
+      "rfc9111": 0.2136,
+      "mdn-header-cache-control": 0.0215,
+      "rfc7231": 0.0013
+    },
+    "citedCount": 4,
+    "verifiedCount": 4,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "answerBlock": true,
+    "answerBlockRepaired": false,
+    "itemsAnswered": 10,
+    "itemCount": 10,
+    "fieldAccuracy": 1,
+    "groundedItems": 10,
+    "fieldMisses": {}
+  },
+  "costUsd": 0.287375,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 11340,
+    "outputTokens": 8583,
+    "cacheReadInputTokens": 91576,
+    "cacheCreationInputTokens": 43055
+  },
+  "turns": 33,
+  "toolCalls": 26,
+  "deniedToolCalls": 0,
+  "subagentCount": 4,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791236456985,
+      "durationMs": 8962,
+      "costUsd": 0.017449199999999998,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 4,
+        "workers": 4,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-caching-age-cc-expires",
+      "label": "Worker 1: caching-age-cc-expires",
+      "callId": "call-2",
+      "startedAtMs": 1791236465947,
+      "durationMs": 15464,
+      "costUsd": 0.0567416,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-validators-lastmod-etag-",
+      "label": "Worker 2: validators-lastmod-etag-",
+      "callId": "call-3",
+      "startedAtMs": 1791236465949,
+      "durationMs": 18324,
+      "costUsd": 0.051147000000000005,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-location-retryafter",
+      "label": "Worker 3: location-retryafter",
+      "callId": "call-4",
+      "startedAtMs": 1791236465949,
+      "durationMs": 11040,
+      "costUsd": 0.050407400000000005,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-hsts-link",
+      "label": "Worker 4: hsts-link",
+      "callId": "call-5",
+      "startedAtMs": 1791236465950,
+      "durationMs": 15944,
+      "costUsd": 0.070929,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-6",
+      "startedAtMs": 1791236484273,
+      "durationMs": 13447,
+      "costUsd": 0.040701,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I have not opened any pages myself. This answer rests entirely on the four worker reports, and the quotes are as the workers copied them. I could not re-check them against the pages.\n\n**Findings**\n- **Age, Cache-Control, Expires** are defined in RFC 9111, in sections 5.1, 5.2 and 5.3 respectively (https://www.rfc-editor.org/rfc/rfc9111.html). The page says it obsoletes RFC 7234, and it shows no later replacement. That worker also searched for \"RFC 9111 obsoleted by\" and found nothing.\n- **Last-Modified, ETag, Vary** are defined in RFC 9110, in sections 8.8.2, 8.8.3 and 12.5.5 respectively (https://www.rfc-editor.org/rfc/rfc9110.html). RFC 9110 obsoletes RFC 7231 and RFC 7232. Its header shows no \"Obsoleted by\" line, but that worker checked no other source.\n- **Location, Retry-After** are defined in RFC 9110, in sections 10.2.2 and 10.2.3 respectively (https://www.rfc-editor.org/rfc/rfc9110.html). That worker also found no sign that RFC 9110 has been obsoleted, and did not check the RFC Editor's metadata for it.\n- **Strict-Transport-Security** is defined in RFC 6797, section 6.1 (https://www.rfc-editor.org/rfc/rfc6797.html).\n- **Link** is defined in RFC 8288, section 3 (https://www.rfc-editor.org/rfc/rfc8288.html). RFC 8288 obsoletes RFC 5988.\n\n**Caveat on \"currently defines\"**\nEvery \"not obsoleted\" conclusion rests on the opened RFC pages showing no \"Obsoleted by\" text, plus one search for RFC 9111. For RFC 6797 and RFC 8288 the RFC Editor info pages returned 404, so neither could be checked against the RFC index. No worker reported conflicting sources.\n\n```json\n{\"answers\":[{\"field\":\"Age\",\"rfc\":\"9111\",\"section\":\"5.1\",\"quote\":\"The Age field value is a non-negative integer, representing time in seconds (see Section 1.2.2).\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},{\"field\":\"Cache-Control\",\"rfc\":\"9111\",\"section\":\"5.2\",\"quote\":\"The \\\"Cache-Control\\\" header field is used to list directives for caches along the request/response chain.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},{\"field\":\"Expires\",\"rfc\":\"9111\",\"section\":\"5.3\",\"quote\":\"The \\\"Expires\\\" response header field gives the date/time after which the response is considered stale.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},{\"field\":\"Last-Modified\",\"rfc\":\"9110\",\"section\":\"8.8.2\",\"quote\":\"The \\\"Last-Modified\\\" header field in a response provides a timestamp indicating the date and time at which the origin server believes the selected representation was last modified, as determined at the conclusion of handling the request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},{\"field\":\"ETag\",\"rfc\":\"9110\",\"section\":\"8.8.3\",\"quote\":\"An entity tag consists of an opaque quoted string, possibly prefixed by a weakness indicator.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},{\"field\":\"Location\",\"rfc\":\"9110\",\"section\":\"10.2.2\",\"quote\":\"The field value consists of a single URI-reference.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},{\"field\":\"Retry-After\",\"rfc\":\"9110\",\"section\":\"10.2.3\",\"quote\":\"The Retry-After field value can be either an HTTP-date or a number of seconds to delay after receiving the response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},{\"field\":\"Vary\",\"rfc\":\"9110\",\"section\":\"12.5.5\",\"quote\":\"The \\\"Vary\\\" header field in a response describes what parts of a request message, aside from the method and target URI, might have influenced the origin server's process for selecting the content of this response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},{\"field\":\"Strict-Transport-Security\",\"rfc\":\"6797\",\"section\":\"6.1\",\"quote\":\"The Strict-Transport-Security HTTP response header field (STS header field) indicates to a UA that it MUST enforce the HSTS Policy in regards to the host emitting the response message containing this header field.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc6797.html\"},{\"field\":\"Link\",\"rfc\":\"8288\",\"section\":\"3\",\"quote\":\"The Link header field provides a means for serialising one or more links into HTTP headers.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc8288.html\"}]}\n```",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__research-header-fields__r1.jsonl"
+}

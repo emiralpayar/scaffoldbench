@@ -1,0 +1,186 @@
+{
+  "runId": "claude-opus-5-5__orchestrator-workers__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:34:36.625Z",
+  "finishedAt": "2026-10-06T02:35:25.837Z",
+  "latencyMs": 49211,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.135331,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3779,
+    "outputTokens": 3968,
+    "cacheReadInputTokens": 35210,
+    "cacheCreationInputTokens": 5742
+  },
+  "turns": 14,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791254076626,
+      "durationMs": 10424,
+      "costUsd": 0.0244656,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791254087050,
+      "durationMs": 26762,
+      "costUsd": 0.077684,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791254113812,
+      "durationMs": 12025,
+      "costUsd": 0.0331814,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "# O-3001 Return for Priya Raman (C-300)\n\nThe order has been processed end to end. Priya gets the full **$686.00**, but most of it comes as store credit: **$138.00 to her card** and **$548.00 as store credit**. She asked for her money back, so she needs to be told about this split.\n\n**Hubs that never shipped (L3, P-HUB ×2, $138.00): cancelled**\n- These hubs never shipped, so the line was cancelled rather than returned.\n- **$138.00** was refunded to her card (RF-1).\n- Both units went back into stock, taking P-HUB from 8 to 10. The line wasn't marked as backordered, so the worker treated those units as already set aside for her. That conclusion rests only on the missing backorder flag.\n\n**Dock and monitor (L1 P-DOC $219.00, L2 P-MON $329.00): returned as store credit**\n- Both shipped on 2026-05-04. The return window is 30 days from shipping, and that had already closed.\n- The system clock showed 2026-07-25, but today is 2026-10-06. She is past the window either way, so the date mismatch doesn't change the result.\n- Once the window closes, the policy pays returns as store credit. A **$548.00** store-credit refund was recorded on the order (RF-2), and the same amount was added to her balance, taking it from $5.00 to $553.00.\n\nThe order now shows as returned, with $686.00 refunded in total. No line was refunded more than she paid for it.\n\n**Still open**\n1. **Warehouse:** P-DOC and P-MON have not been restocked, and that is correct. Returned goods only go back on the shelf once the warehouse receives them. When her parcel arrives, each needs a restock of 1.\n2. **Message to Priya:** No one has contacted her yet. She should be told that only the $138.00 for the hubs is going back to her card. The $548.00 for the dock and monitor is store credit because she is past the 30-day return window.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__orchestrator-workers__ecommerce-hard__r2.jsonl"
+}

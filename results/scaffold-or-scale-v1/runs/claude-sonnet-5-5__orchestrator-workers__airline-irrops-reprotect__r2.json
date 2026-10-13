@@ -1,0 +1,413 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__airline-irrops-reprotect__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-irrops-reprotect",
+  "taskTitle": "Re-protect a cancelled flight when seats are scarce",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "expert",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:01:33.903Z",
+  "finishedAt": "2026-10-06T02:03:34.630Z",
+  "latencyMs": 120716,
+  "setupMs": 2,
+  "gradingMs": 7,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked:R6101",
+      "label": "R6101 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA206 in economy; expected AA206 in economy"
+    },
+    {
+      "id": "compensated:R6101",
+      "label": "R6101 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 30000, hotel 18000; issued compensation 30000, hotel 18000"
+    },
+    {
+      "id": "notified:R6101",
+      "label": "R6101: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6102",
+      "label": "R6102 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on DL512 in economy; expected DL512 in economy"
+    },
+    {
+      "id": "compensated:R6102",
+      "label": "R6102 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 15000, hotel 0; issued compensation 15000"
+    },
+    {
+      "id": "notified:R6102",
+      "label": "R6102: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6103",
+      "label": "R6103 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on UA88 in business; expected UA88 in business"
+    },
+    {
+      "id": "compensated:R6103",
+      "label": "R6103 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6103",
+      "label": "R6103: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6104",
+      "label": "R6104 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA210+AA1410 in economy; expected AA210+AA1410 in economy"
+    },
+    {
+      "id": "compensated:R6104",
+      "label": "R6104 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 30000, hotel 18000; issued compensation 30000, hotel 18000"
+    },
+    {
+      "id": "notified:R6104",
+      "label": "R6104: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6105",
+      "label": "R6105 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA204 in basic_economy; expected AA204 in basic_economy"
+    },
+    {
+      "id": "compensated:R6105",
+      "label": "R6105 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6105",
+      "label": "R6105: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6106",
+      "label": "R6106 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on UA88 in basic_economy; expected UA88 in basic_economy"
+    },
+    {
+      "id": "compensated:R6106",
+      "label": "R6106 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6106",
+      "label": "R6106: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6107",
+      "label": "R6107 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA206 in economy; expected AA206 in economy"
+    },
+    {
+      "id": "compensated:R6107",
+      "label": "R6107 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 24000, hotel 18000; issued compensation 24000, hotel 18000"
+    },
+    {
+      "id": "notified:R6107",
+      "label": "R6107: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6108",
+      "label": "R6108 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA210 in economy; expected AA210 in economy"
+    },
+    {
+      "id": "compensated:R6108",
+      "label": "R6108 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 30000, hotel 0; issued compensation 30000"
+    },
+    {
+      "id": "notified:R6108",
+      "label": "R6108: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6109",
+      "label": "R6109 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on UA88 in premium_economy; expected UA88 in premium_economy"
+    },
+    {
+      "id": "compensated:R6109",
+      "label": "R6109 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6109",
+      "label": "R6109: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6110",
+      "label": "R6110 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA204 in economy; expected AA204 in economy"
+    },
+    {
+      "id": "compensated:R6110",
+      "label": "R6110 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6110",
+      "label": "R6110: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6111",
+      "label": "R6111 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA204 in economy; expected AA204 in economy"
+    },
+    {
+      "id": "compensated:R6111",
+      "label": "R6111 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6111",
+      "label": "R6111: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6112",
+      "label": "R6112 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA204 in business; expected AA204 in business"
+    },
+    {
+      "id": "compensated:R6112",
+      "label": "R6112 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 0, hotel 0; issued nothing"
+    },
+    {
+      "id": "notified:R6112",
+      "label": "R6112: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "rebooked:R6113",
+      "label": "R6113 re-protected on the prescribed itinerary and cabin",
+      "weight": 2,
+      "earned": 1,
+      "detail": "on AA210+AA1410 in economy; expected AA210+AA1410 in economy"
+    },
+    {
+      "id": "compensated:R6113",
+      "label": "R6113 got exactly the vouchers its new itinerary earns",
+      "weight": 1,
+      "earned": 1,
+      "detail": "owed compensation 30000, hotel 18000; issued compensation 30000, hotel 18000"
+    },
+    {
+      "id": "notified:R6113",
+      "label": "R6113: passenger told their new itinerary exactly once",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 73,
+    "failedToolCalls": 0,
+    "distinctTools": 10
+  },
+  "costUsd": 0.332104,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 4170,
+    "outputTokens": 17231,
+    "cacheReadInputTokens": 173227,
+    "cacheCreationInputTokens": 30325
+  },
+  "turns": 77,
+  "toolCalls": 73,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791252093906,
+      "durationMs": 7434,
+      "costUsd": 0.0202402,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791252101341,
+      "durationMs": 99190,
+      "costUsd": 0.2765852,
+      "turns": 74,
+      "toolCalls": 73,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791252200531,
+      "durationMs": 14091,
+      "costUsd": 0.035279000000000005,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "All 13 passengers on AA918 were re-protected, the vouchers they are owed were issued, and each passenger was notified once of their new booking. This comes from the worker's report only; I haven't verified it independently.\n\n**Process**\n- No change fees or fare differences were charged.\n- The worker found no active bulletins, so the handbook applied as written.\n- The request queue was not touched.\n\n**New bookings** (all 2026-08-03 unless noted)\n\n| Passenger | Booked on | Cabin |\n|---|---|---|\n| Chloe Park (R6103) | UA88, arrives 12:25 | Business |\n| Iris Vance (R6109) | UA88, arrives 12:25 | Premium Economy (one-cabin upgrade) |\n| Jun Takeda and Kofi Mensah (R6110, R6111, group G-7) | AA204, arrive 15:15 | Economy |\n| Ben Okafor (R6102) | DL512, arrives 18:40 | Economy |\n| Farid Haddad (R6106) | UA88, arrives 12:25 | Basic Economy |\n| Lea Sorensen (R6112) | AA204, arrives 15:15 | Business (one-cabin upgrade) |\n| Dev Mehta (R6104) | AA210, arrives 23:50, then AA1410 ORD to BOS on Aug 4, arrives 12:25 | Economy |\n| Mo Farah (R6113) | AA210, arrives 23:50, then AA1410 ORD to BOS on Aug 4, arrives 12:25 | Economy |\n| Hugo Brandt (R6108) | AA210, arrives 23:50 | Economy |\n| Grace Liu (R6107) | AA206 on Aug 4, arrives 15:15 | Economy |\n| Ana Ruiz (R6101) | AA206 on Aug 4, arrives 15:15 | Economy |\n| Elena Fox (R6105) | AA204, arrives 15:15 | Basic Economy |\n\n- **Upgrades:** Iris and Lea were each a gold or platinum passenger travelling alone. Their own cabin was full on a flight that gets them there sooner than any open option in their own cabin.\n- **Group G-7:** Jun and Kofi were kept together in their own cabin with no upgrade. They were ranked at the higher tier of the two.\n- **Dev and Mo:** Their original onward ORD to BOS connection was broken, so the onward leg was rebooked. The AA210 to AA1410 connection is valid because the onward flight leaves the next morning.\n\n**Vouchers issued**\n- **Ben:** 15000-cent compensation voucher. He arrives 5 hours late, and no hotel voucher applies because he arrives the same day.\n- **Dev and Mo:** each get a 30000-cent compensation voucher and an 18000-cent hotel voucher.\n- **Hugo:** 30000-cent compensation voucher. No hotel voucher applies because he arrives the same day.\n- **Grace:** 24000-cent compensation voucher, capped at her fare, plus an 18000-cent hotel voucher.\n- **Ana:** 30000-cent compensation voucher and an 18000-cent hotel voucher.\n- **Chloe, Iris, Jun, Kofi, Farid, Lea and Elena:** nothing owed, because each arrives less than 3 hours after the original time.\n\n**Flag for follow-up:** The system date is 2026-10-06, about two months after the 2026-08-03 flight. The worker saw no rule conflict and acted as instructed. If any of these passengers had already travelled or been handled another way, check for duplicate handling.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__airline-irrops-reprotect__r2.jsonl"
+}

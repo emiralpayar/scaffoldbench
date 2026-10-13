@@ -1,0 +1,987 @@
+{
+  "runId": "claude-sonnet-5-5__gated-execute__ecommerce-backorder-allocation__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-backorder-allocation",
+  "taskTitle": "Share two short deliveries out among backorders",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "expert",
+  "strategyId": "gated-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T16:24:24.546Z",
+  "finishedAt": "2026-10-05T16:32:35.929Z",
+  "latencyMs": 491375,
+  "setupMs": 2,
+  "gradingMs": 1,
+  "attempts": 2,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "29 state changes, each allowed by a review (33 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "34 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "outcome:O-5201",
+      "label": "O-5201 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5201",
+      "label": "O-5201: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5202",
+      "label": "O-5202 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5202",
+      "label": "O-5202: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5203",
+      "label": "O-5203 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5203",
+      "label": "O-5203: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5204",
+      "label": "O-5204 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5204",
+      "label": "O-5204: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5206",
+      "label": "O-5206 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14 L2=backordered@2026-08-14 L3=pending"
+    },
+    {
+      "id": "promised:O-5206",
+      "label": "O-5206 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14, L2@2026-08-14"
+    },
+    {
+      "id": "notified:O-5206",
+      "label": "O-5206: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5207",
+      "label": "O-5207 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5207",
+      "label": "O-5207: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5208",
+      "label": "O-5208 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5208",
+      "label": "O-5208: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5209",
+      "label": "O-5209 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5209",
+      "label": "O-5209: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5210",
+      "label": "O-5210 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5210",
+      "label": "O-5210: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5211",
+      "label": "O-5211 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=shipped"
+    },
+    {
+      "id": "notified:O-5211",
+      "label": "O-5211: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5212",
+      "label": "O-5212 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5212",
+      "label": "O-5212: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5213",
+      "label": "O-5213 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14"
+    },
+    {
+      "id": "promised:O-5213",
+      "label": "O-5213 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14"
+    },
+    {
+      "id": "notified:O-5213",
+      "label": "O-5213: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5214",
+      "label": "O-5214 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-19"
+    },
+    {
+      "id": "promised:O-5214",
+      "label": "O-5214 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-19"
+    },
+    {
+      "id": "notified:O-5214",
+      "label": "O-5214: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5215",
+      "label": "O-5215 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5215",
+      "label": "O-5215: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "stock-used",
+      "label": "Both deliveries were allocated in full",
+      "weight": 1,
+      "earned": 1,
+      "detail": "P-DOC stock=0, P-MON stock=0"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 384,
+    "failedToolCalls": 1,
+    "distinctTools": 11
+  },
+  "costUsd": 1.697697,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0.602052,
+  "usage": {
+    "inputTokens": 69451,
+    "outputTokens": 59581,
+    "cacheReadInputTokens": 1041838,
+    "cacheCreationInputTokens": 206888
+  },
+  "turns": 455,
+  "toolCalls": 384,
+  "deniedToolCalls": 0,
+  "subagentCount": 33,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1791217464549,
+      "durationMs": 491375,
+      "costUsd": 0.3492312,
+      "turns": 79,
+      "toolCalls": 78,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: allocate_stock",
+      "callId": "call-2",
+      "startedAtMs": 1791217492339,
+      "durationMs": 21941,
+      "costUsd": 0.0756482,
+      "turns": 25,
+      "toolCalls": 23,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_019UTXLogC39byewqZ6fEJr2",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "O-5201 L1 (2 P-DOC) is a standard-tier line, so it ranks below every platinum and gold line. P-DOC stock is 7, all from PO-88. Allocate in this order:\n1. Platinum O-5204 L1 (2). Stock left: 5.\n2. Platinum O-5207 L1 (1). This is a ship-complete order, and its P-MON line can also be allocated from th…"
+      }
+    },
+    {
+      "phase": "review-2",
+      "label": "Review 2: allocate_stock",
+      "callId": "call-3",
+      "startedAtMs": 1791217514288,
+      "durationMs": 23796,
+      "costUsd": 0.0817476,
+      "turns": 37,
+      "toolCalls": 35,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_014dYqcH4j5xkWUodPsHKCCf",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5202 (gold, C-522, placed 07-05) has L1 (1 P-MON) and L2 (1 P-DOC) backordered. It is not ship-complete and not on risk hold. I walked the full priority order for both products.\n\nP-DOC (7 in stock) goes to:\n- Platinum O-5204 (2), leaving 5.\n- Platinum O-5207 (1), leaving 4. O-5206 is skipped beca…"
+      }
+    },
+    {
+      "phase": "review-3",
+      "label": "Review 3: allocate_stock",
+      "callId": "call-4",
+      "startedAtMs": 1791217538100,
+      "durationMs": 13306,
+      "costUsd": 0.045009,
+      "turns": 17,
+      "toolCalls": 15,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01FYSLXZrBpPgonX6NBJYMvT",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "O-5203 L1 (2 P-MON) belongs to a standard-tier customer (C-523), so it ranks below every platinum and gold line. Allocating it now would skip higher-priority lines. P-MON stock is 3 (4 from PO-89, minus 1 already allocated to O-5202). Allocate in this order:\n1. Platinum O-5207 L2 (1). O-5207 is shi…"
+      }
+    },
+    {
+      "phase": "review-4",
+      "label": "Review 4: allocate_stock",
+      "callId": "call-5",
+      "startedAtMs": 1791217551415,
+      "durationMs": 12643,
+      "costUsd": 0.052108999999999996,
+      "turns": 23,
+      "toolCalls": 21,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01Pz22w8VreBJDEACnuxDgtb",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5204 L1 (2 P-DOC) is the earliest eligible platinum P-DOC line. O-5204 is not on risk hold and is not ship-complete. Customer C-524 is platinum. P-DOC stock is 6, so the 2 units fit in full. The only earlier-placed platinum line, O-5206, is ship-complete and its P-HUB line cannot be allocated (st…"
+      }
+    },
+    {
+      "phase": "review-5",
+      "label": "Review 5: allocate_stock",
+      "callId": "call-6",
+      "startedAtMs": 1791217564065,
+      "durationMs": 14597,
+      "costUsd": 0.0512214,
+      "turns": 20,
+      "toolCalls": 18,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01Aji6rJ2nsG9mcrfjw6ouyd",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5207 is a platinum, ship-complete order. Both of its backordered lines (L1 P-DOC x1 and L2 P-MON x1) can be allocated in full now, since P-DOC stock is 4 and P-MON stock is 3. The only higher-priority platinum line is O-5206. That order is also ship-complete, but its P-HUB line has no stock until…"
+      }
+    },
+    {
+      "phase": "review-6",
+      "label": "Review 6: allocate_stock",
+      "callId": "call-7",
+      "startedAtMs": 1791217578670,
+      "durationMs": 17298,
+      "costUsd": 0.0558962,
+      "turns": 20,
+      "toolCalls": 18,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01LgYGQ6R86WN4EuQ9TNg5nk",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5210 L1 (1 P-DOC) belongs to gold customer C-530. The order is not ship-complete and shows no risk hold. P-DOC stock is 7. The only higher-priority P-DOC lines are platinum O-5206 L1 and gold O-5209 L1. O-5206 is ship-complete and its P-HUB line cannot be filled (P-HUB stock is 0), so it waits. O…"
+      }
+    },
+    {
+      "phase": "review-7",
+      "label": "Review 7: allocate_stock",
+      "callId": "call-8",
+      "startedAtMs": 1791217621414,
+      "durationMs": 13358,
+      "costUsd": 0.042421799999999996,
+      "turns": 15,
+      "toolCalls": 13,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01ViUz3q95d9ZzB3xgfpfC7Y",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5203 L1 (2 P-MON) is correct to allocate now. PU-12 has been in force since 2026-07-01. It puts orders placed 14 or more days before the allocation day at the head of the list, oldest first, whatever the tier. Today is 2026-07-25, and O-5203 was placed 2026-07-08, 17 days ago. The other remaining…"
+      }
+    },
+    {
+      "phase": "review-8",
+      "label": "Review 8: allocate_stock",
+      "callId": "call-9",
+      "startedAtMs": 1791217634785,
+      "durationMs": 18741,
+      "costUsd": 0.0481478,
+      "turns": 16,
+      "toolCalls": 14,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_015Jrhvzz9EPckWdtp9KLfqs",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5201 L1 (2 P-DOC) should be allocated. P-DOC stock is 6, from PO-88 (7) and PO-91 (4), less 5 already allocated. The lines ranked above it need at most 3 units: platinum O-5206 L1 (1, ship-complete) and gold O-5209 L1 (2). That leaves at least 3 units, so O-5201's 2 units can be given in full wha…"
+      }
+    },
+    {
+      "phase": "review-9",
+      "label": "Review 9: allocate_stock",
+      "callId": "call-10",
+      "startedAtMs": 1791217672130,
+      "durationMs": 13260,
+      "costUsd": 0.049872,
+      "turns": 18,
+      "toolCalls": 16,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01BxtYrW3ycos7QH3dhrAkz7",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5209 L1 (2 P-DOC) is a gold-tier line, pending and backordered, with no risk hold and no ship-complete flag. The only higher-priority P-DOC line is platinum O-5206 L1. That order is ship-complete and its P-HUB line cannot be allocated (stock 0), so all its lines wait. P-DOC stock is 4, enough to …"
+      }
+    },
+    {
+      "phase": "review-10",
+      "label": "Review 10: allocate_stock",
+      "callId": "call-11",
+      "startedAtMs": 1791217685396,
+      "durationMs": 11133,
+      "costUsd": 0.043664600000000005,
+      "turns": 16,
+      "toolCalls": 14,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01LGHF2wYEAFDJ8JwcYnXQnF",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "Allocating O-5211 L1 (1 P-DOC) is correct. P-DOC stock is 2. The remaining backordered P-DOC lines rank as follows. O-5206 is platinum but ship-complete, and its P-HUB line cannot be allocated (stock 0), so all its lines wait. O-5205 is on risk hold and is left alone. That makes O-5211 (standard, p…"
+      }
+    },
+    {
+      "phase": "review-11",
+      "label": "Review 11: allocate_stock",
+      "callId": "call-12",
+      "startedAtMs": 1791217696537,
+      "durationMs": 9829,
+      "costUsd": 0.037969199999999995,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01Vs9YQjMzco6dgFSziELwkG",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "P-DOC has 1 unit in stock. Going down the P-DOC backorders in priority order: O-5205 is on risk hold, so it is skipped. O-5206 is platinum but ship-complete, and its P-HUB line cannot be allocated (P-HUB stock is 0), so all its lines wait. O-5213 is standard and needs 2, but only 1 is left, so it w…"
+      }
+    },
+    {
+      "phase": "review-12",
+      "label": "Review 12: set_promise_date",
+      "callId": "call-13",
+      "startedAtMs": 1791217707767,
+      "durationMs": 14202,
+      "costUsd": 0.039236200000000006,
+      "turns": 9,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_011wouKbfSCPtM4g6f8NGvKq",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5206 is a platinum, ship-complete order. L1 (P-DOC) and L2 (P-HUB) are both backordered. P-HUB stock is 0, so the order can't be allocated at once and every line waits. P-DOC stock is also 0 after the earlier allocations. As the top-priority waiting P-DOC line, L1 gets its unit from PO-95 (10 uni…"
+      }
+    },
+    {
+      "phase": "review-13",
+      "label": "Review 13: set_promise_date",
+      "callId": "call-14",
+      "startedAtMs": 1791217721981,
+      "durationMs": 10937,
+      "costUsd": 0.0321604,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_01X7DBuWFpoV6xX3Lqqouhbx",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5206 is a ship-complete order with two waiting lines. L1 (P-DOC) is promised 2026-08-14, from PO-95, the only in-transit P-DOC purchase order. It has 10 units, which covers all the waiting P-DOC lines. L2 (P-HUB) would get 2026-08-06 from PO-90 on its own. The handbook says every waiting line on …"
+      }
+    },
+    {
+      "phase": "review-14",
+      "label": "Review 14: set_promise_date",
+      "callId": "call-15",
+      "startedAtMs": 1791217732925,
+      "durationMs": 10394,
+      "costUsd": 0.0365968,
+      "turns": 11,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_01QPw8Wegeh1rm6D6hWvZHPo",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The date is correct. P-DOC stock is 0 after the earlier allocations. The waiting P-DOC lines in priority order are O-5206 L1 (platinum, 1 unit) and O-5213 L1 (standard, 2 units). O-5205 is on risk hold, so it gets no promise date. The only in-transit P-DOC purchase order is PO-95, with 10 units arr…"
+      }
+    },
+    {
+      "phase": "review-15",
+      "label": "Review 15: set_promise_date",
+      "callId": "call-16",
+      "startedAtMs": 1791217743323,
+      "durationMs": 7910,
+      "costUsd": 0.0237256,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_01JeQGB5JEkgjUp7vDHaEwVF",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "The date 2026-08-05 is wrong. A promise date must be the expected arrival of the in-transit purchase order the line's units are set aside from. The only in-transit P-MON purchase order is PO-97 (6 units, eta 2026-08-19). No P-MON PO arrives on 2026-08-05. The nearest in-transit PO by date is PO-90,…"
+      }
+    },
+    {
+      "phase": "review-16",
+      "label": "Review 16: set_promise_date",
+      "callId": "call-17",
+      "startedAtMs": 1791217751241,
+      "durationMs": 7377,
+      "costUsd": 0.0247802,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_01KYNQkSMrVW1iJ6pfGLtyv1",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "The date 2026-08-05 is wrong for O-5212 L1 (1 P-MON). A promise date must be the expected arrival of the in-transit purchase order that the line's units are set aside from. The only in-transit P-MON purchase order is PO-97 (6 units, eta 2026-08-19). No P-MON PO arrives on 08-05. PO-97 has enough un…"
+      }
+    },
+    {
+      "phase": "review-17",
+      "label": "Review 17: set_promise_date",
+      "callId": "call-18",
+      "startedAtMs": 1791217758623,
+      "durationMs": 42327,
+      "costUsd": 0.106835,
+      "turns": 16,
+      "toolCalls": 14,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__set_promise_date",
+        "toolUseId": "toolu_019t2Dp2Q2TdVerJ6tHtV58R",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5214 L1 (1 P-MON, standard, placed 07-21) is the lowest-priority waiting P-MON line. It is not an aged backorder under PU-12, since it is under 14 days old. The 3 P-MON units now in stock go first to gold O-5208 L1 (2) and then to standard O-5212 L1 (1), the earlier order. O-5214 is therefore lef…"
+      }
+    },
+    {
+      "phase": "review-18",
+      "label": "Review 18: allocate_stock",
+      "callId": "call-19",
+      "startedAtMs": 1791217806560,
+      "durationMs": 13543,
+      "costUsd": 0.0427926,
+      "turns": 11,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01SLmncfJ3ZXPtnQ8ttvw5ii",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5208 L1 (2 P-MON, gold customer C-528) is a backordered line on a single-line order. It isn't ship-complete and shows no risk hold. P-MON stock is 3. PU-12's aged-order rule doesn't apply to it, because it was placed 2026-07-13, only 12 days before today. No other waiting P-MON line outranks it, …"
+      }
+    },
+    {
+      "phase": "review-19",
+      "label": "Review 19: allocate_stock",
+      "callId": "call-20",
+      "startedAtMs": 1791217820111,
+      "durationMs": 8658,
+      "costUsd": 0.03318739999999999,
+      "turns": 9,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__allocate_stock",
+        "toolUseId": "toolu_01EJnWDocHCD1gCoD81MP1S4",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5212 L1 is 1 P-MON, backordered, and the order shows no risk hold or ship-complete flag. P-MON stock is 1, which is the last unit after the earlier allocations. The only other waiting P-MON line is O-5214 L1. That customer is also standard tier but ordered later (07-21 vs 07-15), so O-5212 ranks …"
+      }
+    },
+    {
+      "phase": "review-20",
+      "label": "Review 20: notify_customer",
+      "callId": "call-21",
+      "startedAtMs": 1791217832488,
+      "durationMs": 6254,
+      "costUsd": 0.0252356,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_019aDbDHywVtEwEtqg8E69KA",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The inventory log shows O-5201/L1 (2 P-DOC) was allocated, and the order isn't backordered any more. The message is accurate for that allocation and goes to O-5201 only. It comes after the allocation, as the handbook requires, and it covers the order's single line. I saw no sign that O-5201 was alr…"
+      }
+    },
+    {
+      "phase": "review-21",
+      "label": "Review 21: notify_customer",
+      "callId": "call-22",
+      "startedAtMs": 1791217838752,
+      "durationMs": 7281,
+      "costUsd": 0.0257386,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01LJzvAxh49CzHfGErvMzyP1",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "Both lines of O-5202 (P-MON x1, P-DOC x1) were allocated by the earlier allocate_stock call. Neither line is still on the backorder lists, so nothing on this order is waiting. The message states that accurately and is the first notice sent for this order."
+      }
+    },
+    {
+      "phase": "review-22",
+      "label": "Review 22: notify_customer",
+      "callId": "call-23",
+      "startedAtMs": 1791217846038,
+      "durationMs": 6940,
+      "costUsd": 0.0262516,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01KknGrU8cvv4qTMkPB5hQGZ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5203 has a single line, L1 (2 P-MON). It is already allocated: the inventory log shows -2 allocated to O-5203/L1, and the line is no longer backordered. The message is accurate, and this is the first notice for this order, sent after its allocation as the rules require."
+      }
+    },
+    {
+      "phase": "review-23",
+      "label": "Review 23: notify_customer",
+      "callId": "call-24",
+      "startedAtMs": 1791217852985,
+      "durationMs": 5631,
+      "costUsd": 0.0217616,
+      "turns": 4,
+      "toolCalls": 2,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01NX1nn7e1HYX1amfYnhhJrJ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5204 has one line, L1 (2 P-DOC). It was allocated earlier and no longer appears in the backorder list. The message is accurate and the order has not been notified before, so this is the single notice the policy asks for after allocation."
+      }
+    },
+    {
+      "phase": "review-24",
+      "label": "Review 24: notify_customer",
+      "callId": "call-25",
+      "startedAtMs": 1791217858625,
+      "durationMs": 6327,
+      "costUsd": 0.023358999999999998,
+      "turns": 4,
+      "toolCalls": 2,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_014E9BzraRVtoUxq8Dz3uXVK",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "Both lines on O-5207 (P-DOC x1 and P-MON x1) are no longer backordered. They were allocated earlier, and that allocation was reviewed and allowed. O-5207 is not on the backorder list, which means the lines are allocated. The order is ship-complete and both lines are allocated, so the message is acc…"
+      }
+    },
+    {
+      "phase": "review-25",
+      "label": "Review 25: notify_customer",
+      "callId": "call-26",
+      "startedAtMs": 1791217864959,
+      "durationMs": 9768,
+      "costUsd": 0.03343,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01JR8BnxeHJGzw3GfkmDx5XC",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5208 L1 (2 P-MON) was already allocated. Inventory shows a -2 movement for O-5208/L1, and the line is no longer in the backorder list. The order is a single line with no ship-complete issue, and nothing shows a risk hold. The customer has not been notified yet, so this is the one notice the rules…"
+      }
+    },
+    {
+      "phase": "review-26",
+      "label": "Review 26: notify_customer",
+      "callId": "call-27",
+      "startedAtMs": 1791217874733,
+      "durationMs": 6344,
+      "costUsd": 0.027901,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01Q9RyJ9gBraqz42K7F3MZpi",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5209 has one line, L1: P-DOC x2. Inventory shows 2 P-DOC were allocated to O-5209/L1 on 2026-07-25, and the line has no remaining backorder. The order shows no risk hold or ship-complete flag. It has not been notified before, since the earlier notices went to other orders. The message is accurate…"
+      }
+    },
+    {
+      "phase": "review-27",
+      "label": "Review 27: notify_customer",
+      "callId": "call-28",
+      "startedAtMs": 1791217881085,
+      "durationMs": 11616,
+      "costUsd": 0.0356328,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01V13J2D4ge99TTEMRCGcYnj",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5210 L1 (1 P-DOC, gold customer C-530) is already allocated. The inventory movement shows \"allocated to O-5210/L1\", and the line is no longer in the backorder list. The 11 docks received (PO-88 plus PO-91) are fully allocated, so the message is accurate. The order has no risk hold and no other ba…"
+      }
+    },
+    {
+      "phase": "review-28",
+      "label": "Review 28: notify_customer",
+      "callId": "call-29",
+      "startedAtMs": 1791217892708,
+      "durationMs": 16877,
+      "costUsd": 0.0498876,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01Hn8SwspRUd85UEC8o9JuUd",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5211 L1 (1 P-DOC) is allocated: the line is pending and inventory shows the allocation. The allocation follows priority. O-5205, the only earlier-ranked standard line left waiting, is on risk hold and is correctly skipped. The message is accurate, and O-5211 has not been notified yet, so this is …"
+      }
+    },
+    {
+      "phase": "review-29",
+      "label": "Review 29: notify_customer",
+      "callId": "call-30",
+      "startedAtMs": 1791217909595,
+      "durationMs": 6570,
+      "costUsd": 0.0273194,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_011NZ58AXT3Tfkhx5KHUoNA9",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The inventory log shows 1 P-MON allocated to O-5212/L1, so the order's only line is allocated. No earlier notice has gone out for O-5212. The message accurately says the monitor is allocated and ready to ship. It is the one notice this customer should get, sent after allocation as the handbook requ…"
+      }
+    },
+    {
+      "phase": "review-30",
+      "label": "Review 30: notify_customer",
+      "callId": "call-31",
+      "startedAtMs": 1791217916170,
+      "durationMs": 8928,
+      "costUsd": 0.0336978,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01VU5XaJvaTmojW14WSWmVhN",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5215 L1 (1 P-DOC) is already allocated. The inventory movement shows \"allocated to O-5215/L1\", and the line is no longer in the backorder list. The order is not backordered or on hold, and no notice has been sent for it yet. The message accurately says the dock is allocated and ready to ship, and…"
+      }
+    },
+    {
+      "phase": "review-31",
+      "label": "Review 31: notify_customer",
+      "callId": "call-32",
+      "startedAtMs": 1791217925102,
+      "durationMs": 9325,
+      "costUsd": 0.0331094,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_016A6UrY3iUxqgroySo5jWmU",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The notice is correct. O-5206 is ship-complete, with P-DOC (L1) and P-HUB (L2) both backordered. The hub has no stock, so the whole order has to wait. Both lines are promised 2026-08-14. P-DOC would come from PO-95, which arrives 2026-08-14. P-HUB would come from PO-90, which arrives 2026-08-06. Th…"
+      }
+    },
+    {
+      "phase": "review-32",
+      "label": "Review 32: notify_customer",
+      "callId": "call-33",
+      "startedAtMs": 1791217934434,
+      "durationMs": 7039,
+      "costUsd": 0.029114799999999996,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01FQr8ML8Y9zANy1LKwm9uzA",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5213 L1 (2 P-DOC) is still backordered and already has promise date 2026-08-14. That matches PO-95, the earliest in-transit P-DOC purchase order, and it has 10 units, enough for this line. The order has only one line and has not been notified yet. Its line is already promised, so this single noti…"
+      }
+    },
+    {
+      "phase": "review-33",
+      "label": "Review 33: notify_customer",
+      "callId": "call-34",
+      "startedAtMs": 1791217941477,
+      "durationMs": 7402,
+      "costUsd": 0.0330052,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__notify_customer",
+        "toolUseId": "toolu_01TvSHbWyEY62VPGN7Wt1vXk",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-5214 L1 (1 P-MON) is the only P-MON line still backordered. Stock is 0 after the allocations to higher-priority lines. Its promise date of 2026-08-19 is already set and matches PO-97, the only in-transit P-MON purchase order, which has 6 units. The order is not ship-complete and shows no risk hol…"
+      }
+    }
+  ],
+  "finalText": "I've finished working the P-DOC and P-MON backorders. Of the 17 backordered lines, 12 are allocated, 4 are waiting with promise dates, and 1 is on risk hold and was left alone.\n\n**What happened during the run:** PO-91 (4 docks) and PO-93 (3 monitors) were marked received on 2026-07-25 while I was working. Both were showing in transit when I started. I re-read stock and allocated the on-hand units under the same rules, so the 4 docks from PO-91 and the 3 monitors from PO-93 went to backorders too. You only named PO-88 and PO-89, so tell me if you wanted PO-91 and PO-93 kept out.\n\n**Priority order:** I applied policy update PU-12, which has been in force since 1 July. Orders placed 14 or more days before allocation go first, oldest first, whatever the customer's tier. The action reviewer twice refused allocations that followed PU-12, saying standard-tier lines rank below gold and platinum. It first refused O-5201 and O-5203. It later refused the 2026-08-05 promise dates, because it said no P-MON purchase order was in transit for that date. I retried the allocations and they went through. I did not set those dates, because PO-93 had arrived and the monitors were allocated from stock instead.\n\n**P-DOC (11 units on hand in total)**\n- Allocated: O-5201 (2), O-5202 L2 (1), O-5204 (2), O-5207 (1), O-5209 (2), O-5210 (1), O-5211 (1), O-5215 (1).\n- Waiting: O-5206 L1 and O-5213 L1. Both are promised 2026-08-14 from PO-95.\n\n**P-MON (7 units on hand in total)**\n- Allocated: O-5202 L1 (1), O-5203 (2), O-5207 L2 (1), O-5208 (2), O-5212 (1).\n- Waiting: O-5214, promised 2026-08-19 from PO-97.\n\n**Other lines:**\n- **O-5206:** It is ship-complete and its hub line has no stock, so the whole order waits. Both its backordered lines (dock and hub) are promised 2026-08-14. The hub alone would have been 2026-08-06, but the order takes the latest date of its lines.\n- **O-5205:** It is on risk hold, so I did no allocation, set no promise date and sent no notice.\n\n**Customers told:** I sent one notice each to the 14 customers whose lines I allocated or promised (N-1 to N-14), after the allocations and promise dates were set.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__gated-execute__ecommerce-backorder-allocation__r1.jsonl"
+}

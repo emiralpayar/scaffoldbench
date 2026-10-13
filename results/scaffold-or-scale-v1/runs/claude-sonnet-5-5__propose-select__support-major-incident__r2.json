@@ -1,0 +1,353 @@
+{
+  "runId": "claude-sonnet-5-5__propose-select__support-major-incident__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-major-incident",
+  "taskTitle": "Run the major-incident runbook for a CI outage",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "expert",
+  "strategyId": "propose-select",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T21:18:59.294Z",
+  "finishedAt": "2026-10-12T21:20:13.231Z",
+  "latencyMs": 73933,
+  "setupMs": 2,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 0.82,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "incident-opened",
+      "label": "An incident is open for the build pipeline",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "commander",
+      "label": "The incident-command engineer on call now commands the incident",
+      "weight": 2,
+      "earned": 1,
+      "detail": "commander=E-401 (expected E-401)"
+    },
+    {
+      "id": "paged-commander",
+      "label": "The commander was paged",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "linked:T-3101",
+      "label": "T-3101 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3101",
+      "label": "T-3101 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:52:00Z (expected sev1, 2026-03-30T18:52:00Z)"
+    },
+    {
+      "id": "linked:T-3102",
+      "label": "T-3102 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3102",
+      "label": "T-3102 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:58:00Z (expected sev1, 2026-03-30T18:58:00Z)"
+    },
+    {
+      "id": "linked:T-3103",
+      "label": "T-3103 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3103",
+      "label": "T-3103 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T19:01:00Z (expected sev1, 2026-03-30T19:01:00Z)"
+    },
+    {
+      "id": "linked:T-3104",
+      "label": "T-3104 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3104",
+      "label": "T-3104 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-31T15:05:00Z (expected sev1, 2026-03-31T15:05:00Z)"
+    },
+    {
+      "id": "linked:T-3105",
+      "label": "T-3105 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3105",
+      "label": "T-3105 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-04-01T15:07:00Z (expected sev1, 2026-04-01T15:07:00Z)"
+    },
+    {
+      "id": "linked:T-3106",
+      "label": "T-3106 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3106",
+      "label": "T-3106 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3109",
+      "label": "T-3109 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3109",
+      "label": "T-3109 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3112",
+      "label": "T-3112 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3112",
+      "label": "T-3112 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=new severity=unset due=- (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3113",
+      "label": "T-3113 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3113",
+      "label": "T-3113 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:13:00Z (expected sev1, 2026-03-31T15:13:00Z)"
+    },
+    {
+      "id": "linked:T-3114",
+      "label": "T-3114 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3114",
+      "label": "T-3114 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:16:00Z (expected sev1, 2026-03-31T15:16:00Z)"
+    },
+    {
+      "id": "comms-lead",
+      "label": "The engineer covering comms right now is the communications lead",
+      "weight": 2,
+      "earned": 1,
+      "detail": "comms=E-803 (expected E-803)"
+    },
+    {
+      "id": "status-update",
+      "label": "A status update in the runbook form, with the next update due within 30 minutes",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "postmortem",
+      "label": "A postmortem ticket for the service, linked to the incident, due at close of business five business days on",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-3115 due=2026-04-08T17:00:00Z"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 102,
+    "failedToolCalls": 0,
+    "distinctTools": 20
+  },
+  "costUsd": 0.375772,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 11047,
+    "outputTokens": 15944,
+    "cacheReadInputTokens": 234262,
+    "cacheCreationInputTokens": 39682
+  },
+  "turns": 108,
+  "toolCalls": 102,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791839939297,
+      "durationMs": 24492,
+      "costUsd": 0.0695984,
+      "turns": 23,
+      "toolCalls": 22,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791839939299,
+      "durationMs": 29919,
+      "costUsd": 0.0757934,
+      "turns": 25,
+      "toolCalls": 24,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791839939300,
+      "durationMs": 25594,
+      "costUsd": 0.071331,
+      "turns": 25,
+      "toolCalls": 24,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791839969218,
+      "durationMs": 14828,
+      "costUsd": 0.0460122,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791839984046,
+      "durationMs": 29184,
+      "costUsd": 0.1130374,
+      "turns": 33,
+      "toolCalls": 32,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "INC-1 is open for the company-wide build-runner outage, and I ran every step of the KB-40 runbook against it.\n\n- **Runbook:** KB-40 is the current runbook and KB-39 is superseded. I confirmed at 15:20Z that no incident existed and re-read the on-call rotas before paging.\n- **Commander:** I paged only E-401 Priya Raman (PG-1) and made her incident commander. She is on call for incident-command until 16:00Z.\n- **Comms lead:** E-803 Elif Demir. The comms on-call, E-801 Mia Laurent, is on sick leave today, so the backup rotation (comms-secondary) covers, and Elif is on call there now.\n- **Linked tickets:** T-3101, T-3102, T-3103, T-3104, T-3105, T-3106 and T-3109. All seven report no runners and are now sev1. T-3107 (a flaky test), T-3108 (a local Xcode failure) and T-3090 (already closed) are left out.\n- **Deadlines:** The five existing deadlines are unchanged. T-3106 and T-3109 had none, so each got 16:20Z, which is triage time plus the 60-minute sev1 target.\n- **Status update:** Published on INC-1: \"Impact: company-wide, all CI builds failing, no runners available. Started: 14:52 UTC. Next update: 15:45 UTC.\" The next update is due by 15:45Z.\n- **Postmortem:** T-3115, on build-pipeline and linked to INC-1, is due 2026-04-08T17:00Z. That is close of business on the 5th business day, with Good Friday and Easter Monday skipped.\n\nI did not merge, close or reassign anything, so T-3101 stays with E-101. T-3115 was created with severity unset, which I left as is.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__propose-select__support-major-incident__r2.jsonl"
+}

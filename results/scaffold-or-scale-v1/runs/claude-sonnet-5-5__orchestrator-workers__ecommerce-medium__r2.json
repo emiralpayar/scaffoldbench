@@ -1,0 +1,179 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__ecommerce-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:30:08.402Z",
+  "finishedAt": "2026-10-06T02:30:31.607Z",
+  "latencyMs": 23203,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 6
+  },
+  "costUsd": 0.046694,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3437,
+    "outputTokens": 2124,
+    "cacheReadInputTokens": 26793,
+    "cacheCreationInputTokens": 4228
+  },
+  "turns": 10,
+  "toolCalls": 6,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791253808403,
+      "durationMs": 6008,
+      "costUsd": 0.0087996,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791253814411,
+      "durationMs": 11120,
+      "costUsd": 0.0271406,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791253825531,
+      "durationMs": 6075,
+      "costUsd": 0.0107534,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "The worker reports that Marcus's mouse line on O-2003 is cancelled and refunded to his card. I have no tools, so everything below comes from that report and I haven't checked it myself.\n\n- **Cancellation:** Line L1 (2 wireless mice) had not shipped and is cancelled. L2 (hub) and L3 (cables) are reported still pending, so they should ship as planned.\n- **Refund:** 7,350 cents went back to the original card as refund RF-1. The worker says this is what he actually paid for L1, which is less than the 9,800 list price because of the MOUSE25 discount. The report calls the amount £73.50, but I can't confirm the currency.\n- **Restock:** The worker put 2 mice back into stock, so P-MOU went from 30 to 32. The worker assumed stock had been set aside for this line because it wasn't backordered. The inventory log had no movements to confirm that. If stock was never set aside, the restock would overstate inventory by 2 and should be checked.\n\nThe worker reports touching no other line, order, customer or product.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__ecommerce-medium__r2.jsonl"
+}

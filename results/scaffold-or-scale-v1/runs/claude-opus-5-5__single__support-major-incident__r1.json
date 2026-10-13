@@ -1,0 +1,277 @@
+{
+  "runId": "claude-opus-5-5__single__support-major-incident__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-major-incident",
+  "taskTitle": "Run the major-incident runbook for a CI outage",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "expert",
+  "strategyId": "single",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:23:17.031Z",
+  "finishedAt": "2026-10-05T21:24:23.360Z",
+  "latencyMs": 66326,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 0.82,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "incident-opened",
+      "label": "An incident is open for the build pipeline",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "commander",
+      "label": "The incident-command engineer on call now commands the incident",
+      "weight": 2,
+      "earned": 1,
+      "detail": "commander=E-401 (expected E-401)"
+    },
+    {
+      "id": "paged-commander",
+      "label": "The commander was paged",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "linked:T-3101",
+      "label": "T-3101 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3101",
+      "label": "T-3101 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:52:00Z (expected sev1, 2026-03-30T18:52:00Z)"
+    },
+    {
+      "id": "linked:T-3102",
+      "label": "T-3102 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3102",
+      "label": "T-3102 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:58:00Z (expected sev1, 2026-03-30T18:58:00Z)"
+    },
+    {
+      "id": "linked:T-3103",
+      "label": "T-3103 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3103",
+      "label": "T-3103 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T19:01:00Z (expected sev1, 2026-03-30T19:01:00Z)"
+    },
+    {
+      "id": "linked:T-3104",
+      "label": "T-3104 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3104",
+      "label": "T-3104 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-31T15:05:00Z (expected sev1, 2026-03-31T15:05:00Z)"
+    },
+    {
+      "id": "linked:T-3105",
+      "label": "T-3105 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3105",
+      "label": "T-3105 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-04-01T15:07:00Z (expected sev1, 2026-04-01T15:07:00Z)"
+    },
+    {
+      "id": "linked:T-3106",
+      "label": "T-3106 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3106",
+      "label": "T-3106 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3109",
+      "label": "T-3109 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3109",
+      "label": "T-3109 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3112",
+      "label": "T-3112 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3112",
+      "label": "T-3112 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=new severity=unset due=- (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3113",
+      "label": "T-3113 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3113",
+      "label": "T-3113 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:13:00Z (expected sev1, 2026-03-31T15:13:00Z)"
+    },
+    {
+      "id": "linked:T-3114",
+      "label": "T-3114 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3114",
+      "label": "T-3114 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:16:00Z (expected sev1, 2026-03-31T15:16:00Z)"
+    },
+    {
+      "id": "comms-lead",
+      "label": "The engineer covering comms right now is the communications lead",
+      "weight": 2,
+      "earned": 1,
+      "detail": "comms=E-803 (expected E-803)"
+    },
+    {
+      "id": "status-update",
+      "label": "A status update in the runbook form, with the next update due within 30 minutes",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "postmortem",
+      "label": "A postmortem ticket for the service, linked to the incident, due at close of business five business days on",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-3115 due=2026-04-08T17:00:00Z"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 42,
+    "failedToolCalls": 0,
+    "distinctTools": 19
+  },
+  "costUsd": 0.247772,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1027,
+    "outputTokens": 5547,
+    "cacheReadInputTokens": 180211,
+    "cacheCreationInputTokens": 12485
+  },
+  "turns": 43,
+  "toolCalls": 42,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791235397033,
+      "durationMs": 66326,
+      "costUsd": 0.2477722,
+      "turns": 43,
+      "toolCalls": 42,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I opened INC-1 for the CI outage and ran the current major-incident runbook (KB-40) step by step. KB-39 is an older edition that KB-40 replaces, so I didn't use it.\n\n1. **Incident opened:** INC-1 for build-pipeline at 15:20 UTC, before contacting anyone.\n2. **Commander paged and named:** I paged Priya Raman (E-401), who is on call for incident-command right now, and made her commander. The handbook says to route by ticket deadline, but the runbook says to page whoever is on call now. The runbook governs major incidents, so I followed it. The page has already reached her and can't be taken back.\n3. **Reports linked:** T-3101, T-3102, T-3103, T-3104, T-3105, T-3106 and T-3109 are all reports of runners not picking up jobs. I left two tickets out on purpose because they are separate problems:\n   - **T-3107:** a flaky payments-service test, which a knowledge base article (KB-41) says is unrelated to runners.\n   - **T-3108:** a local Xcode build failure, which KB-42 says doesn't involve CI.\n4. **Raised to sev1:** all seven linked reports. Deadlines already promised to requesters stay as they were. T-3106 and T-3109 had no deadline, so each now has one at 16:20 UTC (triage time plus the 60-minute sev1 target).\n5. **Comms lead:** the comms rota names Mia Laurent (E-801), but she is on sick leave. Elif Demir (E-803), on call for the backup rotation (comms-secondary), is comms lead instead.\n6. **First status update** (on the company status page): \"Impact: all CI builds company-wide are failing… Started: 14:52 UTC. Next update: 15:50 UTC.\"\n7. **Postmortem ticket:** T-3115, linked to INC-1, due 2026-04-08 17:00 UTC. That is the 5th business day after the incident opened, skipping Good Friday (Apr 3) and Easter Monday (Apr 6).\n\nStill open:\n- **Next status update is due by 15:50 UTC.** The runbook requires one within 30 minutes, and someone needs to post it.\n- **No severity on T-3115:** it was created as company-wide, which the matrix grades sev1. I didn't apply that because it's a postmortem rather than an outage report.\n- **No reports merged or reassigned:** the runbook calls for linking, not merging.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__single__support-major-incident__r1.jsonl"
+}

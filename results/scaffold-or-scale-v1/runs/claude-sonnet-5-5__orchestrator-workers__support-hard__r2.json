@@ -1,0 +1,193 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__support-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-hard",
+  "taskTitle": "Escalate a payroll outage the requester wants closed",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T20:59:18.750Z",
+  "finishedAt": "2026-10-12T20:59:48.226Z",
+  "latencyMs": 29474,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity raised to the matrix value for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev1 (matrix says sev1)"
+    },
+    {
+      "id": "escalated-to-deadline-oncall",
+      "label": "Escalated to the incident commander on call at the ticket deadline",
+      "weight": 4,
+      "earned": 1,
+      "detail": "escalated_to=E-402 (expected E-402, on call at 2026-03-17T19:40:00Z)"
+    },
+    {
+      "id": "left-escalated",
+      "label": "Ticket left in status escalated rather than closed",
+      "weight": 2,
+      "earned": 1,
+      "detail": "status=escalated"
+    },
+    {
+      "id": "committed-deadline-preserved",
+      "label": "The committed SLA deadline survived the escalation",
+      "weight": 2,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T19:40:00Z"
+    },
+    {
+      "id": "blocker-documented",
+      "label": "A comment records that the open linked ticket blocks closure",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was raised",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.057312,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 2577,
+    "outputTokens": 2834,
+    "cacheReadInputTokens": 27564,
+    "cacheCreationInputTokens": 5262
+  },
+  "turns": 12,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791838758751,
+      "durationMs": 6237,
+      "costUsd": 0.0092212,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791838764988,
+      "durationMs": 14876,
+      "costUsd": 0.034389600000000006,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791838779864,
+      "durationMs": 8360,
+      "costUsd": 0.013701,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "T-1070 is graded and escalated, but it is not closed, so Grace's request to close it today is not met. This summary relies on the worker's report only, and I have not checked it against the ticket system.\n\n**Done**\n- **Severity:** The worker raised T-1070 from sev3 to sev1. According to the report, the escalation matrix gives sev1 for payroll with company-wide impact.\n- **Escalation:** The worker escalated it to the incident-command rotation, which the matrix names for sev1. E-402 Ola Berg is the engineer on call there when the deadline falls (2026-03-17 19:40Z), so she now owns it. The ticket status is `escalated`.\n- **Deadline:** It stays at 19:40Z. The ticket already had that deadline, and a committed deadline can't be moved earlier.\n- **Handoff:** The worker commented on T-1070 with the triage, the escalation, the reason it stays open, and the next steps.\n\n**Not done: closing the ticket**\n- T-1071 (payroll reporting replica lag) is linked to T-1070 and still open. The report calls it the root cause, and E-201's comment says the batch can't be rerun until it is fixed.\n- Policy forbids closing a ticket while a linked ticket is open.\n- T-1071 is a separate underlying problem, so it was not merged and was left unchanged.\n\n**Next shift**\n1. Track T-1071, which is assigned to E-101 and due at 10:30Z.\n2. Rerun the payroll batch once T-1071 is fixed.\n3. Confirm the result with Grace, since payday is Friday.\n4. Close T-1070.\n\nSomeone still needs to tell Grace that T-1070 can't be closed until the root cause is resolved. The report doesn't say anyone has done so.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__support-hard__r2.jsonl"
+}

@@ -1,0 +1,503 @@
+{
+  "runId": "claude-opus-5-5__plan-execute-verify__research-script-loading__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-script-loading",
+  "taskTitle": "async vs defer on <script>",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "medium",
+  "strategyId": "plan-execute-verify",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T22:37:37.754Z",
+  "finishedAt": "2026-10-12T22:39:53.162Z",
+  "latencyMs": 129294,
+  "setupMs": 0,
+  "gradingMs": 6113,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "harness.judge",
+        "ok": true
+      },
+      {
+        "id": "plan-execute-verify.plan",
+        "ok": true,
+        "detail": "a 8-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.verdicts",
+        "ok": true,
+        "detail": "1 verdict, each read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.loop",
+        "ok": true,
+        "detail": "0 revisions, each called for by a verdict"
+      },
+      {
+        "id": "plan-execute-verify.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "parallel-download",
+      "label": "States that both async and defer let a classic script be fetched in parallel with HTML parsing, so the fetch does not block the parser, unlike a classic script with src and neither attribute.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E1, E2, E5. “`defer` downloads in parallel and runs the scripts in document order after parsing ends”"
+    },
+    {
+      "id": "defer-timing",
+      "label": "States that a defer script executes only after the document has finished parsing, and before DOMContentLoaded fires.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E2, E3. “It runs after the document is parsed but before `DOMContentLoaded` fires.”"
+    },
+    {
+      "id": "async-timing",
+      "label": "States that an async script executes as soon as it is available, interrupting parsing if parsing is still in progress, so it may run before or after DOMContentLoaded.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E5, E6, E8. “The download doesn't block parsing, but running it can: an async script \"can interrupt DOM building\" if it arrives mid-parse”"
+    },
+    {
+      "id": "ordering",
+      "label": "States that multiple defer scripts execute in document order, while async scripts execute in the order their downloads complete, which is not predictable.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E4, E7. “Deferred scripts run in the order they appear in the document (MDN, same page).”"
+    },
+    {
+      "id": "inline-ignored",
+      "label": "States that async and defer have no effect on a classic inline script (a script element without a src attribute).",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E11, E12. “Both attributes do nothing when there is no `src`.”"
+    },
+    {
+      "id": "modules",
+      "label": "States that module scripts are deferred by default, so the defer attribute has no effect on them, while the async attribute does apply to module scripts.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E13, E14, E15. “\"The defer attribute has no effect on module scripts\"”"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "a5d703ba820ee9c957565ac15b9f98daeac8212372d73d7658a7a6bb2bbc1978",
+      "documents": 6
+    },
+    "openedDocuments": [
+      "mdn-script-element",
+      "whatwg-html-scripting",
+      "mdn-domcontentloaded",
+      "webdev-third-party-javascript",
+      "mdn-js-modules"
+    ],
+    "openedByRole": {
+      "secondary": [
+        "mdn-script-element",
+        "mdn-domcontentloaded",
+        "webdev-third-party-javascript",
+        "mdn-js-modules"
+      ],
+      "primary": [
+        "whatwg-html-scripting"
+      ]
+    },
+    "displayedShare": {
+      "mdn-script-element": 0.8766,
+      "whatwg-html-scripting": 0.2341,
+      "mdn-domcontentloaded": 0.9488,
+      "webdev-third-party-javascript": 0.9285,
+      "webdev-optimize-resource-loading": 0.0157,
+      "mdn-js-modules": 0.0061
+    },
+    "citedCount": 5,
+    "verifiedCount": 5,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "evidenceBlock": true,
+    "evidenceBlockRepaired": false,
+    "evidenceCount": 16,
+    "verifiedQuoteCount": 16,
+    "verifiedQuoteRate": 1,
+    "evidence": [
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "A classic external script with neither attribute blocks parsing while it is fetched and run.",
+        "quote": "If neither attribute is present, then the script is fetched and evaluated immediately, blocking parsing until these are both complete.",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "A defer classic script downloads in parallel and runs after parsing finishes.",
+        "quote": "If the async attribute is not present but the defer attribute is present, then the classic script will be fetched in parallel and evaluated when the page has finished parsing.",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Deferred scripts run after parsing and before DOMContentLoaded, and DOMContentLoaded waits for them.",
+        "quote": "This Boolean attribute is set to indicate to a browser that the script is meant to be executed after the document has been parsed, but before firing DOMContentLoaded event.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Deferred scripts run in document order.",
+        "quote": "Scripts with the defer attribute will execute in the order in which they appear in the document.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "An async classic script downloads in parallel and runs as soon as it is available, possibly before parsing ends.",
+        "quote": "For external classic scripts, if the async attribute is present, then the classic script will be fetched in parallel to parsing and evaluated as soon as it is available (potentially before parsing completes).",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://web.dev/articles/efficiently-load-third-party-javascript",
+        "claim": "An async script that arrives mid-parse interrupts parsing while it runs.",
+        "quote": "It also means they can interrupt DOM building if they finish downloading while the parser is still at work.",
+        "verified": true,
+        "document": "webdev-third-party-javascript"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Async scripts have no guaranteed execution order.",
+        "quote": "You get no guarantee that scripts will run in any specific order.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event",
+        "claim": "DOMContentLoaded does not wait for async scripts.",
+        "quote": "It doesn't wait for other things like images, subframes, and async scripts to finish loading.",
+        "verified": true,
+        "document": "mdn-domcontentloaded"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event",
+        "claim": "MDN's DOMContentLoaded page says async scripts run after DOMContentLoaded, which conflicts with the spec's statement that they may run before parsing completes.",
+        "quote": "DOMContentLoaded is fired after the execution of these scripts, but before the execution of scripts with async.",
+        "verified": true,
+        "document": "mdn-domcontentloaded"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "If both attributes are present, async takes precedence; defer exists only as a fallback for old browsers.",
+        "quote": "The defer attribute may be specified even if the async attribute is specified, to cause legacy web browsers that only support defer (and not async) to fall back to the defer behavior instead of the blocking behavior that is the default.",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "async has no effect on inline classic scripts.",
+        "quote": "This attribute must not be used if the src attribute is absent (i.e., for inline scripts) for classic scripts, in this case it would have no effect.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "The spec's async and defer handling applies only to classic scripts with src or to any module script; inline classic scripts take a different path.",
+        "quote": "If el's type is \"classic\" and el has a src attribute, or el's type is \"module\":",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "Module scripts without async are deferred by default.",
+        "quote": "Otherwise, the module script and its dependencies will be fetched in parallel to parsing and evaluated when the page has finished parsing.",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "defer has no effect on module scripts because they are deferred automatically.",
+        "quote": "The defer attribute has no effect on module scripts — they defer by default.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "An async module script runs as soon as it and its imports are fetched.",
+        "quote": "For module scripts, if the async attribute is present then the scripts and all their dependencies will be fetched in parallel to parsing and evaluated as soon as they are available.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://html.spec.whatwg.org/multipage/scripting.html",
+        "claim": "Even an inline module script never runs synchronously during parsing.",
+        "quote": "Queueing a task here means that, even if the inline module script has no dependencies or synchronously results in a parse error, we won't proceed to execute the script element synchronously.",
+        "verified": true,
+        "document": "whatwg-html-scripting"
+      }
+    ],
+    "judgeUnverifiedQuotes": 0,
+    "judgeVerdicts": [
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E5"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E2",
+            "E3"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E6",
+            "E8"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E11",
+            "E12"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E13",
+            "E14",
+            "E15"
+          ]
+        }
+      },
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E5"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E3",
+            "E2"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E6"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E11",
+            "E12"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E13",
+            "E14",
+            "E15"
+          ]
+        }
+      },
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E5"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E2",
+            "E3"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E6"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E11",
+            "E12"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E13",
+            "E14",
+            "E15"
+          ]
+        }
+      }
+    ],
+    "judgeFailures": 0,
+    "groundedWeightShare": 1
+  },
+  "costUsd": 0.684671,
+  "judgeCostUsd": 0.083378,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 7464,
+    "outputTokens": 13130,
+    "cacheReadInputTokens": 249385,
+    "cacheCreationInputTokens": 45655
+  },
+  "turns": 36,
+  "toolCalls": 31,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1791844657755,
+      "durationMs": 16398,
+      "costUsd": 0.0324542,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 8,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1791844674154,
+      "durationMs": 76161,
+      "costUsd": 0.39975639999999996,
+      "turns": 20,
+      "toolCalls": 19,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "verify-1",
+      "label": "Verify",
+      "callId": "call-3",
+      "startedAtMs": 1791844750315,
+      "durationMs": 36734,
+      "costUsd": 0.2524604,
+      "turns": 14,
+      "toolCalls": 12,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "approved": true,
+        "severity": "none",
+        "issues": 0,
+        "decision": "approve",
+        "source": "schema"
+      }
+    }
+  ],
+  "finalText": "I've finished the research. Some planned sources returned 404 (the spec's `parsing.html` page and javascript.info), so the answer relies on the WHATWG scripting section, MDN and web.dev. Where they differ, I treat the WHATWG spec as normative.\n\n## Short answer\n\nWith no attributes, a classic script stops the HTML parser until it has downloaded and run. `defer` downloads in parallel and runs the scripts in document order after parsing ends, before `DOMContentLoaded`. `async` downloads in parallel and runs each script as soon as it arrives, in no fixed order, possibly mid-parse. Both are ignored on inline classic scripts. Module scripts are deferred by default, `defer` does nothing to them, and `async` works on them even when inline.\n\n## No attributes (the baseline)\n\nFor a classic script with `src` and neither attribute, \"the script is fetched and evaluated immediately, blocking parsing until these are both complete\" (https://html.spec.whatwg.org/multipage/scripting.html). MDN adds that inline scripts without `type=\"module\"` behave the same way: they run immediately, before parsing continues (https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script).\n\n## `defer` (classic scripts with `src`)\n\n- **Parsing:** The script downloads in parallel with parsing and runs \"when the page has finished parsing\" (https://html.spec.whatwg.org/multipage/scripting.html). It doesn't block the parser.\n- **DOMContentLoaded:** It runs after the document is parsed but before `DOMContentLoaded` fires. Deferred scripts hold back `DOMContentLoaded` until they have loaded and run (https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script). `document.readyState` is already `\"interactive\"` while they run (https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event).\n- **Order:** Deferred scripts run in the order they appear in the document (MDN, same page). In the spec, a parser-inserted deferred script is added to the document's \"list of scripts that will execute when the document has finished parsing\", and the parser runs that list (https://html.spec.whatwg.org/multipage/scripting.html).\n\n## `async` (classic scripts with `src`)\n\n- **Parsing:** The script downloads in parallel and runs \"as soon as it is available (potentially before parsing completes)\" (https://html.spec.whatwg.org/multipage/scripting.html). The download doesn't block parsing, but running it can: an async script \"can interrupt DOM building\" if it arrives mid-parse (https://web.dev/articles/efficiently-load-third-party-javascript).\n- **Order:** Each async script goes into a set (not a list) of \"scripts that will execute as soon as possible\" and runs when its own fetch completes (spec, same page). MDN puts it plainly: \"You get no guarantee that scripts will run in any specific order.\" In practice, whichever finishes downloading first runs first.\n- **DOMContentLoaded:** `DOMContentLoaded` does not wait for async scripts (https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event). An async script may run before or after it.\n  - **Where sources disagree:** A note on that same MDN page says `DOMContentLoaded` fires \"before the execution of scripts with async\". That conflicts with the spec, which says async scripts may run before parsing finishes, and therefore before `DOMContentLoaded`. I follow the spec. Read MDN's note as describing a common case, not a rule.\n- **Both attributes together:** `async` wins (MDN). The spec says adding `defer` alongside `async` exists only so that old browsers without `async` support fall back to deferring instead of blocking.\n\n## Inline classic scripts\n\nBoth attributes do nothing when there is no `src`. MDN warns about this for each attribute. In the spec's processing steps, the async and defer branches apply only \"If el's type is \\\"classic\\\" and el has a src attribute, or el's type is \\\"module\\\"\". Inline classic scripts take the other path and normally run immediately, while the parser waits (https://html.spec.whatwg.org/multipage/scripting.html).\n\n## `type=\"module\"`\n\n- **Default:** Module scripts behave as if deferred. The module and its imports download in parallel and run when parsing finishes. \"The defer attribute has no effect on module scripts\" (https://html.spec.whatwg.org/multipage/scripting.html). MDN agrees (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules). Like deferred classic scripts, they run before `DOMContentLoaded`.\n- **With `async`:** The module and all its imports are fetched in parallel and the module runs as soon as everything is ready, possibly mid-parse, in no fixed order.\n- **Inline modules:** The type check covers all module scripts, not just ones with `src`, so `async` applies to inline modules too. Even an inline module with no imports never runs synchronously, because the spec queues a task first.\n\n## Summary\n\n| Script | Blocks parsing? | Runs when | Order | Relation to DOMContentLoaded |\n|---|---|---|---|---|\n| Classic, no attribute (external or inline) | Yes | Immediately | Document order | Before it |\n| `defer` (external classic) | No | After parsing | Document order | Before; DOMContentLoaded waits for it |\n| `async` (external classic) | Only while it runs | When downloaded | No guarantee | Before or after; not waited for |\n| `defer`/`async` on inline classic | Yes (attributes ignored) | Immediately | Document order | Before it |\n| `type=\"module\"` | No | After parsing | Document order | Before; DOMContentLoaded waits for it |\n| `type=\"module\" async` (external or inline) | Only while it runs | When it and its imports are ready | No guarantee | Before or after |\n\n```json\n{\"evidence\": [\n{\"claim\": \"A classic external script with neither attribute blocks parsing while it is fetched and run.\", \"quote\": \"If neither attribute is present, then the script is fetched and evaluated immediately, blocking parsing until these are both complete.\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"A defer classic script downloads in parallel and runs after parsing finishes.\", \"quote\": \"If the async attribute is not present but the defer attribute is present, then the classic script will be fetched in parallel and evaluated when the page has finished parsing.\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"Deferred scripts run after parsing and before DOMContentLoaded, and DOMContentLoaded waits for them.\", \"quote\": \"This Boolean attribute is set to indicate to a browser that the script is meant to be executed after the document has been parsed, but before firing DOMContentLoaded event.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"Deferred scripts run in document order.\", \"quote\": \"Scripts with the defer attribute will execute in the order in which they appear in the document.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"An async classic script downloads in parallel and runs as soon as it is available, possibly before parsing ends.\", \"quote\": \"For external classic scripts, if the async attribute is present, then the classic script will be fetched in parallel to parsing and evaluated as soon as it is available (potentially before parsing completes).\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"An async script that arrives mid-parse interrupts parsing while it runs.\", \"quote\": \"It also means they can interrupt DOM building if they finish downloading while the parser is still at work.\", \"url\": \"https://web.dev/articles/efficiently-load-third-party-javascript\"},\n{\"claim\": \"Async scripts have no guaranteed execution order.\", \"quote\": \"You get no guarantee that scripts will run in any specific order.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"DOMContentLoaded does not wait for async scripts.\", \"quote\": \"It doesn't wait for other things like images, subframes, and async scripts to finish loading.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event\"},\n{\"claim\": \"MDN's DOMContentLoaded page says async scripts run after DOMContentLoaded, which conflicts with the spec's statement that they may run before parsing completes.\", \"quote\": \"DOMContentLoaded is fired after the execution of these scripts, but before the execution of scripts with async.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event\"},\n{\"claim\": \"If both attributes are present, async takes precedence; defer exists only as a fallback for old browsers.\", \"quote\": \"The defer attribute may be specified even if the async attribute is specified, to cause legacy web browsers that only support defer (and not async) to fall back to the defer behavior instead of the blocking behavior that is the default.\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"async has no effect on inline classic scripts.\", \"quote\": \"This attribute must not be used if the src attribute is absent (i.e., for inline scripts) for classic scripts, in this case it would have no effect.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"The spec's async and defer handling applies only to classic scripts with src or to any module script; inline classic scripts take a different path.\", \"quote\": \"If el's type is \\\"classic\\\" and el has a src attribute, or el's type is \\\"module\\\":\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"Module scripts without async are deferred by default.\", \"quote\": \"Otherwise, the module script and its dependencies will be fetched in parallel to parsing and evaluated when the page has finished parsing.\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"},\n{\"claim\": \"defer has no effect on module scripts because they are deferred automatically.\", \"quote\": \"The defer attribute has no effect on module scripts — they defer by default.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"An async module script runs as soon as it and its imports are fetched.\", \"quote\": \"For module scripts, if the async attribute is present then the scripts and all their dependencies will be fetched in parallel to parsing and evaluated as soon as they are available.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"Even an inline module script never runs synchronously during parsing.\", \"quote\": \"Queueing a task here means that, even if the inline module script has no dependencies or synchronously results in a parse error, we won't proceed to execute the script element synchronously.\", \"url\": \"https://html.spec.whatwg.org/multipage/scripting.html\"}\n]}\n```",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__plan-execute-verify__research-script-loading__r2.jsonl"
+}

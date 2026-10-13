@@ -1,0 +1,278 @@
+{
+  "runId": "claude-opus-5-5__propose-select__research-header-fields__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-header-fields",
+  "taskTitle": "Where ten HTTP header fields are defined",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "hard",
+  "strategyId": "propose-select",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T22:51:25.481Z",
+  "finishedAt": "2026-10-12T22:52:59.273Z",
+  "latencyMs": 93661,
+  "setupMs": 0,
+  "gradingMs": 129,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 2 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "4 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "Age",
+      "label": "header field Age",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Cache-Control",
+      "label": "header field Cache-Control",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Expires",
+      "label": "header field Expires",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9111"
+    },
+    {
+      "id": "Last-Modified",
+      "label": "header field Last-Modified",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "ETag",
+      "label": "header field ETag",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Location",
+      "label": "header field Location",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Retry-After",
+      "label": "header field Retry-After",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Vary",
+      "label": "header field Vary",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc9110"
+    },
+    {
+      "id": "Strict-Transport-Security",
+      "label": "header field Strict-Transport-Security",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc6797"
+    },
+    {
+      "id": "Link",
+      "label": "header field Link",
+      "weight": 1,
+      "earned": 1,
+      "detail": "quote verified in rfc8288"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "86bd1bd14f66db67ec5c7686f5e47663ee99f16c49edb5b9384b8668854857dc",
+      "documents": 9
+    },
+    "openedDocuments": [
+      "rfc9111",
+      "rfc9110",
+      "rfc6797",
+      "rfc8288"
+    ],
+    "openedByRole": {
+      "primary": [
+        "rfc9111",
+        "rfc9110",
+        "rfc6797",
+        "rfc8288"
+      ]
+    },
+    "displayedShare": {
+      "rfc9111": 0.2935,
+      "rfc9110": 0.0657,
+      "rfc6797": 0.1469,
+      "rfc8288": 0.3466,
+      "rfc7231": 0.0026,
+      "rfc7232": 0.0041
+    },
+    "citedCount": 4,
+    "verifiedCount": 4,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "answerBlock": true,
+    "answerBlockRepaired": false,
+    "itemsAnswered": 10,
+    "itemCount": 10,
+    "fieldAccuracy": 1,
+    "groundedItems": 10,
+    "fieldMisses": {}
+  },
+  "costUsd": 1.379586,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 9918,
+    "outputTokens": 18559,
+    "cacheReadInputTokens": 424284,
+    "cacheCreationInputTokens": 114286
+  },
+  "turns": 68,
+  "toolCalls": 63,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791845485482,
+      "durationMs": 45575,
+      "costUsd": 0.3560134,
+      "turns": 19,
+      "toolCalls": 18,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791845485483,
+      "durationMs": 60641,
+      "costUsd": 0.4748513999999999,
+      "turns": 25,
+      "toolCalls": 24,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791845485483,
+      "durationMs": 40880,
+      "costUsd": 0.3960188,
+      "turns": 22,
+      "toolCalls": 21,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791845546124,
+      "durationMs": 33019,
+      "costUsd": 0.15270219999999998,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 2,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    }
+  ],
+  "finalText": "I picked proposal 2. All three proposals give the same RFC and section for every field, so the quotes decided it.\n\n**Results**\n- **Age:** RFC 9111, section 5.1 (https://www.rfc-editor.org/rfc/rfc9111.html)\n- **Cache-Control:** RFC 9111, section 5.2 (https://www.rfc-editor.org/rfc/rfc9111.html)\n- **Expires:** RFC 9111, section 5.3 (https://www.rfc-editor.org/rfc/rfc9111.html)\n- **Last-Modified:** RFC 9110, section 8.8.2 (https://www.rfc-editor.org/rfc/rfc9110.html)\n- **ETag:** RFC 9110, section 8.8.3 (https://www.rfc-editor.org/rfc/rfc9110.html)\n- **Location:** RFC 9110, section 10.2.2 (https://www.rfc-editor.org/rfc/rfc9110.html)\n- **Retry-After:** RFC 9110, section 10.2.3 (https://www.rfc-editor.org/rfc/rfc9110.html)\n- **Vary:** RFC 9110, section 12.5.5 (https://www.rfc-editor.org/rfc/rfc9110.html)\n- **Strict-Transport-Security:** RFC 6797, section 6.1 (https://www.rfc-editor.org/rfc/rfc6797.html)\n- **Link:** RFC 8288, section 3 (https://www.rfc-editor.org/rfc/rfc8288.html)\n\n**Why the older RFCs don't count**\n- RFC 9110's header lists what it obsoletes: \"2818, 7230, 7231, 7232, 7233, 7235, 7538, 7615, 7694\" (https://www.rfc-editor.org/rfc/rfc9110.html).\n- RFC 9111 says \"This document obsoletes RFC 7234.\" (https://www.rfc-editor.org/rfc/rfc9111.html).\n- RFC 8288 says \"Obsoletes: 5988\" (https://www.rfc-editor.org/rfc/rfc8288.html).\n\n**One check is still missing:** no proposal could confirm from a status page that RFC 9110, 9111, 6797 or 8288 hasn't itself been replaced since. The RFC Editor status pages returned 404, and no opened page or search result pointed to a replacement.\n\n**About the quotes:** each quote is the opening sentence of its section. The pages wrap lines and put two spaces after full stops, and these quotes are joined onto one line with single spaces. If the checker compares spacing exactly, that's the one thing that could cause a mismatch.\n\n```json\n{\"answers\":[\n{\"field\":\"Age\",\"rfc\":\"9111\",\"section\":\"5.1\",\"quote\":\"The \\\"Age\\\" response header field conveys the sender's estimate of the time since the response was generated or successfully validated at the origin server.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Cache-Control\",\"rfc\":\"9111\",\"section\":\"5.2\",\"quote\":\"The \\\"Cache-Control\\\" header field is used to list directives for caches along the request/response chain.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Expires\",\"rfc\":\"9111\",\"section\":\"5.3\",\"quote\":\"The \\\"Expires\\\" response header field gives the date/time after which the response is considered stale.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"field\":\"Last-Modified\",\"rfc\":\"9110\",\"section\":\"8.8.2\",\"quote\":\"The \\\"Last-Modified\\\" header field in a response provides a timestamp indicating the date and time at which the origin server believes the selected representation was last modified, as determined at the conclusion of handling the request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"ETag\",\"rfc\":\"9110\",\"section\":\"8.8.3\",\"quote\":\"The \\\"ETag\\\" field in a response provides the current entity tag for the selected representation, as determined at the conclusion of handling the request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Location\",\"rfc\":\"9110\",\"section\":\"10.2.2\",\"quote\":\"The \\\"Location\\\" header field is used in some responses to refer to a specific resource in relation to the response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Retry-After\",\"rfc\":\"9110\",\"section\":\"10.2.3\",\"quote\":\"Servers send the \\\"Retry-After\\\" header field to indicate how long the user agent ought to wait before making a follow-up request.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Vary\",\"rfc\":\"9110\",\"section\":\"12.5.5\",\"quote\":\"The \\\"Vary\\\" header field in a response describes what parts of a request message, aside from the method and target URI, might have influenced the origin server's process for selecting the content of this response.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"field\":\"Strict-Transport-Security\",\"rfc\":\"6797\",\"section\":\"6.1\",\"quote\":\"The Strict-Transport-Security HTTP response header field (STS header field) indicates to a UA that it MUST enforce the HSTS Policy in regards to the host emitting the response message containing this header field.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc6797.html\"},\n{\"field\":\"Link\",\"rfc\":\"8288\",\"section\":\"3\",\"quote\":\"The Link header field provides a means for serialising one or more links into HTTP headers.\",\"url\":\"https://www.rfc-editor.org/rfc/rfc8288.html\"}\n]}\n```",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__propose-select__research-header-fields__r2.jsonl"
+}

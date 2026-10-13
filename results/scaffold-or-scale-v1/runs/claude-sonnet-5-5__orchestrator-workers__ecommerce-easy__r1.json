@@ -1,0 +1,178 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__ecommerce-easy__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T14:20:08.965Z",
+  "finishedAt": "2026-10-05T14:20:29.739Z",
+  "latencyMs": 20772,
+  "setupMs": 0,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 4
+  },
+  "costUsd": 0.047943,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3537,
+    "outputTokens": 1826,
+    "cacheReadInputTokens": 21731,
+    "cacheCreationInputTokens": 5504
+  },
+  "turns": 10,
+  "toolCalls": 6,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791210008966,
+      "durationMs": 6821,
+      "costUsd": 0.0128662,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791210015787,
+      "durationMs": 9022,
+      "costUsd": 0.022968,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791210024809,
+      "durationMs": 4929,
+      "costUsd": 0.012109000000000002,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Dana's new address is now on O-1001, the order that hadn't shipped. The order in transit, O-1002, was not changed. This is based on the worker's report; I had no tools to check the records myself.\n\n- **O-1001 (pending, nothing shipped):** the shipping address was 12 Alder Lane, Bristol BS1 4TR, UK. It is now 7 Quarry Rise, Sheffield S11 8XZ, UK.\n- **O-1002 (shipped 2026-07-07):** I left it alone, because the handbook says the address on a shipped order must never change. The worker re-read it after the update and found it still shows 88 Old Mill Road, Bristol BS3 2QQ, UK, with status shipped and no refunds.\n\nNo other orders, lines, customers or products were touched.\n\nBecause O-1002 keeps the Bristol address, Dana may want to arrange redelivery or collection with the carrier.\n\nThe worker also noted that the system dates on the orders appear to be around 2026-07-25, while today's date is 2026-10-05. This did not affect the task.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__ecommerce-easy__r1.jsonl"
+}

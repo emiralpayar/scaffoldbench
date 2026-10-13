@@ -1,0 +1,210 @@
+{
+  "runId": "claude-opus-5-5__propose-select__ecommerce-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "propose-select",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T16:23:21.309Z",
+  "finishedAt": "2026-10-05T16:24:08.132Z",
+  "latencyMs": 46820,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 20,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.270811,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 9249,
+    "outputTokens": 6780,
+    "cacheReadInputTokens": 59569,
+    "cacheCreationInputTokens": 14427
+  },
+  "turns": 26,
+  "toolCalls": 20,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791217401310,
+      "durationMs": 17288,
+      "costUsd": 0.043978199999999995,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791217401312,
+      "durationMs": 18897,
+      "costUsd": 0.05100640000000001,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791217401313,
+      "durationMs": 17526,
+      "costUsd": 0.0483364,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791217420210,
+      "durationMs": 13944,
+      "costUsd": 0.058640599999999994,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791217434154,
+      "durationMs": 13976,
+      "costUsd": 0.0688492,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I cancelled the wireless mouse on Marcus Ade's order O-2003, refunded it to his card, and checked that the rest of the order is unchanged and will still ship.\n\n1. **Cancelled the mouse line (L1, 2 units).** It hadn't shipped, so it's a cancellation, not a return. Cancelling didn't issue a refund or put any stock back, so I did both next.\n2. **Refunded 7,350¢ to his card (refund RF-1).** That's what he actually paid for the mouse after the MOUSE25 discount. The full price would be 9,800¢, but a refund can't be more than what he paid for the line.\n3. **Put the 2 mice back in stock.** Stock went from 30 to 32. The mouse line was reserved for this order, not backordered, so stock had been set aside for it.\n4. **Checked the order again afterwards:**\n   - The mouse line is cancelled, with 7,350¢ refunded to card.\n   - The order shows 7,350¢ refunded out of 19,950¢ paid.\n   - The order is still pending, and the USB-C hub and the 3 cables haven't changed.\n\nI didn't touch anything else: the shipping address, his store credit, his other order (O-2001), and all other products are as they were. I found nothing that conflicted with the plan or the store rules.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__propose-select__ecommerce-medium__r1.jsonl"
+}

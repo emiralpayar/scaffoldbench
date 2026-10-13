@@ -1,0 +1,217 @@
+{
+  "runId": "claude-sonnet-5-5__propose-select__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "propose-select",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:33:54.290Z",
+  "finishedAt": "2026-10-06T02:34:44.775Z",
+  "latencyMs": 50482,
+  "setupMs": 0,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 28,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.173717,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 9831,
+    "outputTokens": 8672,
+    "cacheReadInputTokens": 48234,
+    "cacheCreationInputTokens": 16989
+  },
+  "turns": 34,
+  "toolCalls": 28,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791254034292,
+      "durationMs": 16076,
+      "costUsd": 0.030962000000000003,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791254034294,
+      "durationMs": 16457,
+      "costUsd": 0.030237399999999998,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791254034295,
+      "durationMs": 22888,
+      "costUsd": 0.029543000000000003,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791254057183,
+      "durationMs": 12409,
+      "costUsd": 0.0343426,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791254069593,
+      "durationMs": 15180,
+      "costUsd": 0.0486318,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Order O-3001 is processed, but only part of the money goes back to Priya's card. I split it rather than refunding the whole order to the card, because the return policy doesn't allow that.\n\n- **Hubs (L3, 2 × P-HUB):** these never shipped, so I cancelled the line and refunded the 13,800¢ she paid to her card. I put both hubs back in stock, taking P-HUB from 8 to 10. The line was pending rather than backordered, so I treated stock as set aside for it. The inventory log doesn't show a reservation, so that is an assumption.\n- **Dock and monitor (L1 and L2):** both shipped on 2026-05-04, well past the 30-day return window. The policy says they must be paid out as store credit, never to the card.\n  - I recorded 21,900¢ for L1 and 32,900¢ for L2 against the order as store credit.\n  - I added the same 54,800¢ to her balance, which went from 500¢ to 55,300¢.\n  - Both lines now show as returned, and the order status is \"returned\".\n- **Total refunded:** 68,600¢ (13,800¢ to the card and 54,800¢ as store credit), which equals what she paid.\n- **Stock for the returned goods:** I did not restock P-DOC or P-MON. Returned goods only go back on the shelf once the warehouse receives them, so that step is still open.\n- **Left alone:** I changed nothing else, including the shipping address.\n\nThe tools gave today's date as 2026-07-25, while the session header says 2026-10-06. Both dates put the shipped lines outside the window, so the result is the same.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__propose-select__ecommerce-hard__r2.jsonl"
+}

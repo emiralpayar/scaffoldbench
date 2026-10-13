@@ -1,0 +1,186 @@
+{
+  "runId": "claude-haiku-4-5-20251001__orchestrator-workers__airline-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-02T18:07:41.088Z",
+  "finishedAt": "2026-10-02T18:09:39.271Z",
+  "latencyMs": 118181,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 0.5714,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "2 subtasks, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "2 workers ran in parallel"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "4 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 0,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 16,
+    "failedToolCalls": 1,
+    "distinctTools": 7
+  },
+  "costUsd": 0.122442,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 17408,
+    "outputTokens": 13753,
+    "cacheReadInputTokens": 49748,
+    "cacheCreationInputTokens": 15647
+  },
+  "turns": 21,
+  "toolCalls": 16,
+  "deniedToolCalls": 0,
+  "subagentCount": 2,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1790964461089,
+      "durationMs": 76042,
+      "costUsd": 0.040825,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 2,
+        "workers": 2,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-gather-flight-info",
+      "label": "Worker 1: gather-flight-info",
+      "callId": "call-2",
+      "startedAtMs": 1790964537131,
+      "durationMs": 31129,
+      "costUsd": 0.038445,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-execute-change-and-settl",
+      "label": "Worker 2: execute-change-and-settl",
+      "callId": "call-3",
+      "startedAtMs": 1790964537136,
+      "durationMs": 25383,
+      "costUsd": 0.034692799999999996,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-4",
+      "startedAtMs": 1790964568260,
+      "durationMs": 11009,
+      "costUsd": 0.008479,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "# Task Summary\n\n**Primary objective achieved:** Dana Whitfield has been moved to the earliest available departure on 2026-08-03—AA204 departing SFO at 09:05, 8 hours 35 minutes earlier than her original flight. The booking is confirmed and her economy cabin preference has been preserved.\n\n**Critical unresolved issue:** The two concurrent workers created a **duplicate billing error**. Both charged the same $80 fare difference, resulting in Dana being charged $160.00 instead of the correct $80.00. \n\nAccording to the domain policy, Dana owes:\n- Fare difference: $80 ($390 new fare − $310 original fare) ✓\n- Change fee: $0 (waived due to gold tier status) ✓\n- **Correct total: $80.00**\n\n**Current state (incorrect):**\n- L1 charge: $80.00 fare difference\n- L2 charge: $80.00 fare difference  \n- **Total charged: $160.00 (overage of $80.00)**\n\n**What blocks completion:** The task is not fully complete because Dana's financial settlement violates the domain policy—she has been charged twice the correct amount. One of the $80 fare difference ledger entries must be reversed, but I have no tools available to execute that reversal. Worker 1 identified this need but could not resolve it. This requires immediate correction to bring the reservation into compliance with policy.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__orchestrator-workers__airline-medium__r2.jsonl"
+}

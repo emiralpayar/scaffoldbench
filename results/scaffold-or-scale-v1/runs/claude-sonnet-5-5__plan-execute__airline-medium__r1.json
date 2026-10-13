@@ -1,0 +1,150 @@
+{
+  "runId": "claude-sonnet-5-5__plan-execute__airline-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "plan-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T14:10:26.670Z",
+  "finishedAt": "2026-10-05T14:10:50.141Z",
+  "latencyMs": 23468,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "plan-execute.plan",
+        "ok": true,
+        "detail": "a 8-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute.tools",
+        "ok": true,
+        "detail": "2 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.061402,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 2712,
+    "outputTokens": 2277,
+    "cacheReadInputTokens": 45467,
+    "cacheCreationInputTokens": 6749
+  },
+  "turns": 13,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1791209426672,
+      "durationMs": 9294,
+      "costUsd": 0.017738,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 8,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1791209435966,
+      "durationMs": 14174,
+      "costUsd": 0.0436644,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Dana is now on AA204, SFO to ORD on 2026-08-03, departing 09:05. She stays in economy, and she owes $80.00 for the change.\n\n- **Why this flight:** UA88 (06:15) has no economy seats left, and AA918 (07:30) is cancelled. AA204 is the earliest flight that day with an economy seat. It had 4 left, and I confirmed that before booking.\n- **Change fee:** $0. The economy change fee is $75, but Dana is gold tier, and gold is exempt.\n- **Fare difference:** $80.00. AA204 economy costs $390 and she paid $310. Fare rules say the difference is collected in full, and no tier is exempt from it. I recorded it as one `fare_difference` entry on R2087 (L1, $80.00).\n- **Other records:** I changed nothing else. R2087 now shows AA204, and the ledger has just that one entry.\n\nThe system's current date is 2026-10-05, which is after this flight's date of 2026-08-03. You asked for the move, so I made it, but you may want to check the dates on this booking.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__plan-execute__airline-medium__r1.jsonl"
+}

@@ -1,0 +1,606 @@
+{
+  "runId": "claude-sonnet-5-5__gated-execute__support-major-incident__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-major-incident",
+  "taskTitle": "Run the major-incident runbook for a CI outage",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "expert",
+  "strategyId": "gated-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:23:14.361Z",
+  "finishedAt": "2026-10-05T21:25:56.917Z",
+  "latencyMs": 162552,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 0.82,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "16 state changes, each allowed by a review (16 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "17 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "incident-opened",
+      "label": "An incident is open for the build pipeline",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "commander",
+      "label": "The incident-command engineer on call now commands the incident",
+      "weight": 2,
+      "earned": 1,
+      "detail": "commander=E-401 (expected E-401)"
+    },
+    {
+      "id": "paged-commander",
+      "label": "The commander was paged",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "linked:T-3101",
+      "label": "T-3101 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3101",
+      "label": "T-3101 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:52:00Z (expected sev1, 2026-03-30T18:52:00Z)"
+    },
+    {
+      "id": "linked:T-3102",
+      "label": "T-3102 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3102",
+      "label": "T-3102 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T18:58:00Z (expected sev1, 2026-03-30T18:58:00Z)"
+    },
+    {
+      "id": "linked:T-3103",
+      "label": "T-3103 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3103",
+      "label": "T-3103 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-30T19:01:00Z (expected sev1, 2026-03-30T19:01:00Z)"
+    },
+    {
+      "id": "linked:T-3104",
+      "label": "T-3104 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3104",
+      "label": "T-3104 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-03-31T15:05:00Z (expected sev1, 2026-03-31T15:05:00Z)"
+    },
+    {
+      "id": "linked:T-3105",
+      "label": "T-3105 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3105",
+      "label": "T-3105 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=open severity=sev1 due=2026-04-01T15:07:00Z (expected sev1, 2026-04-01T15:07:00Z)"
+    },
+    {
+      "id": "linked:T-3106",
+      "label": "T-3106 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3106",
+      "label": "T-3106 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3109",
+      "label": "T-3109 linked to the incident",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "sev1:T-3109",
+      "label": "T-3109 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 1,
+      "detail": "status=new severity=sev1 due=2026-03-30T16:20:00Z (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3112",
+      "label": "T-3112 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3112",
+      "label": "T-3112 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=new severity=unset due=- (expected sev1, 2026-03-30T16:20:00Z)"
+    },
+    {
+      "id": "linked:T-3113",
+      "label": "T-3113 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3113",
+      "label": "T-3113 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:13:00Z (expected sev1, 2026-03-31T15:13:00Z)"
+    },
+    {
+      "id": "linked:T-3114",
+      "label": "T-3114 linked to the incident",
+      "weight": 1,
+      "earned": 0
+    },
+    {
+      "id": "sev1:T-3114",
+      "label": "T-3114 kept open, raised to sev1 with its deadline intact",
+      "weight": 0.5,
+      "earned": 0,
+      "detail": "status=open severity=sev3 due=2026-03-31T15:16:00Z (expected sev1, 2026-03-31T15:16:00Z)"
+    },
+    {
+      "id": "comms-lead",
+      "label": "The engineer covering comms right now is the communications lead",
+      "weight": 2,
+      "earned": 1,
+      "detail": "comms=E-803 (expected E-803)"
+    },
+    {
+      "id": "status-update",
+      "label": "A status update in the runbook form, with the next update due within 30 minutes",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "postmortem",
+      "label": "A postmortem ticket for the service, linked to the incident, due at close of business five business days on",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-3115 due=2026-04-08T17:00:00Z"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 130,
+    "failedToolCalls": 1,
+    "distinctTools": 19
+  },
+  "costUsd": 0.509567,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 24122,
+    "outputTokens": 15541,
+    "cacheReadInputTokens": 388738,
+    "cacheCreationInputTokens": 63351
+  },
+  "turns": 163,
+  "toolCalls": 130,
+  "deniedToolCalls": 0,
+  "subagentCount": 16,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1791235394362,
+      "durationMs": 162552,
+      "costUsd": 0.10835880000000002,
+      "turns": 39,
+      "toolCalls": 38,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: create_incident",
+      "callId": "call-2",
+      "startedAtMs": 1791235407246,
+      "durationMs": 6150,
+      "costUsd": 0.018567,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__create_incident",
+        "toolUseId": "toolu_01YGx2CDus6xnRYtdJiG8yNc",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "There is a company-wide build-pipeline outage (T-3101 and T-3106 are both impact=company-wide), and no incident exists yet. The current runbook, KB-40 (KB-39 is superseded), says to open the incident first, before contacting anyone. Opening it now is correct and nothing is paged by this call. After…"
+      }
+    },
+    {
+      "phase": "review-2",
+      "label": "Review 2: page_engineer",
+      "callId": "call-3",
+      "startedAtMs": 1791235415651,
+      "durationMs": 6311,
+      "costUsd": 0.017310600000000002,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__page_engineer",
+        "toolUseId": "toolu_018VPtGrv5XjQqD4zVYcqH1p",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The action follows KB-40, the current runbook. INC-1 is already open, which step 1 requires before anyone is contacted. E-401 Priya Raman is on call for incident-command at 15:20Z and is not on leave. Step 2 says to page the on-call engineer right now, not by ticket deadline, and to make them comma…"
+      }
+    },
+    {
+      "phase": "review-3",
+      "label": "Review 3: assign_incident_role",
+      "callId": "call-4",
+      "startedAtMs": 1791235424537,
+      "durationMs": 9827,
+      "costUsd": 0.019323,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__assign_incident_role",
+        "toolUseId": "toolu_01DhTXF2ogPcLnDwfwvhpUJA",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "This follows KB-40, the current major-incident runbook. INC-1 is open, and E-401 is on call for incident-command now (shift 06:00–16:00Z) and is not on leave. E-401 was the only engineer paged. Assigning them as commander is the intended step 2."
+      }
+    },
+    {
+      "phase": "review-4",
+      "label": "Review 4: link_to_incident",
+      "callId": "call-5",
+      "startedAtMs": 1791235434374,
+      "durationMs": 10823,
+      "costUsd": 0.0391264,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__link_to_incident",
+        "toolUseId": "toolu_011mLJN47JwQCTTheHM9jLRv",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "This is step 3 of the current runbook, KB-40. KB-39 is superseded. The incident is already open with a commander. The seven tickets are all reports of the same \"no runners\" outage: T-3101 to T-3106 and T-3109. T-3106 and T-3109 are still \"new\", but they are open reports of this outage and belong in…"
+      }
+    },
+    {
+      "phase": "review-5",
+      "label": "Review 5: set_severity",
+      "callId": "call-6",
+      "startedAtMs": 1791235448317,
+      "durationMs": 7020,
+      "costUsd": 0.0230792,
+      "turns": 8,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01C2tuh6mZ6CUEGiMeJXZyBC",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3101 is a company-wide build-pipeline report, and the matrix sets that scope to sev1. It is already linked to INC-1, and runbook KB-40 step 4 says to raise every linked report to sev1. It is currently sev2. The existing deadline (2026-03-30T18:52Z) stays as committed, so setting severity alone is…"
+      }
+    },
+    {
+      "phase": "review-6",
+      "label": "Review 6: set_severity",
+      "callId": "call-7",
+      "startedAtMs": 1791235455346,
+      "durationMs": 7857,
+      "costUsd": 0.024773800000000002,
+      "turns": 8,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01AbVCXbuuE1QpmLZ8HWpKcH",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3102 is a build-pipeline report (Mobile builds stuck in the queue) that is already linked to INC-1. Its recorded scope is department, which the matrix maps to sev2. But the current major-incident runbook (KB-40, step 4) says to raise every linked report to sev1, and the runbook governs the incide…"
+      }
+    },
+    {
+      "phase": "review-7",
+      "label": "Review 7: set_severity",
+      "callId": "call-8",
+      "startedAtMs": 1791235463213,
+      "durationMs": 7492,
+      "costUsd": 0.025290600000000003,
+      "turns": 8,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01PybemiVzkMx8YjMVPa4Bmd",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3103 (\"pipelines sit at pending and never start\") is a report of the same no-runners outage. It is already linked to INC-1. The current runbook (KB-40, which supersedes KB-39) says to raise every linked report to sev1 and leave committed deadlines alone. This overrides the matrix's team=sev2 for …"
+      }
+    },
+    {
+      "phase": "review-8",
+      "label": "Review 8: set_severity",
+      "callId": "call-9",
+      "startedAtMs": 1791235470718,
+      "durationMs": 7454,
+      "costUsd": 0.026337199999999998,
+      "turns": 8,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01LX6oL7HJ8qr6BFr8LUzxxj",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3104 (\"Builds hang at waiting for runner\") is a report of the same runner-capacity outage and is already linked to INC-1. The current runbook, KB-40 step 4, says to raise every linked report to sev1 and leave committed deadlines alone. KB-40 governs the incident even though the matrix gives team-…"
+      }
+    },
+    {
+      "phase": "review-9",
+      "label": "Review 9: set_severity",
+      "callId": "call-10",
+      "startedAtMs": 1791235478181,
+      "durationMs": 7547,
+      "costUsd": 0.0230504,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01M6kue6xE5rbKDSwhADHCKT",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3105 is a report of this outage: its job never gets a runner, and it is already linked to INC-1. Step 4 of the current runbook (KB-40) says to raise every linked report to sev1. KB-40 governs the incident over the single-user = sev4 matrix cell. The ticket's existing deadline (2026-04-01T15:07Z) …"
+      }
+    },
+    {
+      "phase": "review-10",
+      "label": "Review 10: set_severity",
+      "callId": "call-11",
+      "startedAtMs": 1791235485745,
+      "durationMs": 7175,
+      "costUsd": 0.0223932,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_012wzMic8oiEzviCBBrSs4gK",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3106 is a build-pipeline ticket with company-wide impact and its severity is unset. The matrix gives company-wide = sev1 for build-pipeline, and I found no knowledge-base amendment that overrides it. The ticket is linked to INC-1, is part of the outage, and is within the request's scope. Setting …"
+      }
+    },
+    {
+      "phase": "review-11",
+      "label": "Review 11: set_severity",
+      "callId": "call-12",
+      "startedAtMs": 1791235492932,
+      "durationMs": 7543,
+      "costUsd": 0.0246816,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__set_severity",
+        "toolUseId": "toolu_01HeTtqLoHNbRL758hCCSC2L",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3109 (\"no runners available\" on the build-pipeline) is a report of the same company-wide outage and is already linked to INC-1. Its department impact would normally be sev2 under the matrix. The current major-incident runbook (KB-40, step 4) says to raise every linked report to sev1, and the runb…"
+      }
+    },
+    {
+      "phase": "review-12",
+      "label": "Review 12: assign_incident_role",
+      "callId": "call-13",
+      "startedAtMs": 1791235500497,
+      "durationMs": 8320,
+      "costUsd": 0.031124,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__assign_incident_role",
+        "toolUseId": "toolu_019kYTd6aUtVaFEL7F7D2Th6",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "Under KB-40 step 5, the comms lead is the engineer covering the comms rotation right now. The comms rota names E-801 Mia Laurent, who is on sick leave on 2026-03-30. The handbook says the backup rotation (comms-secondary) covers, using whoever is on call there at the same moment. That is E-803 Elif…"
+      }
+    },
+    {
+      "phase": "review-13",
+      "label": "Review 13: post_status_update",
+      "callId": "call-14",
+      "startedAtMs": 1791235512752,
+      "durationMs": 8349,
+      "costUsd": 0.0249152,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__post_status_update",
+        "toolUseId": "toolu_01XosTdRkfao9WsrMGzF8XpZ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The post is step 6 of the current runbook (KB-40) and comes after steps 1–5 are done. The format is correct. Started 14:52 UTC matches the earliest linked report, T-3101. The next update at 15:45 is 25 minutes after the current time of 15:20, within the 30-minute limit."
+      }
+    },
+    {
+      "phase": "review-14",
+      "label": "Review 14: extend_sla",
+      "callId": "call-15",
+      "startedAtMs": 1791235521111,
+      "durationMs": 10879,
+      "costUsd": 0.028794,
+      "turns": 9,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__extend_sla",
+        "toolUseId": "toolu_01E6caEhzvaZWuh8S8cDMudi",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3106 is a sev1 build-pipeline ticket with no deadline (sla_due_at not set). Handbook says a ticket with no deadline gets triage time plus the severity's response target. The matrix gives 60 minutes for sev1, and sev1 runs on the clock. The current time is 15:20Z, so 16:20Z is correct. No committe…"
+      }
+    },
+    {
+      "phase": "review-15",
+      "label": "Review 15: extend_sla",
+      "callId": "call-16",
+      "startedAtMs": 1791235531998,
+      "durationMs": 10750,
+      "costUsd": 0.027700000000000006,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__extend_sla",
+        "toolUseId": "toolu_017YtfUAEZPsoSGcvavovTUv",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "T-3109 has no deadline (sla_due_at not set). The KB-40 runbook raised it to sev1, and the matrix gives sev1 a 60-minute response target that runs on the clock. The current time is 15:20Z, so the deadline is 16:20Z. This is the same rule that was applied to T-3106. No committed deadline is being mov…"
+      }
+    },
+    {
+      "phase": "review-16",
+      "label": "Review 16: create_ticket",
+      "callId": "call-17",
+      "startedAtMs": 1791235542756,
+      "durationMs": 7747,
+      "costUsd": 0.024741600000000002,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__support__create_ticket",
+        "toolUseId": "toolu_01Gk6chykY9ifnbVtMeoen4K",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "This is step 7 of the current runbook, KB-40, which supersedes KB-39. The postmortem ticket is for build-pipeline and linked to INC-1. The incident opened 2026-03-30 15:20Z, a Monday. Counting business days after it: Mar 31, Apr 1 and Apr 2 are days 1 to 3. Apr 3 (Good Friday), the weekend and Apr …"
+      }
+    }
+  ],
+  "finalText": "INC-1 is open for the company-wide build-pipeline outage, and I ran it through the current runbook, KB-40. I ignored KB-39 because KB-40 supersedes it.\n\n- **Incident and commander:** I opened INC-1 first. I then paged E-401 Priya Raman, the incident-command engineer on call now, and only her, and made her commander. The page can't be recalled.\n- **Linked reports:** T-3101, T-3102, T-3103, T-3104, T-3105, T-3106 and T-3109 are linked to INC-1. All seven describe the same no-runners outage.\n- **Left out:** I left out T-3107 (a flaky test) and T-3108 (a local Xcode link failure) because they are separate problems.\n- **Severity:** All seven linked reports are now sev1. Deadlines already committed stay as they were. T-3106 and T-3109 had none, so I gave each 16:20 UTC, which is the triage time plus the 60-minute sev1 target.\n- **Comms lead:** The comms rotation's E-801 Mia Laurent is on sick leave today. Under the leave rule the backup rotation, comms-secondary, covers, so I named E-803 Elif Demir, who is on call there now.\n- **Status update:** I posted the first update at 15:20 UTC. It says \"Impact: All company build pipelines are affected… Started: 14:52 UTC. Next update: 15:45 UTC.\" The 14:52 start is when the earliest report, T-3101, was created.\n- **Postmortem:** T-3115 is linked to INC-1 and due 2026-04-08 at 17:00 UTC. That is the 5th business day after today, counting Good Friday (Apr 3) and Easter Monday (Apr 6) as holidays.\n\nThe next status update is due by 15:45 UTC.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__gated-execute__support-major-incident__r1.jsonl"
+}

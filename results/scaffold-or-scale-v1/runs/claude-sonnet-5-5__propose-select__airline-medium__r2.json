@@ -1,0 +1,204 @@
+{
+  "runId": "claude-sonnet-5-5__propose-select__airline-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "propose-select",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T01:05:25.871Z",
+  "finishedAt": "2026-10-06T01:06:00.279Z",
+  "latencyMs": 34406,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 27,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.195275,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 8802,
+    "outputTokens": 6902,
+    "cacheReadInputTokens": 63196,
+    "cacheCreationInputTokens": 26343
+  },
+  "turns": 33,
+  "toolCalls": 27,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791248725872,
+      "durationMs": 12990,
+      "costUsd": 0.0432056,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791248725874,
+      "durationMs": 13242,
+      "costUsd": 0.039030999999999996,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791248725874,
+      "durationMs": 12587,
+      "costUsd": 0.038773,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791248739117,
+      "durationMs": 10149,
+      "costUsd": 0.034142,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791248749266,
+      "durationMs": 11012,
+      "costUsd": 0.0401236,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Dana Whitfield is now on AA204 departing SFO at 09:05 on 2026-08-03, still in economy, and she owes $80.00 for the change.\n\n- **Earlier flights ruled out:** UA88 (06:15) has no economy seats left. AA918 (07:30) is cancelled. AA204 is the earliest flight with an economy seat.\n- **Fare difference:** The new fare is $390.00 against the $310.00 she paid, so I charged the $80.00 difference. Her gold tier doesn't exempt her from that.\n- **Change fee:** The $75.00 fee is waived because she is gold, so I didn't charge it.\n- **Cabin and bag:** I kept her in economy because she didn't ask for another cabin. Her one checked bag is within the limit, so there is no baggage fee.\n\nThe ledger now has one entry for R2087, the $80.00 fare difference. Before changing anything I re-checked the reservation, her tier, the fare rules and AA204's status and seats.\n\nThe refund policy's \"today\" is 2026-07-28, but the session date is 2026-10-06, which would put the 08-03 flight in the past. The booking system accepted the change anyway. I went by the reservation's own data, but someone may want to check why the dates disagree.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__propose-select__airline-medium__r2.jsonl"
+}

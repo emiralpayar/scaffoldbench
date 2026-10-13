@@ -1,0 +1,141 @@
+{
+  "runId": "claude-sonnet-5-5__single__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:32:33.382Z",
+  "finishedAt": "2026-10-06T02:32:47.755Z",
+  "latencyMs": 14371,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.037553,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1042,
+    "outputTokens": 1641,
+    "cacheReadInputTokens": 26737,
+    "cacheCreationInputTokens": 3708
+  },
+  "turns": 11,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791253953384,
+      "durationMs": 14370,
+      "costUsd": 0.0375534,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "O-3001 is fully refunded: $138.00 goes back to her card and $548.00 goes to her as store credit. The two shipped items are not back in stock yet.\n\n- **Hub line (L3, 2 × USB-C Hub):** It never shipped, so I cancelled it and refunded $138.00 to her card. I put the 2 hubs back in stock (8 → 10), since stock was set aside for the line.\n- **Dock and monitor (L1, L2):** Both shipped on 2026-05-04, which is more than 30 days before today (2026-10-06). The policy therefore requires store credit instead of a card refund. I recorded $548.00 as a store-credit refund on the order ($219.00 + $329.00, exactly what she paid). I also added $548.00 to her balance, which went from $5.00 to $553.00. The order now shows as returned.\n- **Dock and monitor stock:** I did not restock P-DOC or P-MON. Returned goods only go back on the shelf once the warehouse receives them, so that still needs doing when the parcel arrives.\n\nThe order record's own date line read 2026-07-25, which doesn't match today's date of 2026-10-06. Either way both shipped lines are past the 30-day window, so the outcome is the same.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__single__ecommerce-hard__r2.jsonl"
+}

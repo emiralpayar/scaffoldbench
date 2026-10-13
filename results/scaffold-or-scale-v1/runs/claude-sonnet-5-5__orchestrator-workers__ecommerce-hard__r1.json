@@ -1,0 +1,186 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__ecommerce-hard__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T14:21:34.543Z",
+  "finishedAt": "2026-10-05T14:22:07.451Z",
+  "latencyMs": 32906,
+  "setupMs": 0,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 0.8182,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 0,
+      "detail": "P-HUB=8 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.068807,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3678,
+    "outputTokens": 3610,
+    "cacheReadInputTokens": 29653,
+    "cacheCreationInputTokens": 5838
+  },
+  "turns": 14,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791210094545,
+      "durationMs": 6619,
+      "costUsd": 0.010603600000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791210101164,
+      "durationMs": 18260,
+      "costUsd": 0.0433966,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791210119425,
+      "durationMs": 8025,
+      "costUsd": 0.014806400000000003,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "**Status: money and order record done; warehouse side not finished.**\n\n**Done on O-3001 (Priya Raman, C-300), per the worker's report:**\n- **L3 (2 × USB-C Hub, never shipped):** Cancelled as a cancellation, not a return. The 13,800 cents she paid was refunded to the original card (RF-1).\n- **L1 (Laptop Dock) and L2 (Monitor):** Both shipped on 2026-05-04, outside the 30-day return window. The return policy therefore pays these out as store credit, not to the card.\n  - 54,800 cents of store credit was recorded against the order (RF-2).\n  - The same 54,800 cents was added to her balance, which went from 500 to 55,300.\n- The order is fully refunded (68,600 of 68,600 cents) and its status is `returned`.\n\n**Not done:**\n- **L1 and L2 stock:** No restock has been made. These items go back into stock only when the warehouse receives them. Once P-DOC and P-MON arrive, someone needs to restock 1 unit of each against O-3001.\n- **L3 stock (2 × P-HUB):** No restock has been made. This one is unresolved. Policy requires the full quantity to go back into stock if stock was set aside for the line, and nothing if the line was backordered. The worker found no reservation movement for it. The only P-HUB movement is a supplier delivery on 2026-06-30, after the order date. From that the worker inferred the line was backordered, but this is an inference, not confirmation. If stock was in fact set aside, 2 × P-HUB must be restocked. Someone should confirm this.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__ecommerce-hard__r1.jsonl"
+}

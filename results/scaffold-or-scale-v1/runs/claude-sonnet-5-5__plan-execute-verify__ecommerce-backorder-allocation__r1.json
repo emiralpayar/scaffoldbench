@@ -1,0 +1,416 @@
+{
+  "runId": "claude-sonnet-5-5__plan-execute-verify__ecommerce-backorder-allocation__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-backorder-allocation",
+  "taskTitle": "Share two short deliveries out among backorders",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "expert",
+  "strategyId": "plan-execute-verify",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T14:23:01.281Z",
+  "finishedAt": "2026-10-05T14:25:37.799Z",
+  "latencyMs": 156514,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 0.9744,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "plan-execute-verify.plan",
+        "ok": true,
+        "detail": "a 8-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.verdicts",
+        "ok": true,
+        "detail": "2 verdicts, each read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.loop",
+        "ok": true,
+        "detail": "2 revisions, each called for by a verdict"
+      },
+      {
+        "id": "plan-execute-verify.tools",
+        "ok": true,
+        "detail": "6 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "outcome:O-5201",
+      "label": "O-5201 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5201",
+      "label": "O-5201: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5202",
+      "label": "O-5202 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5202",
+      "label": "O-5202: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5203",
+      "label": "O-5203 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5203",
+      "label": "O-5203: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5204",
+      "label": "O-5204 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5204",
+      "label": "O-5204: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5206",
+      "label": "O-5206 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14 L2=backordered@2026-08-14 L3=pending"
+    },
+    {
+      "id": "promised:O-5206",
+      "label": "O-5206 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14, L2@2026-08-14"
+    },
+    {
+      "id": "notified:O-5206",
+      "label": "O-5206: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5207",
+      "label": "O-5207 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5207",
+      "label": "O-5207: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5208",
+      "label": "O-5208 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending@2026-08-05"
+    },
+    {
+      "id": "notified:O-5208",
+      "label": "O-5208: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "outcome:O-5209",
+      "label": "O-5209 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5209",
+      "label": "O-5209: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5210",
+      "label": "O-5210 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5210",
+      "label": "O-5210: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5211",
+      "label": "O-5211 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=shipped"
+    },
+    {
+      "id": "notified:O-5211",
+      "label": "O-5211: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5212",
+      "label": "O-5212 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending@2026-08-05"
+    },
+    {
+      "id": "notified:O-5212",
+      "label": "O-5212: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "outcome:O-5213",
+      "label": "O-5213 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14"
+    },
+    {
+      "id": "promised:O-5213",
+      "label": "O-5213 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14"
+    },
+    {
+      "id": "notified:O-5213",
+      "label": "O-5213: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5214",
+      "label": "O-5214 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-19"
+    },
+    {
+      "id": "promised:O-5214",
+      "label": "O-5214 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-19"
+    },
+    {
+      "id": "notified:O-5214",
+      "label": "O-5214: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5215",
+      "label": "O-5215 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5215",
+      "label": "O-5215: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "stock-used",
+      "label": "Both deliveries were allocated in full",
+      "weight": 1,
+      "earned": 1,
+      "detail": "P-DOC stock=0, P-MON stock=0"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 134,
+    "failedToolCalls": 0,
+    "distinctTools": 11
+  },
+  "costUsd": 0.502842,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 10696,
+    "outputTokens": 20579,
+    "cacheReadInputTokens": 351588,
+    "cacheCreationInputTokens": 54164
+  },
+  "turns": 143,
+  "toolCalls": 134,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1791210181283,
+      "durationMs": 10039,
+      "costUsd": 0.015268400000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 8,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1791210191322,
+      "durationMs": 63083,
+      "costUsd": 0.21765400000000001,
+      "turns": 71,
+      "toolCalls": 70,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "verify-1",
+      "label": "Verify",
+      "callId": "call-3",
+      "startedAtMs": 1791210254405,
+      "durationMs": 17227,
+      "costUsd": 0.0705548,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "approved": false,
+        "severity": "blocking",
+        "issues": 3,
+        "decision": "revise",
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "revise-1",
+      "label": "Revise (round 1)",
+      "callId": "call-4",
+      "startedAtMs": 1791210271632,
+      "durationMs": 20550,
+      "costUsd": 0.063406,
+      "turns": 18,
+      "toolCalls": 17,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "verify-2",
+      "label": "Verify revision 1",
+      "callId": "call-5",
+      "startedAtMs": 1791210292183,
+      "durationMs": 37505,
+      "costUsd": 0.1138392,
+      "turns": 36,
+      "toolCalls": 34,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "approved": false,
+        "severity": "blocking",
+        "issues": 3,
+        "decision": "revise",
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "revise-2",
+      "label": "Revise (round 2)",
+      "callId": "call-6",
+      "startedAtMs": 1791210329688,
+      "durationMs": 8109,
+      "costUsd": 0.0221192,
+      "turns": 3,
+      "toolCalls": 2,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I made no changes this time. Neither issue can be fixed with the tools I have, and the work already done is correct.\n\n- **Issue 2 (notices sent twice):** This is real, but it can't be undone. The first notices to C-528 (O-5208) and C-532 (O-5212) went out with the wrong 08-05 date. The handbook says to notify each customer once, and these notices can't be recalled. Sending a third message would only add to the breach. Each customer has already received a correction saying the order is allocated and the 08-05 date no longer applies. I'm recording the breach here.\n- **Issue 3 (stale 08-05 date):** I re-read both orders. O-5208 L1 and O-5212 L1 are `pending` (allocated) and still show `promisedDate=2026-08-05`. No tool clears a promise date. `set_promise_date` is only for waiting lines, so using it would put a different invented date on allocated lines. That would make the record worse, so I left it. Someone with record-edit access needs to clear those two dates. The customers have already been told to disregard that date.\n\nAllocations, promise dates and customer notices are unchanged. The earlier allocations and promise dates were not in question.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__plan-execute-verify__ecommerce-backorder-allocation__r1.jsonl"
+}

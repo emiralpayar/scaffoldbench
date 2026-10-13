@@ -1,0 +1,141 @@
+{
+  "runId": "claude-opus-5-5__single__support-easy__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-easy",
+  "taskTitle": "Triage a new service desk ticket",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:13:04.282Z",
+  "finishedAt": "2026-10-05T21:13:18.207Z",
+  "latencyMs": 13924,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity matches the escalation matrix for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev3 (matrix says sev3)"
+    },
+    {
+      "id": "deadline-from-response-target",
+      "label": "SLA deadline is the triage time plus the response target for that severity",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T17:20:00Z (expected 2026-03-17T17:20:00Z)"
+    },
+    {
+      "id": "assigned-to-oncall",
+      "label": "Assigned to the engineer on call for the owning rotation at the deadline",
+      "weight": 3,
+      "earned": 1,
+      "detail": "assignee=E-301 (expected E-301)"
+    },
+    {
+      "id": "ticket-opened",
+      "label": "Ticket left in status open",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was set",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 7,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.069573,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1038,
+    "outputTokens": 934,
+    "cacheReadInputTokens": 19052,
+    "cacheCreationInputTokens": 5780
+  },
+  "turns": 8,
+  "toolCalls": 7,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791234784282,
+      "durationMs": 13924,
+      "costUsd": 0.0695734,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I triaged T-1041 (VPN drops for the Berlin sales team). Nothing conflicted with the task or the handbook, and I changed no other ticket.\n\n- **Severity: sev3.** The escalation matrix gives sev3 for the VPN service when the impact is a single team, which is what the ticket records. The requester being senior played no part, since severity comes only from the matrix.\n- **Deadline: 2026-03-17T17:20:00Z.** The ticket had no deadline. The service desk clock read 2026-03-17T09:20:00Z when I triaged it, and sev3 has a 480-minute response target, so the deadline is eight hours later.\n- **Assignee: E-301 Yuki Sato.** The network-primary rotation owns VPN tickets, and Yuki Sato is on call for it at the deadline (shift 08:00–20:00Z). The ticket's status changed from new to open.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__single__support-easy__r1.jsonl"
+}

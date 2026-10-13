@@ -1,0 +1,177 @@
+{
+  "runId": "claude-haiku-4-5-20251001__gated-execute__airline-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "gated-execute",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-02T18:13:27.856Z",
+  "finishedAt": "2026-10-02T18:14:36.589Z",
+  "latencyMs": 68730,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "2 state changes, each allowed by a review (2 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.087602,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 13856,
+    "outputTokens": 6722,
+    "cacheReadInputTokens": 31740,
+    "cacheCreationInputTokens": 18481
+  },
+  "turns": 20,
+  "toolCalls": 15,
+  "deniedToolCalls": 0,
+  "subagentCount": 2,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1790964807858,
+      "durationMs": 68730,
+      "costUsd": 0.028882699999999997,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: change_flight",
+      "callId": "call-2",
+      "startedAtMs": 1790964821467,
+      "durationMs": 21029,
+      "costUsd": 0.024372199999999997,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__change_flight",
+        "toolUseId": "toolu_011xyqmwdKUm3kKZRsTYRWMV",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The action is correct. AA204 at 09:05 is the earliest scheduled departure on 2026-08-03 with available seats in economy (her current cabin). The flight is confirmed scheduled with 4 economy seats remaining. The agent should proceed to book Dana onto AA204 and settle fees per economy fare rules: $75…"
+      }
+    },
+    {
+      "phase": "review-2",
+      "label": "Review 2: charge_fee",
+      "callId": "call-3",
+      "startedAtMs": 1790964842504,
+      "durationMs": 29435,
+      "costUsd": 0.0343471,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__charge_fee",
+        "toolUseId": "toolu_01R9NXZNLPbDcMWWAinsx5Vd",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "The $80 fare difference charge is correct. Dana (gold tier) was properly moved to AA204, the earliest departure on 2026-08-03 with available economy seats. The charge amount ($390 new fare minus $310 original fare) is accurate. Her gold tier status correctly exempts her from the $75 change fee, but…"
+      }
+    }
+  ],
+  "finalText": "Perfect! I've successfully completed the task. Here's what I did:\n\n**Summary:**\n- **Moved Dana Whitfield** from AA210 (departing 17:40) to **AA204 (departing 09:05)** on 2026-08-03 — the earliest flight that day with available economy seats\n- **Cabin unchanged:** Economy (as booked)\n- **Charged:** $80.00 fare difference (AA204 economy fare is $390 vs. her original $310)\n- **Change fee waived:** Dana's gold tier frequent flyer status exempts her from the $75 change fee\n\nDana is now booked on the earliest available departure in her cabin and has been charged only for the fare difference, with no change fee applied due to her gold tier status.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__gated-execute__airline-medium__r2.jsonl"
+}

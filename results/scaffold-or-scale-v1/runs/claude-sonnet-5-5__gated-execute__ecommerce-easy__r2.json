@@ -1,0 +1,162 @@
+{
+  "runId": "claude-sonnet-5-5__gated-execute__ecommerce-easy__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "gated-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:27:53.820Z",
+  "finishedAt": "2026-10-06T02:28:10.703Z",
+  "latencyMs": 16880,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "1 state change, each allowed by a review (1 review in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "2 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "distinctTools": 4
+  },
+  "costUsd": 0.042389,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 2296,
+    "outputTokens": 994,
+    "cacheReadInputTokens": 27367,
+    "cacheCreationInputTokens": 6201
+  },
+  "turns": 12,
+  "toolCalls": 9,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1791253673822,
+      "durationMs": 16879,
+      "costUsd": 0.0216076,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: update_shipping_address",
+      "callId": "call-2",
+      "startedAtMs": 1791253680065,
+      "durationMs": 6208,
+      "costUsd": 0.020781800000000003,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__ecommerce__update_shipping_address",
+        "toolUseId": "toolu_014yR5P3dL3uLyvXg3m6RUFB",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "O-1001 is pending and nothing on it has shipped, so its address can be changed. O-1002 is the shipped order, and this call doesn't touch it. The new address matches the request."
+      }
+    }
+  ],
+  "finalText": "I updated the address on the order that hasn't shipped, O-1001, and left the one in transit alone.\n\n- **O-1001 (pending):** the shipping address was 12 Alder Lane, Bristol BS1 4TR, UK. It is now 7 Quarry Rise, Sheffield S11 8XZ, UK.\n- **O-1002 (shipped 2026-07-07):** I didn't change it. I read it again after the update and it still shows 88 Old Mill Road, Bristol BS3 2QQ, UK. The handbook says a shipped order's address must never be changed, because the parcel is in transit and the shipping record has to stay accurate.\n\nI made no other changes.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__gated-execute__ecommerce-easy__r2.jsonl"
+}

@@ -1,0 +1,199 @@
+{
+  "runId": "claude-sonnet-5-5__orchestrator-workers__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:33:17.295Z",
+  "finishedAt": "2026-10-06T02:33:58.287Z",
+  "latencyMs": 40990,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "2 subtasks, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "2 workers ran in parallel"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "4 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.120875,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 6118,
+    "outputTokens": 6099,
+    "cacheReadInputTokens": 54988,
+    "cacheCreationInputTokens": 10782
+  },
+  "turns": 20,
+  "toolCalls": 15,
+  "deniedToolCalls": 0,
+  "subagentCount": 2,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791253997296,
+      "durationMs": 9658,
+      "costUsd": 0.014908600000000003,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 2,
+        "workers": 2,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-unshipped-lines",
+      "label": "Worker 1: unshipped-lines",
+      "callId": "call-2",
+      "startedAtMs": 1791254006954,
+      "durationMs": 22213,
+      "costUsd": 0.047938800000000004,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-shipped-lines",
+      "label": "Worker 2: shipped-lines",
+      "callId": "call-3",
+      "startedAtMs": 1791254006955,
+      "durationMs": 14294,
+      "costUsd": 0.0353148,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-4",
+      "startedAtMs": 1791254029167,
+      "durationMs": 9119,
+      "costUsd": 0.0227124,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Order O-3001 is refunded in full (68,600 cents), but two warehouse points are still open. I could not confirm the L3 restock, and the L1 and L2 restocks wait on the warehouse.\n\n**Money**\n- **L3 (2 × P-HUB USB-C Hub):** This line had not shipped, so it was cancelled, not returned. 13,800 cents (2 × 6,900) went back to the original card as refund RF-3.\n- **L1 (P-DOC Laptop Dock) and L2 (P-MON 27-inch Monitor):** Both shipped on 2026-05-04 and are past the 30-day return window. Policy therefore pays them out as store credit, not card.\n  - RF-1 is L1 for 21,900 cents and RF-2 is L2 for 32,900 cents. Each is the full amount paid.\n  - The same 54,800 cents was added to C-300's store credit balance, taking it from 500 to 55,300.\n- **No double refund:** The three refunds total 68,600 cents, which matches the order total and the \"refunded 68,600 of 68,600\" the order showed. The unshipped-lines worker couldn't see where the 54,800 came from, but it is the shipped-lines worker's RF-1 and RF-2.\n\n**Order record**\n- L1, L2 and L3 are all closed out, and the order status is \"returned\".\n- Shipping address untouched.\n- No other order, customer or product was touched.\n\n**Warehouse**\n- **L3 restock (unverified):** 2 units of P-HUB went back into stock, taking it from 8 to 10, and the movement is recorded against O-3001. The line showed plain \"pending\" with no backorder marker, so the worker treated its stock as set aside. The inventory log has no reservation entry for this order, so that is unconfirmed. If L3 was actually backordered, the 2 units should not have been added and P-HUB should be corrected to 8. Someone should check this.\n- **L1 and L2 not restocked:** Returned goods go back on the shelf only when the warehouse receives them, and neither inventory record shows a receipt. Once the warehouse confirms receipt, restock 1 unit of P-DOC and 1 unit of P-MON.\n\n**Date discrepancy:** The system clock read 2026-07-25 while the task date is 2026-10-06. Both are well past 30 days after 2026-05-04, so the store-credit outcome is the same either way.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__orchestrator-workers__ecommerce-hard__r2.jsonl"
+}

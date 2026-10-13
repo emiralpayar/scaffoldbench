@@ -1,0 +1,171 @@
+{
+  "runId": "claude-haiku-4-5-20251001__plan-execute__support-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "plan-execute",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T16:29:12.406Z",
+  "finishedAt": "2026-10-02T16:30:55.872Z",
+  "latencyMs": 103462,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 0.8462,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "plan-execute.plan",
+        "ok": true,
+        "detail": "a 8-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute.tools",
+        "ok": true,
+        "detail": "2 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 0,
+      "detail": "assignee=E-101 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 18,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.095222,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 8416,
+    "outputTokens": 9904,
+    "cacheReadInputTokens": 91542,
+    "cacheCreationInputTokens": 14066
+  },
+  "turns": 21,
+  "toolCalls": 18,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1790958552408,
+      "durationMs": 28611,
+      "costUsd": 0.015761,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 8,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1790958581019,
+      "durationMs": 74851,
+      "costUsd": 0.07946120000000001,
+      "turns": 19,
+      "toolCalls": 18,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! The task has been completed successfully. Here's a summary of what was done:\n\n## Summary\n\n**Consolidation Results:**\n\n1. **Merged T-1052, T-1053, and T-1054** - These three tickets all reported the same underlying problem: CRM search returning HTTP 500 errors. \n   - **Survivor ticket:** T-1052 (earliest created: 2026-03-17T07:05:00Z)\n   - **Merged into:** T-1053, T-1054\n   - **Impact scope:** Updated to \"department\" (broadest scope affected)\n   - **Severity:** Set to sev2 (correctly mapped for department-wide impact per escalation matrix)\n   - **Deadline:** 2026-03-17T12:40:00Z (preserved earliest deadline from T-1053)\n   - **Assigned to:** E-101 Dana Whitfield (on-call for platform-primary escalation rotation at deadline time)\n\n2. **Left untouched:**\n   - **T-1055** (CSV export produces empty file) - Different problem, not related to search failures\n   - **T-1061** (Search index rebuild tracking) - Engineering internal tracking ticket, not a duplicate report; remains linked to T-1052 for coordination\n\nThe consolidated ticket T-1052 is now properly graded, assigned to the appropriate escalation rotation, and has the earliest deadline honored per domain policy.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__plan-execute__support-medium__r1.jsonl"
+}

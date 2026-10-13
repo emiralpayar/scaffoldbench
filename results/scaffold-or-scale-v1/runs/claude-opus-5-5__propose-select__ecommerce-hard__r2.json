@@ -1,0 +1,217 @@
+{
+  "runId": "claude-opus-5-5__propose-select__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "propose-select",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:34:58.606Z",
+  "finishedAt": "2026-10-06T02:37:30.679Z",
+  "latencyMs": 152071,
+  "setupMs": 0,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 2 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 27,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.376629,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 10403,
+    "outputTokens": 10673,
+    "cacheReadInputTokens": 69754,
+    "cacheCreationInputTokens": 17506
+  },
+  "turns": 33,
+  "toolCalls": 27,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791254098607,
+      "durationMs": 105186,
+      "costUsd": 0.05654000000000001,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791254098609,
+      "durationMs": 21390,
+      "costUsd": 0.0617666,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791254098610,
+      "durationMs": 22098,
+      "costUsd": 0.0609914,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791254203793,
+      "durationMs": 25678,
+      "costUsd": 0.10206359999999999,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 2,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791254229471,
+      "durationMs": 21207,
+      "costUsd": 0.09526720000000001,
+      "turns": 10,
+      "toolCalls": 9,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Priya's order O-3001 is fully refunded: 68,600¢ in total, which is everything she paid. Only 13,800¢ went back to her card. The other 54,800¢ became store credit, because the rules don't allow a card refund for those two items.\n\n**What I did**\n1. **USB-C Hub ×2 (L3), cancelled and refunded to her card:** this line never shipped, so it counts as a cancellation, not a return. I refunded the 13,800¢ she paid for it to her card. The cancellation didn't show it as backordered, so I put the 2 hubs back in stock right away (P-HUB went from 8 to 10).\n2. **Laptop Dock (L1) and Monitor (L2), returned for store credit:** both shipped on 2026-05-04, more than 30 days ago, so the return window has closed. After that, refunds can only be paid as store credit. I recorded a 54,800¢ store-credit refund on the order (21,900¢ + 32,900¢). Recording it there doesn't change her balance, so I also added 54,800¢ to her account separately. Her store credit went from 500¢ to 55,300¢.\n\n**End state**\n- O-3001 is marked `returned`, with 68,600¢ of 68,600¢ refunded.\n- The shipping address is unchanged.\n\n**Not done, per policy**\n- **No card refund for the dock and monitor:** her request to get her money back was met in value, but as store credit rather than to her card.\n- **No restock of the dock and monitor yet:** the warehouse hasn't received them back. They go back into stock (P-DOC at 3, P-MON at 5) when the parcels arrive.\n\nI didn't touch any other order, customer or product.\n\n**What to tell Priya:** £138.00 is going back to her card for the hubs, which never shipped. The other £548.00 is store credit, because the dock and monitor shipped more than 30 days ago.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__propose-select__ecommerce-hard__r2.jsonl"
+}

@@ -1,0 +1,134 @@
+{
+  "runId": "claude-haiku-4-5-20251001__single__ecommerce-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:28:45.420Z",
+  "finishedAt": "2026-10-06T02:29:33.561Z",
+  "latencyMs": 48139,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.050708,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 8276,
+    "outputTokens": 4712,
+    "cacheReadInputTokens": 14656,
+    "cacheCreationInputTokens": 8703
+  },
+  "turns": 7,
+  "toolCalls": 6,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791253725421,
+      "durationMs": 48139,
+      "costUsd": 0.05070759999999999,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! Task completed successfully. Here's what I did:\n\n## Summary\n\nI've successfully processed Marcus Ade's (C-200) request on order O-2003:\n\n**Actions taken:**\n1. **Cancelled Line L1** - The wireless mouse line (product P-MOU, qty=2) that was added by mistake\n2. **Refunded $73.50 to card** - Issued refund RF-1 for the full amount paid (7350 cents) back to the customer's original payment method\n3. **Restocked inventory** - Returned 2 units of the wireless mouse (P-MOU) to stock (30 → 32 units)\n\n**Order status:**\n- Lines L2 (Hub) and L3 (Cables) remain pending and will ship as planned\n- Only the wireless mouse line has been cancelled\n- Order total refunded: $73.50 of the original $199.50\n\nThe customer will receive their refund on their card, and the rest of the order will proceed to shipment as requested.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__single__ecommerce-medium__r2.jsonl"
+}

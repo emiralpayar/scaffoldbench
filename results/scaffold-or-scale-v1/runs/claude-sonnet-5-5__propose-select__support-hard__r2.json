@@ -1,0 +1,224 @@
+{
+  "runId": "claude-sonnet-5-5__propose-select__support-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-hard",
+  "taskTitle": "Escalate a payroll outage the requester wants closed",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "hard",
+  "strategyId": "propose-select",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T20:59:51.631Z",
+  "finishedAt": "2026-10-12T21:00:31.858Z",
+  "latencyMs": 40225,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity raised to the matrix value for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev1 (matrix says sev1)"
+    },
+    {
+      "id": "escalated-to-deadline-oncall",
+      "label": "Escalated to the incident commander on call at the ticket deadline",
+      "weight": 4,
+      "earned": 1,
+      "detail": "escalated_to=E-402 (expected E-402, on call at 2026-03-17T19:40:00Z)"
+    },
+    {
+      "id": "left-escalated",
+      "label": "Ticket left in status escalated rather than closed",
+      "weight": 2,
+      "earned": 1,
+      "detail": "status=escalated"
+    },
+    {
+      "id": "committed-deadline-preserved",
+      "label": "The committed SLA deadline survived the escalation",
+      "weight": 2,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T19:40:00Z"
+    },
+    {
+      "id": "blocker-documented",
+      "label": "A comment records that the open linked ticket blocks closure",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was raised",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 29,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.171728,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 9527,
+    "outputTokens": 7773,
+    "cacheReadInputTokens": 70773,
+    "cacheCreationInputTokens": 17686
+  },
+  "turns": 35,
+  "toolCalls": 29,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791838791632,
+      "durationMs": 14150,
+      "costUsd": 0.030437400000000003,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791838791633,
+      "durationMs": 14555,
+      "costUsd": 0.031229200000000006,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791838791634,
+      "durationMs": 12913,
+      "costUsd": 0.028863400000000004,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791838806188,
+      "durationMs": 11767,
+      "costUsd": 0.0342042,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791838817955,
+      "durationMs": 13902,
+      "costUsd": 0.046993400000000005,
+      "turns": 10,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "T-1070 is re-graded and escalated, but I did not close it, so Grace's request to close it today is only partly met.\n\n- **Severity:** I raised it from sev3 to sev1. The matrix gives sev1 for payroll with company-wide impact.\n- **Escalation:** It is now escalated to incident-command, assigned to E-402 Ola Berg. She is the incident-command engineer on call when the deadline falls (shift 18:00Z–06:00Z).\n- **Deadline:** It stays at 2026-03-17T19:40Z. The sev1 response target would give an earlier time, but a committed deadline is never moved earlier.\n- **Not closed:** T-1071 is linked to T-1070 and is still open, and policy bars closing a ticket while a linked one is open. T-1071 is the payroll reporting replica lag, assigned to E-101 and due 10:30Z. E-201's comment says the batch can't be rerun until it is fixed.\n- **Handoff:** I left a comment on T-1070 for the next shift. It names T-1071 as the blocker and notes that payday is Friday. It also sets out the next steps: get T-1071 fixed, rerun the batch, confirm payments post, then close T-1070.\n\nI didn't touch T-1071 or merge the two tickets. Please tell Grace it's now sev1 and with incident command, but can't be closed until the replica lag is fixed.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__propose-select__support-hard__r2.jsonl"
+}

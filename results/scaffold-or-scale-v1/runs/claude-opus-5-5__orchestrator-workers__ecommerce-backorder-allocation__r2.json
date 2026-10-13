@@ -1,0 +1,363 @@
+{
+  "runId": "claude-opus-5-5__orchestrator-workers__ecommerce-backorder-allocation__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-backorder-allocation",
+  "taskTitle": "Share two short deliveries out among backorders",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "expert",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:47:22.823Z",
+  "finishedAt": "2026-10-06T02:49:34.808Z",
+  "latencyMs": 131981,
+  "setupMs": 2,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "outcome:O-5201",
+      "label": "O-5201 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5201",
+      "label": "O-5201: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5202",
+      "label": "O-5202 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5202",
+      "label": "O-5202: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5203",
+      "label": "O-5203 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5203",
+      "label": "O-5203: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5204",
+      "label": "O-5204 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5204",
+      "label": "O-5204: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5206",
+      "label": "O-5206 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14 L2=backordered@2026-08-14 L3=pending"
+    },
+    {
+      "id": "promised:O-5206",
+      "label": "O-5206 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14, L2@2026-08-14"
+    },
+    {
+      "id": "notified:O-5206",
+      "label": "O-5206: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5207",
+      "label": "O-5207 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5207",
+      "label": "O-5207: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5208",
+      "label": "O-5208 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5208",
+      "label": "O-5208: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5209",
+      "label": "O-5209 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5209",
+      "label": "O-5209: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5210",
+      "label": "O-5210 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=pending"
+    },
+    {
+      "id": "notified:O-5210",
+      "label": "O-5210: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5211",
+      "label": "O-5211 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending L2=shipped"
+    },
+    {
+      "id": "notified:O-5211",
+      "label": "O-5211: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5212",
+      "label": "O-5212 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5212",
+      "label": "O-5212: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5213",
+      "label": "O-5213 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-14"
+    },
+    {
+      "id": "promised:O-5213",
+      "label": "O-5213 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-14"
+    },
+    {
+      "id": "notified:O-5213",
+      "label": "O-5213: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5214",
+      "label": "O-5214 left waiting, with a promise date",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=backordered@2026-08-19"
+    },
+    {
+      "id": "promised:O-5214",
+      "label": "O-5214 waiting lines promised for the date the in-transit supply gives them",
+      "weight": 1,
+      "earned": 1,
+      "detail": "expected L1@2026-08-19"
+    },
+    {
+      "id": "notified:O-5214",
+      "label": "O-5214: customer told once, with the promised date",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "outcome:O-5215",
+      "label": "O-5215 allocated from the delivery",
+      "weight": 2,
+      "earned": 1,
+      "detail": "L1=pending"
+    },
+    {
+      "id": "notified:O-5215",
+      "label": "O-5215: customer told once that the order is allocated",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "stock-used",
+      "label": "Both deliveries were allocated in full",
+      "weight": 1,
+      "earned": 1,
+      "detail": "P-DOC stock=0, P-MON stock=0"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 77,
+    "failedToolCalls": 0,
+    "distinctTools": 10
+  },
+  "costUsd": 0.570029,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 4146,
+    "outputTokens": 13195,
+    "cacheReadInputTokens": 370519,
+    "cacheCreationInputTokens": 28594
+  },
+  "turns": 81,
+  "toolCalls": 77,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791254842825,
+      "durationMs": 7456,
+      "costUsd": 0.0328812,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791254850281,
+      "durationMs": 101857,
+      "costUsd": 0.4636766,
+      "turns": 78,
+      "toolCalls": 77,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791254952138,
+      "durationMs": 22668,
+      "costUsd": 0.073471,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "# Dock and monitor backorders after PO-88 and PO-89\n\nThe work was done, but the report's own numbers don't agree, so I can't confirm it is exact. The lists below come from one worker's report, and I had no way to check them against the system.\n\n## Allocated (as listed by the worker)\nAll 11 docks and all 7 monitors were allocated. Stock on hand for both products is now 0.\n- **Docks:** O-5201 (2), O-5202 line 2 (1), O-5204 (2), O-5207 line 1 (1), O-5209 (2), O-5210 (1), O-5211 (1), O-5215 (1)\n- **Monitors:** O-5202 line 1 (1), O-5203 (2), O-5207 line 2 (1), O-5208 (2), O-5212 (1)\n- O-5207 must ship complete. Both of its lines could be filled at once, so it was allocated in full.\n\n## Still waiting, with promise dates\n| Order | Waiting for | Promise date | Source |\n|---|---|---|---|\n| O-5206 (platinum, ship-complete) | 1 dock, 1 USB-C hub | 2026-08-14 for both lines | Hub from PO-90 (due 08-06), dock from PO-95 (due 08-14); the whole order takes the later date |\n| O-5213 | 2 docks | 2026-08-14 | PO-95 |\n| O-5214 | 1 monitor | 2026-08-19 | PO-97 |\n\n## Not touched\n**O-5205** is on risk hold. It got no stock, no promise date and no message. It needs working once the hold is lifted.\n\n## Customers told\nThe worker says 14 customers were each notified once. Allocated orders were told their items will ship shortly. O-5206, O-5213 and O-5214 were given their expected dates.\n\n## Problems to check\n1. **The counts don't match.** The worker says 12 orders and 17 lines were allocated. The lists above contain only 11 orders and 13 lines. The unit totals (11 docks, 7 monitors) do add up. Fourteen notifications fits 11 allocated orders plus 3 waiting ones, not 12 plus 3. Either the summary figures are wrong or some allocations are missing from the list. Someone should compare the actual allocations and notifications against the system.\n2. **The worker also allocated two more deliveries.** The task covered only PO-88 and PO-89. Two more deliveries were received during the work: PO-91 (4 docks) and PO-93 (3 monitors). The worker says it allocated that stock \"by hand\" in the same priority order. It says the result is the same as if all the stock had arrived together. That is reasonable, since the stock had arrived and the same rules apply. Still, it goes beyond the request, and it isn't clear the allocations went through the normal process.\n3. **The priority order depends on which date counts as \"now.\"** The worker applied policy update PU-12, which puts orders placed on or before 2026-07-11 first, oldest first. It counted from the order system's date of 2026-07-25 rather than today's date, 2026-10-06. Measured from today, every order would be 14 or more days old, and the priority order might come out differently. The worker ignored PU-9, which ranked gold with platinum, because it applied only in June 2026. The report doesn't quote PU-12's actual text, so I can't confirm it was read correctly.\n4. **O-5206 depends on two deliveries:** hubs on PO-90 and docks on PO-95. A delay to either pushes back the whole order.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__orchestrator-workers__ecommerce-backorder-allocation__r2.jsonl"
+}

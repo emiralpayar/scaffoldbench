@@ -1,0 +1,179 @@
+{
+  "runId": "claude-opus-5-5__orchestrator-workers__ecommerce-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-medium",
+  "taskTitle": "Cancel one line of a multi-line order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:31:01.120Z",
+  "finishedAt": "2026-10-06T02:31:33.604Z",
+  "latencyMs": 32482,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "line-cancelled-and-refunded",
+      "label": "The mouse line is cancelled and refunded to the card for exactly what was paid",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L1: status=cancelled refundedCents=7350 method=card"
+    },
+    {
+      "id": "restocked-exact-quantity",
+      "label": "Exactly the cancelled quantity went back into stock",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-MOU stock=32"
+    },
+    {
+      "id": "rest-of-order-untouched",
+      "label": "The other lines of the order are still on their way",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "read-order-before-mutating",
+      "label": "Read the order before changing it",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.101192,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3578,
+    "outputTokens": 2652,
+    "cacheReadInputTokens": 28467,
+    "cacheCreationInputTokens": 4961
+  },
+  "turns": 12,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791253861122,
+      "durationMs": 8108,
+      "costUsd": 0.019167599999999996,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791253869230,
+      "durationMs": 15773,
+      "costUsd": 0.05794939999999999,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791253885003,
+      "durationMs": 8601,
+      "costUsd": 0.024075399999999997,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "The wireless mouse on order O-2003 is cancelled, Marcus has been refunded $73.50 to his card, and the rest of his order is still due to ship as planned.\n\n- **What was cancelled:** line L1, the 2 wireless mice, and nothing else. The line hadn't shipped, so this is a cancellation rather than a return.\n- **Refund:** $73.50 went back to his card (refund RF-1). That's what he actually paid for the mice after his MOUSE25 discount, not the $98.00 list price.\n- **Stock:** the mice weren't backordered, so both units had been set aside for him. They've been put back in stock, taking wireless mouse stock from 30 to 32.\n- **Rest of the order:** the hub (L2) and the 3 cables (L3) haven't been touched. They're still pending, going to the same shipping address. The order now shows $73.50 refunded out of $199.50 paid.\n\nTwo things to be aware of:\n\n1. **Discount code:** MOUSE25 looks like it was tied to the mouse. The refund system counted the discount against the mouse line only, and the hub and cable prices didn't change. So nothing else on the order needed adjusting.\n2. **Date mismatch:** the order record gives today's date as 2026-07-25, but the actual date is 2026-10-06. This didn't affect the cancellation because the items hadn't shipped, but the system clock may be worth checking.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__orchestrator-workers__ecommerce-medium__r2.jsonl"
+}

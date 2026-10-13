@@ -1,0 +1,204 @@
+{
+  "runId": "claude-haiku-4-5-20251001__propose-select__airline-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "propose-select",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T09:44:09.399Z",
+  "finishedAt": "2026-10-02T09:45:46.899Z",
+  "latencyMs": 97497,
+  "setupMs": 2,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 2 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 23,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.136043,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 20826,
+    "outputTokens": 12124,
+    "cacheReadInputTokens": 57070,
+    "cacheCreationInputTokens": 24445
+  },
+  "turns": 29,
+  "toolCalls": 23,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1790934249401,
+      "durationMs": 30572,
+      "costUsd": 0.0313806,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1790934249402,
+      "durationMs": 20824,
+      "costUsd": 0.0262135,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1790934249404,
+      "durationMs": 22297,
+      "costUsd": 0.0260769,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1790934279973,
+      "durationMs": 34833,
+      "costUsd": 0.022831999999999998,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 2,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1790934314806,
+      "durationMs": 32092,
+      "costUsd": 0.029539999999999997,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! **Task completed successfully.**\n\n## Summary of Actions:\n\n✅ **Dana Whitfield moved to AA204, departing 09:05 on 2026-08-03**\n- **Original booking**: AA210 at 17:40 (economy)\n- **New booking**: AA204 at 09:05 (economy)\n- **This is the earliest available departure** with an available economy seat on that date\n\n✅ **Financial Settlement:**\n- **Change fee**: $0.00 (waived due to Gold tier status)\n- **Fare difference**: $80.00 charged ($390.00 new fare − $310.00 original fare)\n- **Total amount Dana owes**: $80.00\n\nThe reservation is now confirmed with Dana on her new, earlier flight. She saves over 8 hours of waiting time by departing at 09:05 instead of 17:40, and her Gold tier frequent flyer status saved her the $75 change fee.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__propose-select__airline-medium__r1.jsonl"
+}

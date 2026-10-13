@@ -1,0 +1,128 @@
+{
+  "runId": "claude-opus-5-5__single__airline-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T16:08:04.669Z",
+  "finishedAt": "2026-10-05T16:08:24.203Z",
+  "latencyMs": 19510,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.097807,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1043,
+    "outputTokens": 1415,
+    "cacheReadInputTokens": 30409,
+    "cacheCreationInputTokens": 7842
+  },
+  "turns": 10,
+  "toolCalls": 9,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791216484690,
+      "durationMs": 19510,
+      "costUsd": 0.0978068,
+      "turns": 10,
+      "toolCalls": 9,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I moved Dana Whitfield on reservation R2087 to AA204 (SFO to ORD, 2026-08-03, leaving at 09:05), still in economy. She owes $80.00 for the change, and I've charged it.\n\n**Why AA204:** It's the earliest flight that day that's running and has an economy seat (4 left).\n- UA88 at 06:15 has no economy seats left.\n- AA918 at 07:30 is cancelled.\n\n**What she owes:** $80.00, charged as a fare difference.\n- Economy on AA204 costs $390.00 and she paid $310.00, so the difference is $80.00. The fare rules say this is collected in full and no tier is exempt.\n- She doesn't pay the usual $75.00 change fee because she is a gold member.\n\n**About the date:** The date given to me was 2026-10-05, which would make this flight two months in the past. The airline system gives today's date as 2026-07-28, and the flight is still listed as scheduled. I went by the system's date, so I treated the change as happening before departure.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__single__airline-medium__r1.jsonl"
+}

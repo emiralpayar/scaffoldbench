@@ -1,0 +1,141 @@
+{
+  "runId": "claude-sonnet-5-5__single__ecommerce-hard__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T14:21:17.310Z",
+  "finishedAt": "2026-10-05T14:21:34.543Z",
+  "latencyMs": 17231,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.04032,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1042,
+    "outputTokens": 1874,
+    "cacheReadInputTokens": 27084,
+    "cacheCreationInputTokens": 3801
+  },
+  "turns": 11,
+  "toolCalls": 10,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791210077311,
+      "durationMs": 17231,
+      "costUsd": 0.0403198,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Order O-3001 is fully refunded: 54,800 cents as store credit and 13,800 cents back to the card.\n\n- **L3 (2 × USB-C Hub, never shipped):** I cancelled it and refunded the 13,800 cents to the original card. I put the 2 units back into stock (P-HUB went from 8 to 10). The line showed as pending, not backordered, so I treated the stock as set aside for it. If it was actually backordered, that restock should be reversed.\n- **L1 (P-DOC) and L2 (P-MON), both shipped 2026-05-04:** The return window is 30 days from the ship date, and it closed long ago. Policy says these must be paid as store credit, not to the card. I recorded the refund against the order (RF-1, 54,800 cents) and added the same amount to Priya's balance. Her balance went from 500 to 55,300 cents.\n- **Warehouse:** I did not restock P-DOC or P-MON. Returned goods only go back on the shelf once the warehouse receives them, so that restock is still to do when they arrive.\n\nThe order now shows as returned, with 68,600 of 68,600 cents refunded.\n\nPriya asked for her money back, and the shipped items can't go back to her card under the policy. She should be told that part comes as store credit.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__single__ecommerce-hard__r1.jsonl"
+}

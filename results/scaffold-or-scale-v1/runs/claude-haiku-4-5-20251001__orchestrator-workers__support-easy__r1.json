@@ -1,0 +1,186 @@
+{
+  "runId": "claude-haiku-4-5-20251001__orchestrator-workers__support-easy__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-easy",
+  "taskTitle": "Triage a new service desk ticket",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T16:24:07.412Z",
+  "finishedAt": "2026-10-02T16:25:00.424Z",
+  "latencyMs": 53009,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity matches the escalation matrix for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev3 (matrix says sev3)"
+    },
+    {
+      "id": "deadline-from-response-target",
+      "label": "SLA deadline is the triage time plus the response target for that severity",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T17:20:00Z (expected 2026-03-17T17:20:00Z)"
+    },
+    {
+      "id": "assigned-to-oncall",
+      "label": "Assigned to the engineer on call for the owning rotation at the deadline",
+      "weight": 3,
+      "earned": 1,
+      "detail": "assignee=E-301 (expected E-301)"
+    },
+    {
+      "id": "ticket-opened",
+      "label": "Ticket left in status open",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was set",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.049008,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 10460,
+    "outputTokens": 4734,
+    "cacheReadInputTokens": 20242,
+    "cacheCreationInputTokens": 6427
+  },
+  "turns": 12,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1790958247414,
+      "durationMs": 20994,
+      "costUsd": 0.012348000000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1790958268408,
+      "durationMs": 20819,
+      "costUsd": 0.029131200000000003,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1790958289227,
+      "durationMs": 11196,
+      "costUsd": 0.007528999999999999,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "The task is **not complete**. While the worker report shows progress on ticket T-1041, there is a critical error:\n\n**What was done correctly:**\n- Severity was set to sev3 based on the escalation matrix (team-level impact on VPN service) ✓\n- The ticket was assigned to E-301 Yuki Sato, the on-call engineer for the network-primary rotation that owns VPN ✓\n- Status automatically transitioned to \"open\" upon assignment ✓\n\n**Critical error:**\nThe deadline was set to **2026-03-17T17:20:00Z**, which is in the past. Today's date is **2026-10-02**, so this deadline is approximately 6.5 months behind current date. \n\nPer the domain policy, a deadline should be \"the time of triage plus the response target for its severity.\" The deadline should have been calculated from today (2026-10-02) plus the response target for sev3 (reportedly 480 minutes), resulting in a deadline approximately 8 hours in the future from now, not months in the past.\n\nThis deadline error must be corrected before the task is complete. The ticket requires a valid future deadline that reflects the actual triage date and the severity's response target.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__orchestrator-workers__support-easy__r1.jsonl"
+}

@@ -1,0 +1,217 @@
+{
+  "runId": "claude-haiku-4-5-20251001__propose-select__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "propose-select",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:31:49.745Z",
+  "finishedAt": "2026-10-06T02:33:57.505Z",
+  "latencyMs": 127756,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 1 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 22,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.160654,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 27805,
+    "outputTokens": 18309,
+    "cacheReadInputTokens": 48064,
+    "cacheCreationInputTokens": 18249
+  },
+  "turns": 28,
+  "toolCalls": 22,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791253909746,
+      "durationMs": 33194,
+      "costUsd": 0.023413999999999997,
+      "turns": 4,
+      "toolCalls": 3,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791253909748,
+      "durationMs": 26832,
+      "costUsd": 0.02024,
+      "turns": 4,
+      "toolCalls": 3,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791253909748,
+      "durationMs": 27383,
+      "costUsd": 0.031535999999999995,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791253942940,
+      "durationMs": 61640,
+      "costUsd": 0.044250000000000005,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 1,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791254004581,
+      "durationMs": 32921,
+      "costUsd": 0.0412144,
+      "turns": 11,
+      "toolCalls": 10,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! All steps completed successfully. Here's the final summary:\n\n## Order O-3001 Return - Complete Processing for Priya Raman (C-300)\n\n**What was done:**\n\n1. ✅ **Cancelled L3 (P-HUB, 2 units)** - Refunded 13,800¢ to card (original payment method) because this line never shipped. This is a cancellation, not a return.\n\n2. ✅ **Refunded L1 & L2 to store credit** - Both shipped on 2026-05-04, now 82+ days in the past (well outside the 30-day return window). Per policy, returns outside the window must be paid as store credit, not to card. Total: 54,800¢.\n\n3. ✅ **Restocked inventory** - 2 units of P-HUB returned to warehouse stock (cancelled goods re-enter immediately). Stock: 8 → 10 units.\n\n4. ✅ **Applied store credit** - Added 54,800¢ to Priya's account. Her balance: 500¢ → 55,300¢.\n\n**Final State:**\n- Order O-3001: Status **returned**, 100% refunded (68,600¢)\n  - L3: Cancelled, refunded 13,800¢ to card\n  - L1 & L2: Returned, refunded 54,800¢ as store credit\n- Customer C-300: Tier platinum, store credit 55,300¢\n- Warehouse: P-HUB stock restored to 10 units\n\nAll actions follow the domain policy: L1 & L2 respect the 30-day window boundary; L3 follows cancellation rules; refunds match what was paid; store credit refund is complete (both order record and customer balance updated).",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__propose-select__ecommerce-hard__r2.jsonl"
+}

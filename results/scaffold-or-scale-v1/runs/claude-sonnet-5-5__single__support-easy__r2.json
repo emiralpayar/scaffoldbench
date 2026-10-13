@@ -1,0 +1,141 @@
+{
+  "runId": "claude-sonnet-5-5__single__support-easy__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-easy",
+  "taskTitle": "Triage a new service desk ticket",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T20:51:10.075Z",
+  "finishedAt": "2026-10-12T20:51:19.349Z",
+  "latencyMs": 9271,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity matches the escalation matrix for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev3 (matrix says sev3)"
+    },
+    {
+      "id": "deadline-from-response-target",
+      "label": "SLA deadline is the triage time plus the response target for that severity",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T17:20:00Z (expected 2026-03-17T17:20:00Z)"
+    },
+    {
+      "id": "assigned-to-oncall",
+      "label": "Assigned to the engineer on call for the owning rotation at the deadline",
+      "weight": 3,
+      "earned": 1,
+      "detail": "assignee=E-301 (expected E-301)"
+    },
+    {
+      "id": "ticket-opened",
+      "label": "Ticket left in status open",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was set",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 7,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.036125,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1036,
+    "outputTokens": 867,
+    "cacheReadInputTokens": 14638,
+    "cacheCreationInputTokens": 5892
+  },
+  "turns": 8,
+  "toolCalls": 7,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791838270076,
+      "durationMs": 9271,
+      "costUsd": 0.0361246,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I triaged T-1041 and changed no other ticket.\n\n- **Severity:** I set it to sev3. The matrix gives VPN with team-wide impact sev3, and this is the Berlin sales team of about nine people.\n- **Deadline:** I set it to 2026-03-17T17:20:00Z. That is the triage time (09:20Z) plus the 480-minute sev3 response target. The ticket had no deadline before.\n- **Assignee:** I assigned it to E-301 Yuki Sato. VPN belongs to the network-primary rotation, and Yuki is on call for it at 17:20Z, when the deadline falls. Her shift runs 08:00Z to 20:00Z. The ticket is now open.\n\nI didn't escalate it. Sev3 has no escalation rotation in the matrix.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__single__support-easy__r2.jsonl"
+}

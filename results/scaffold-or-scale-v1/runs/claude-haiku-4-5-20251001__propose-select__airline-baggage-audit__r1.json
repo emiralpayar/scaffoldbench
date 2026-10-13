@@ -1,0 +1,439 @@
+{
+  "runId": "claude-haiku-4-5-20251001__propose-select__airline-baggage-audit__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-baggage-audit",
+  "taskTitle": "Audit a week of baggage fees",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "expert",
+  "strategyId": "propose-select",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T10:04:55.942Z",
+  "finishedAt": "2026-10-02T10:09:05.686Z",
+  "latencyMs": 249738,
+  "setupMs": 1,
+  "gradingMs": 4,
+  "attempts": 1,
+  "score": 0,
+  "passed": false,
+  "failureMode": "policy_violation",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 3 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "refund:L2",
+      "label": "L2 (R8124): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L2",
+      "label": "L2: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L3",
+      "label": "L3 (R8125): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 12000"
+    },
+    {
+      "id": "outcome:L3",
+      "label": "L3: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "refund:L4",
+      "label": "L4 (R8112): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L4",
+      "label": "L4: audit outcome recorded as undercharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L5",
+      "label": "L5 (R8116): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 5500"
+    },
+    {
+      "id": "outcome:L5",
+      "label": "L5: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L6",
+      "label": "L6 (R8117): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L6",
+      "label": "L6: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L7",
+      "label": "L7 (R8118): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 4500"
+    },
+    {
+      "id": "outcome:L7",
+      "label": "L7: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L8",
+      "label": "L8 (R8120): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L8",
+      "label": "L8: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "refund:L9",
+      "label": "L9 (R8126): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L9",
+      "label": "L9: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L10",
+      "label": "L10 (R8113): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 7500"
+    },
+    {
+      "id": "outcome:L10",
+      "label": "L10: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L11",
+      "label": "L11 (R8115): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L11",
+      "label": "L11: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L12",
+      "label": "L12 (R8122): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L12",
+      "label": "L12: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L13",
+      "label": "L13 (R8123): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L13",
+      "label": "L13: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "refund:L15",
+      "label": "L15 (R8119): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 2500"
+    },
+    {
+      "id": "outcome:L15",
+      "label": "L15: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L16",
+      "label": "L16 (R8110): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L16",
+      "label": "L16: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L17",
+      "label": "L17 (R8111): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L17",
+      "label": "L17: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L18",
+      "label": "L18 (R8114): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L18",
+      "label": "L18: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L19",
+      "label": "L19 (R8114): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 5000"
+    },
+    {
+      "id": "outcome:L19",
+      "label": "L19: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L20",
+      "label": "L20 (R8121): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L20",
+      "label": "L20: audit outcome recorded as undercharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L21",
+      "label": "L21 (R8122): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L21",
+      "label": "L21: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    }
+  ],
+  "penalties": [
+    {
+      "id": "out-of-scope-change",
+      "label": "Moved money outside the audit: a new charge, or a refund of an entry outside it",
+      "kind": "unsafe_action",
+      "multiplier": 0,
+      "detail": "Out of scope: ledger[L25], ledger[L26], ledger[L27], ledger[L28], ledger[L29], ledger[L30] and 1 more."
+    }
+  ],
+  "scoreMetadata": {
+    "toolCalls": 211,
+    "failedToolCalls": 0,
+    "distinctTools": 12
+  },
+  "costUsd": 0.559749,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 13943,
+    "outputTokens": 62287,
+    "cacheReadInputTokens": 404869,
+    "cacheCreationInputTokens": 96942
+  },
+  "turns": 217,
+  "toolCalls": 211,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1790935495943,
+      "durationMs": 114316,
+      "costUsd": 0.14816820000000003,
+      "turns": 61,
+      "toolCalls": 60,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1790935495945,
+      "durationMs": 126210,
+      "costUsd": 0.1480957,
+      "turns": 63,
+      "toolCalls": 62,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1790935495946,
+      "durationMs": 115579,
+      "costUsd": 0.1273321,
+      "turns": 54,
+      "toolCalls": 53,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1790935622155,
+      "durationMs": 67987,
+      "costUsd": 0.06039800000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 3,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1790935690142,
+      "durationMs": 55539,
+      "costUsd": 0.0757549,
+      "turns": 37,
+      "toolCalls": 36,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! I have completed the baggage fee audit for the period 2026-07-20 through 2026-07-26. Here's the final summary:\n\n## AUDIT SETTLEMENT COMPLETE\n\n**All 19 baggage fees audited and settled:**\n\n### Audit Outcomes Recorded:\n- **10 CORRECT** (no action): L2, L3, L6, L9, L11, L12, L16, L17, L18, L21\n- **2 UNDERCHARGED** (per policy, not re-billed): L4 (3000¢), L20 (500¢)\n- **7 OVERCHARGED** (refunded): L5, L7, L8, L10, L13, L15, L19\n\n### Refunds Issued as Travel Credit (39,000¢ total):\nSince all affected reservations had no active payment instrument on file, all overcharges were refunded as travel credit per the domain policy:\n\n| Reservation | Amount | Ledger |\n|-------------|--------|--------|\n| R8116 | 7,500¢ ($75.00) | L25 |\n| R8118 | 4,500¢ ($45.00) | L26 |\n| R8120 | 7,500¢ ($75.00) | L27 |\n| R8113 | 7,500¢ ($75.00) | L28 |\n| R8123 | 4,500¢ ($45.00) | L29 |\n| R8119 | 2,500¢ ($25.00) | L30 |\n| R8114 | 5,000¢ ($50.00) | L31 |\n\n**Total refunded: $490.00**\n\nThe two undercharged fees remain as posted per domain policy (never re-bill undercharges).",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__propose-select__airline-baggage-audit__r1.jsonl"
+}

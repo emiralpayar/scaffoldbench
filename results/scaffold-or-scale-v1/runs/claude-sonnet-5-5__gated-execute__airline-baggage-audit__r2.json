@@ -1,0 +1,892 @@
+{
+  "runId": "claude-sonnet-5-5__gated-execute__airline-baggage-audit__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-baggage-audit",
+  "taskTitle": "Audit a week of baggage fees",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "expert",
+  "strategyId": "gated-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:21:05.320Z",
+  "finishedAt": "2026-10-06T02:26:47.769Z",
+  "latencyMs": 342441,
+  "setupMs": 2,
+  "gradingMs": 5,
+  "attempts": 1,
+  "score": 0.7298,
+  "passed": false,
+  "failureMode": "wrong_answer",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "24 state changes, each allowed by a review (26 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "27 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "refund:L2",
+      "label": "L2 (R8124): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L2",
+      "label": "L2: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L3",
+      "label": "L3 (R8125): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 12000 of an expected 12000"
+    },
+    {
+      "id": "outcome:L3",
+      "label": "L3: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L4",
+      "label": "L4 (R8112): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L4",
+      "label": "L4: audit outcome recorded as undercharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L5",
+      "label": "L5 (R8116): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 7500 of an expected 5500"
+    },
+    {
+      "id": "outcome:L5",
+      "label": "L5: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L6",
+      "label": "L6 (R8117): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L6",
+      "label": "L6: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L7",
+      "label": "L7 (R8118): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 4500 of an expected 4500"
+    },
+    {
+      "id": "outcome:L7",
+      "label": "L7: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L8",
+      "label": "L8 (R8120): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 0,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L8",
+      "label": "L8: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 0
+    },
+    {
+      "id": "refund:L9",
+      "label": "L9 (R8126): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L9",
+      "label": "L9: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L10",
+      "label": "L10 (R8113): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 7500 of an expected 7500"
+    },
+    {
+      "id": "outcome:L10",
+      "label": "L10: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L11",
+      "label": "L11 (R8115): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L11",
+      "label": "L11: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L12",
+      "label": "L12 (R8122): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L12",
+      "label": "L12: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L13",
+      "label": "L13 (R8123): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L13",
+      "label": "L13: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L15",
+      "label": "L15 (R8119): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 2500 of an expected 2500"
+    },
+    {
+      "id": "outcome:L15",
+      "label": "L15: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L16",
+      "label": "L16 (R8110): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L16",
+      "label": "L16: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L17",
+      "label": "L17 (R8111): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L17",
+      "label": "L17: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L18",
+      "label": "L18 (R8114): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L18",
+      "label": "L18: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L19",
+      "label": "L19 (R8114): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 5000 of an expected 5000"
+    },
+    {
+      "id": "outcome:L19",
+      "label": "L19: audit outcome recorded as overcharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L20",
+      "label": "L20 (R8121): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L20",
+      "label": "L20: audit outcome recorded as undercharged",
+      "weight": 0.5,
+      "earned": 1
+    },
+    {
+      "id": "refund:L21",
+      "label": "L21 (R8122): audited, and refunded exactly the overcharge, if any",
+      "weight": 1,
+      "earned": 1,
+      "detail": "refunded 0 of an expected 0"
+    },
+    {
+      "id": "outcome:L21",
+      "label": "L21: audit outcome recorded as correct",
+      "weight": 0.5,
+      "earned": 1
+    }
+  ],
+  "penalties": [
+    {
+      "id": "over-refunded",
+      "label": "Refunded more than a charge was overcharged",
+      "kind": "policy_violation",
+      "multiplier": 0.8,
+      "detail": "Refunded beyond the overcharge: L5."
+    }
+  ],
+  "scoreMetadata": {
+    "toolCalls": 308,
+    "failedToolCalls": 7,
+    "distinctTools": 12
+  },
+  "costUsd": 1.106828,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 43106,
+    "outputTokens": 35978,
+    "cacheReadInputTokens": 980778,
+    "cacheCreationInputTokens": 127847
+  },
+  "turns": 363,
+  "toolCalls": 308,
+  "deniedToolCalls": 0,
+  "subagentCount": 26,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1791253265322,
+      "durationMs": 342441,
+      "costUsd": 0.20404279999999997,
+      "turns": 87,
+      "toolCalls": 86,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: refund_fee",
+      "callId": "call-2",
+      "startedAtMs": 1791253297489,
+      "durationMs": 8968,
+      "costUsd": 0.029169000000000007,
+      "turns": 11,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_017u4oLAXLWZng9Nd7yEhQ4h",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L3 on R8125 was posted 2026-07-20 for 3 bags on an economy booking. The passenger, Jakob Weiss, was gold on that date. His tier dropped to none on 2026-07-21. The fee audit judges him as he was on the posting date. Economy gives 1 free bag and gold adds 2, so the allowance is 3 and no fee was due. …"
+      }
+    },
+    {
+      "phase": "review-2",
+      "label": "Review 2: refund_fee",
+      "callId": "call-3",
+      "startedAtMs": 1791253306473,
+      "durationMs": 12837,
+      "costUsd": 0.033169599999999994,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_01VXjPbixfPGQn2Ku6nWK8p9",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L5 (R8116) was posted 2026-07-21, before bulletin PB-2026-13 took effect on 07-23, so the 4500-cent first-bag rate applies. Elif Aydin has been silver since 2025-11-01 and booked economy. Her free allowance is 1 + 1 = 2 bags, and she holds 3 bags, so one bag is chargeable. The correct fee is 4500 c…"
+      }
+    },
+    {
+      "phase": "review-3",
+      "label": "Review 3: refund_fee",
+      "callId": "call-4",
+      "startedAtMs": 1791253319319,
+      "durationMs": 13438,
+      "costUsd": 0.0409288,
+      "turns": 14,
+      "toolCalls": 12,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_01DksFgkpiUrCdSzysmebQDE",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L7 is a 4500-cent baggage fee on R8118, posted 2026-07-21. R8118 is an economy booking for Nils Berg, who has been silver since 2025-11-01. Economy gives 1 free bag and silver adds 1, so 2 bags are free. The reservation holds 2 bags, so no fee was due and the whole 4500 cents was an overcharge. PB-…"
+      }
+    },
+    {
+      "phase": "review-4",
+      "label": "Review 4: refund_fee",
+      "callId": "call-5",
+      "startedAtMs": 1791253332764,
+      "durationMs": 10704,
+      "costUsd": 0.037512000000000004,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_01LYih6kaHevmhUL58w7Dsf5",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L10 is on R8113 (Sven Holm), posted 2026-07-22. The cabin is basic_economy, which has 0 free bags. He has been silver since 2025-11-01, which adds 1, so he has 1 free bag. He added 2 bags, so 1 is chargeable. The bulletin PB-2026-13 rate of 5000 cents only starts on 07-23, so the 07-22 rate is the …"
+      }
+    },
+    {
+      "phase": "review-5",
+      "label": "Review 5: refund_fee",
+      "callId": "call-6",
+      "startedAtMs": 1791253343473,
+      "durationMs": 12211,
+      "costUsd": 0.039491399999999996,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_014viJtozEm1dWwUgnJ8Y9CS",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L15 (R8119) was posted 2026-07-24. Dana Kowal has been gold since 2025-11-01 and booked basic economy, so her free allowance is 0 + 2 = 2 bags. She added 3 bags, so 1 bag is chargeable. Bulletin PB-2026-13 has been in effect since 2026-07-23 and sets the first chargeable bag at 5000 cents. The corr…"
+      }
+    },
+    {
+      "phase": "review-6",
+      "label": "Review 6: refund_fee",
+      "callId": "call-7",
+      "startedAtMs": 1791253355690,
+      "durationMs": 11684,
+      "costUsd": 0.036813399999999996,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__refund_fee",
+        "toolUseId": "toolu_01Jup8wT4aA1PeMWTCMEfhhd",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L19 is a second baggage_fee of 5000 cents on R8114. L18, posted the same day, already charged for the same 3 bags (bags_added=3, bags_after=3). Policy says a reservation pays the baggage fee for its bags once, and a duplicate is refunded in full, so 5000 is the right amount. Payment status shows no…"
+      }
+    },
+    {
+      "phase": "review-7",
+      "label": "Review 7: annotate_ledger_entry",
+      "callId": "call-8",
+      "startedAtMs": 1791253368764,
+      "durationMs": 9818,
+      "costUsd": 0.030410799999999998,
+      "turns": 11,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01LUkxgmkfRZZirR9cw6tCRf",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L2 (R8124) is correct. The passenger is an economy passenger with no tier, and the tier has been \"none\" since 2025-11-01. That gives 1 free bag. They added 2 bags on 2026-07-20, so 1 bag is chargeable at the first-bag price of 4500 cents. PB-2026-13 only raises the price from 2026-07-23, so it does…"
+      }
+    },
+    {
+      "phase": "review-8",
+      "label": "Review 8: annotate_ledger_entry",
+      "callId": "call-9",
+      "startedAtMs": 1791253378587,
+      "durationMs": 14003,
+      "costUsd": 0.028355399999999996,
+      "turns": 9,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01NHjeb1uzY4cuot5Yv2X8JQ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L3 on R8125 was charged 12000 cents on 2026-07-20 for 3 bags in economy. The passenger was gold on that date, so the allowance was 1 + 2 = 3 bags and no fee was due. The tier dropped to none on 07-21, which doesn't affect this entry. Bulletin PB-2026-13 only takes effect on 07-23. The full 12000 re…"
+      }
+    },
+    {
+      "phase": "review-9",
+      "label": "Review 9: annotate_ledger_entry",
+      "callId": "call-10",
+      "startedAtMs": 1791253392598,
+      "durationMs": 8401,
+      "costUsd": 0.028900199999999997,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_017iamjCHCPFHh9RF8yPxbD9",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L4 (R8112) is an economy passenger with no tier, so 1 bag is free. The other 2 bags cost 4500 + 7500 = 12000 cents at the rate in force on 2026-07-21, which is before bulletin PB-2026-13 took effect. L4 charged 9000 cents, so it is undercharged. Undercharges are annotated and not re-billed, so this…"
+      }
+    },
+    {
+      "phase": "review-10",
+      "label": "Review 10: annotate_ledger_entry",
+      "callId": "call-11",
+      "startedAtMs": 1791253401012,
+      "durationMs": 9580,
+      "costUsd": 0.030074999999999998,
+      "turns": 8,
+      "toolCalls": 6,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01Ua14r6jPsjNBd2vcoefLwo",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L5 (R8116) was a 12000-cent fee posted 2026-07-21. The passenger is silver, and silver has been her tier since 2025-11-01. Economy gives 1 free bag and silver adds 1, so 2 bags are free. Only 1 of her 3 bags is chargeable, which costs 4500 cents. Bulletin PB-2026-13 took effect 2026-07-23, so it do…"
+      }
+    },
+    {
+      "phase": "review-11",
+      "label": "Review 11: annotate_ledger_entry",
+      "callId": "call-12",
+      "startedAtMs": 1791253410596,
+      "durationMs": 11840,
+      "costUsd": 0.0303082,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01XagMjtm8hZ9x4E24iiLPuR",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L6 (R8117, basic economy) was posted on 2026-07-21. Tara Singh was silver on that date. She became gold on 07-22, so the current gold tier doesn't apply. Basic economy gives 0 free bags and silver adds 1, so she had 1 free bag. Of her 3 bags, 2 were chargeable: 4500 + 7500 = 12000 cents. That match…"
+      }
+    },
+    {
+      "phase": "review-12",
+      "label": "Review 12: annotate_ledger_entry",
+      "callId": "call-13",
+      "startedAtMs": 1791253422439,
+      "durationMs": 11860,
+      "costUsd": 0.029516,
+      "turns": 9,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01B7csbanKLcpdHpb4oUuHtF",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L7 (R8118, Nils Berg) charged 4500 cents for 2 bags on 2026-07-21. He was silver from 2025-11-01 and booked economy, so his allowance is 1+1 = 2 free bags and no fee was due. The full 4500-cent refund is already on the ledger (L27). Annotating L7 as \"overcharged\" is correct and finishes the audit o…"
+      }
+    },
+    {
+      "phase": "review-13",
+      "label": "Review 13: annotate_ledger_entry",
+      "callId": "call-14",
+      "startedAtMs": 1791253434309,
+      "durationMs": 11570,
+      "costUsd": 0.032734200000000005,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01E4xSBiwBruYdcjzFPELotV",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "L8 is not correct, so don't annotate it \"correct\". It is an overcharge. R8120 is premium_economy, which has 2 free bags. Mona Haddad's tier on 2026-07-21 was none, with no tier change since 2025-11-01, so she gets no extra bags. She added 3 bags, so 1 bag is chargeable. The fee was posted on 2026-0…"
+      }
+    },
+    {
+      "phase": "review-14",
+      "label": "Review 14: annotate_ledger_entry",
+      "callId": "call-15",
+      "startedAtMs": 1791253445888,
+      "durationMs": 12031,
+      "costUsd": 0.030603200000000004,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_013ZQPqGbfkVwJ8vKqaR1VuZ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L9 (R8126) is correct. The fee was posted 2026-07-21, before bulletin PB-2026-13 took effect on 07-23. Quinn Harper's tier on that date was none, because silver only started 2026-07-22. Economy gives 1 free bag, so 3 bags leaves 2 chargeable. That is 4500 + 7500 = 12000 cents, which matches the amo…"
+      }
+    },
+    {
+      "phase": "review-15",
+      "label": "Review 15: annotate_ledger_entry",
+      "callId": "call-16",
+      "startedAtMs": 1791253457924,
+      "durationMs": 12967,
+      "costUsd": 0.040014600000000004,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01J1jCC3o7KUZzZRYitTxGKX",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L10 on R8113 is an overcharge. Sven Holm is silver (since 2025-11-01), so his basic_economy allowance is 0+1 = 1 free bag. He added 2 bags, so 1 is chargeable, at 4500 cents on 2026-07-22. That is before the PB-2026-13 change, which took effect 2026-07-23. He was charged 12000, so the overcharge is…"
+      }
+    },
+    {
+      "phase": "review-16",
+      "label": "Review 16: annotate_ledger_entry",
+      "callId": "call-17",
+      "startedAtMs": 1791253470906,
+      "durationMs": 10593,
+      "costUsd": 0.0389668,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01TWqtpou7N7ESPjsDLyZrTc",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L11 is correct. R8115 is economy, which gives 1 free bag. Isla Murray has been silver since 2025-11-01, which adds 1 more, so 2 bags are free. She added 3 bags, so 1 is chargeable. The fee was posted on 2026-07-22, before bulletin PB-2026-13 took effect on 07-23. The first-bag price that day was th…"
+      }
+    },
+    {
+      "phase": "review-17",
+      "label": "Review 17: annotate_ledger_entry",
+      "callId": "call-18",
+      "startedAtMs": 1791253481506,
+      "durationMs": 12416,
+      "costUsd": 0.040553799999999994,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_0143m8ZT2wP4UAUUVMPg2LjG",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L12 is correct. R8122 is economy, which has 1 free bag. Aaron Blake's tier was none on 2026-07-22, with no tier change since 2025-11-01, so he gets no extra bags. He added 2 bags, so 1 bag is chargeable. The fee was posted on 2026-07-22, before bulletin PB-2026-13 took effect on 07-23, so the first…"
+      }
+    },
+    {
+      "phase": "review-18",
+      "label": "Review 18: annotate_ledger_entry",
+      "callId": "call-19",
+      "startedAtMs": 1791253493926,
+      "durationMs": 11240,
+      "costUsd": 0.040274800000000006,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_016jwrk1vzCFRbuZVjvgD37z",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L13 is correct. On 2026-07-22, when the fee posted, R8123 was still economy. The cabin changed to premium_economy on 07-23, and the history confirms it. Greta Lind has been silver since 2025-11-01. Her free allowance was therefore 1 (economy) + 1 (silver) = 2 bags. She added 3 bags, so 1 was charge…"
+      }
+    },
+    {
+      "phase": "review-19",
+      "label": "Review 19: annotate_ledger_entry",
+      "callId": "call-20",
+      "startedAtMs": 1791253505177,
+      "durationMs": 11033,
+      "costUsd": 0.0416878,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01JmwC6QTbB3bYQXrzJP1YJc",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L15 (R8119) was an overcharge. The cabin is basic_economy, which has 0 free bags. Dana Kowal has been gold since 2025-11-01, which adds 2 free bags. She added 3 bags, so 1 is chargeable. The fee was posted on 2026-07-24, after bulletin PB-2026-13 took effect on 2026-07-23, so the first chargeable b…"
+      }
+    },
+    {
+      "phase": "review-20",
+      "label": "Review 20: annotate_ledger_entry",
+      "callId": "call-21",
+      "startedAtMs": 1791253516216,
+      "durationMs": 9328,
+      "costUsd": 0.0380462,
+      "turns": 12,
+      "toolCalls": 10,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_0115ixD9ZjDdtZ5JUHGuHxTP",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L16 is correct. R8110 is economy, which has 1 free bag. Pedro Alves has had tier none since 2025-11-01, so he gets no extra bags. He added 2 bags, so 1 is chargeable. The fee was posted on 2026-07-25, when bulletin PB-2026-13 (in effect from 2026-07-23) set the first chargeable bag at 5000 cents. T…"
+      }
+    },
+    {
+      "phase": "review-21",
+      "label": "Review 21: annotate_ledger_entry",
+      "callId": "call-22",
+      "startedAtMs": 1791253525552,
+      "durationMs": 11148,
+      "costUsd": 0.0432604,
+      "turns": 13,
+      "toolCalls": 11,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_014oH2VGV3t12Dii2ztXGG8p",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L17 (R8111) is correct. The passenger is economy with tier none for the whole period, so the allowance is 1 free bag. He added 3 bags, so 2 are chargeable. The fee posted 2026-07-25, after bulletin PB-2026-13 took effect on 2026-07-23, so the first chargeable bag is 5000 cents and the second is 750…"
+      }
+    },
+    {
+      "phase": "review-22",
+      "label": "Review 22: annotate_ledger_entry",
+      "callId": "call-23",
+      "startedAtMs": 1791253536706,
+      "durationMs": 12962,
+      "costUsd": 0.038141600000000005,
+      "turns": 11,
+      "toolCalls": 9,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_0184mwHX6zwhC3NzVxDaE28H",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L18 is correct. R8114 is economy, which has 1 free bag. Kavya Rao has been silver since 2025-11-01, which adds 1, so she has 2 free bags. She added 3 bags, so 1 is chargeable. The fee was posted on 2026-07-25, and bulletin PB-2026-13 has been in effect since 2026-07-23. It sets the first chargeable…"
+      }
+    },
+    {
+      "phase": "review-23",
+      "label": "Review 23: annotate_ledger_entry",
+      "callId": "call-24",
+      "startedAtMs": 1791253549676,
+      "durationMs": 7186,
+      "costUsd": 0.0270096,
+      "turns": 5,
+      "toolCalls": 3,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_019Umjrzre9KTyF1Jdu97dJ1",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L19 is a second baggage_fee (5000 cents, 3 bags) on R8114, which already paid the same fee for the same bags in L18. Policy says a duplicate is refunded in full, and that refund was already issued. Annotating L19 \"overcharged\" records that outcome correctly."
+      }
+    },
+    {
+      "phase": "review-24",
+      "label": "Review 24: annotate_ledger_entry",
+      "callId": "call-25",
+      "startedAtMs": 1791253556865,
+      "durationMs": 11697,
+      "costUsd": 0.033032200000000005,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01EeJGw7TJGWZLYhRYzmJvK4",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L20 should be annotated \"undercharged\". R8121 is basic_economy with 0 free bags, and the passenger's tier was none. The 1 bag added on 2026-07-25 was chargeable. Bulletin PB-2026-13 has been in effect since 2026-07-23 and sets the first chargeable bag at 5000 cents. The 4500 cents charged is 500 ce…"
+      }
+    },
+    {
+      "phase": "review-25",
+      "label": "Review 25: annotate_ledger_entry",
+      "callId": "call-26",
+      "startedAtMs": 1791253568571,
+      "durationMs": 17271,
+      "costUsd": 0.0343478,
+      "turns": 10,
+      "toolCalls": 8,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_018V7bKqhXxu6yNxGYi8gk4r",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "L21 is correct. R8122 is economy, which has 1 free bag. Aaron Blake's tier was none on 2026-07-25, with no change since 2025-11-01. With 3 bags in total, 2 are chargeable. L12 already charged 4500 for the first chargeable bag. L21 charges 7500 for the second chargeable bag. That is the further-bag …"
+      }
+    },
+    {
+      "phase": "review-26",
+      "label": "Review 26: annotate_ledger_entry",
+      "callId": "call-27",
+      "startedAtMs": 1791253590785,
+      "durationMs": 8170,
+      "costUsd": 0.029462000000000002,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__annotate_ledger_entry",
+        "toolUseId": "toolu_01MbRa9zCQJac672ij9WXZd8",
+        "decision": "deny",
+        "source": "schema",
+        "reason": "L8 is not correct, so don't annotate it \"correct\". R8120 is premium_economy, which has 2 free bags. Mona Haddad's tier was none on 2026-07-21 (none since 2025-11-01), so she gets no extra bags. She added 3 bags, so only 1 is chargeable, at 4500 cents. L8 charged 12000 cents, which is an overcharge …"
+      }
+    }
+  ],
+  "finalText": "I audited all 19 baggage fees posted 2026-07-20 to 2026-07-26 and settled 18 of them. L8 is still unannotated because the action reviewer blocked it twice.\n\n**L8 (R8120, Mona Haddad, 12000 cents).** I judge this fee correct. The reservation history shows she was still in economy when the fee posted on 2026-07-21. She moved to premium economy on 2026-07-22. As an economy passenger with no tier, she had 1 free bag. With 3 bags that leaves 2 chargeable: 4500 + 7500 = 12000 cents.\n\nThe reviewer judged it using her current premium economy cabin and refused to let me annotate it \"correct\". It asked for a 7500-cent refund instead. The audit rules say to judge a fee by the rules and passenger status on the date it was charged, so I did not refund it. I'd leave L8 as \"correct\" and have someone annotate it.\n\nI applied the bulletin PB-2026-13 rate, which raised the first chargeable bag from 4500 to 5000 cents from 2026-07-23. I also used each passenger's tier and cabin as of the posting date.\n\n**Overcharged — refunded to the original payment method and annotated \"overcharged\":**\n- L3 (R8125): 12000 cents. He was gold on 2026-07-20, so all 3 bags were free.\n- L5 (R8116): 7500 cents.\n- L7 (R8118): 4500 cents. Silver economy has 2 free bags.\n- L10 (R8113): 7500 cents.\n- L15 (R8119): 2500 cents. The correct fee was 5000, because the new rate applied on 2026-07-24.\n- L19 (R8114): 5000 cents. It duplicated L18 for the same bags, so it is refunded in full.\n\n**Undercharged — annotated \"undercharged\", not re-billed:**\n- L4 (R8112): charged 9000, should have been 12000.\n- L20 (R8121): charged 4500, should have been 5000.\n\n**Correct — annotated \"correct\":** L2, L6, L9, L11, L12, L13, L16, L17, L18, L21.\n\n- L6: Tara Singh became gold on 2026-07-22, so she was still silver when the fee posted on 2026-07-21.\n- L9: Quinn Harper became silver on 2026-07-22, so she had no tier when the fee posted on 2026-07-21.\n- L13: Greta Lind moved to premium economy on 2026-07-23, so she was in economy when the fee posted on 2026-07-22.\n\nL21 was a separate 7500-cent charge for one added bag, not a repeat of L12.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__gated-execute__airline-baggage-audit__r2.jsonl"
+}

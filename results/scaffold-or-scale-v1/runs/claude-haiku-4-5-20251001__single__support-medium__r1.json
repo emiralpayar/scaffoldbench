@@ -1,0 +1,149 @@
+{
+  "runId": "claude-haiku-4-5-20251001__single__support-medium__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T16:28:28.775Z",
+  "finishedAt": "2026-10-02T16:29:12.404Z",
+  "latencyMs": 43626,
+  "setupMs": 1,
+  "gradingMs": 2,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 1,
+      "detail": "assignee=E-201 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.053387,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 4733,
+    "outputTokens": 4800,
+    "cacheReadInputTokens": 37982,
+    "cacheCreationInputTokens": 10428
+  },
+  "turns": 14,
+  "toolCalls": 13,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1790958508776,
+      "durationMs": 43626,
+      "costUsd": 0.05338719999999999,
+      "turns": 14,
+      "toolCalls": 13,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "## Summary\n\nI've successfully consolidated the CRM incident. Here's what I did:\n\n**Identified duplicate reports of the same underlying problem:**\n- T-1052: \"CRM search returns 500 error\" \n- T-1053: \"Cannot search accounts in CRM - server error\"\n- T-1054: \"CRM account search 500\"\n\nAll three were customer-facing reports of the identical incident: CRM search functionality returning 500 errors.\n\n**Merged into a single ticket (T-1052):**\n- ✅ Consolidated T-1053 and T-1054 into T-1052 (earliest-created report)\n- ✅ Set severity to **sev2** (correct for department-wide impact per escalation matrix)\n- ✅ Assigned to **E-201 Ines Kovac** (on-call for business-apps rotation at the deadline)\n- ✅ SLA deadline set to **2026-03-17T12:40:00Z** (earliest deadline from the three tickets)\n- ✅ Inherited broadest impact scope: **department** (from T-1053)\n\n**Left unchanged (different underlying problems):**\n- **T-1055**: CSV export producing empty file — unrelated issue, left with E-201\n- **T-1061**: Internal engineering tracking ticket for search index rebuild — separate tracking purpose, remains linked\n\nRevenue Ops now has a single consolidated ticket for the CRM search problem that is properly graded, assigned, and routed to the right engineer.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__single__support-medium__r1.jsonl"
+}

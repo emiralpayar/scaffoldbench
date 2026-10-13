@@ -1,0 +1,460 @@
+{
+  "runId": "claude-haiku-4-5-20251001__gated-execute__research-script-loading__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-script-loading",
+  "taskTitle": "async vs defer on <script>",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "medium",
+  "strategyId": "gated-execute",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T17:26:50.579Z",
+  "finishedAt": "2026-10-02T17:27:57.870Z",
+  "latencyMs": 62899,
+  "setupMs": 0,
+  "gradingMs": 4387,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "harness.judge",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "0 state changes, each allowed by a review (0 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "parallel-download",
+      "label": "States that both async and defer let a classic script be fetched in parallel with HTML parsing, so the fetch does not block the parser, unlike a classic script with src and neither attribute.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E1, E13. “Both `async` and `defer` eliminate this parser-blocking during the download phase by downloading in parallel.”"
+    },
+    {
+      "id": "defer-timing",
+      "label": "States that a defer script executes only after the document has finished parsing, and before DOMContentLoaded fires.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E4, E7. “Deferred scripts execute after HTML parsing completes but before the `DOMContentLoaded` event fires.”"
+    },
+    {
+      "id": "async-timing",
+      "label": "States that an async script executes as soon as it is available, interrupting parsing if parsing is still in progress, so it may run before or after DOMContentLoaded.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E1, E2, E8. “This means async scripts can interrupt DOM building if they finish downloading while the parser is still working.”"
+    },
+    {
+      "id": "ordering",
+      "label": "States that multiple defer scripts execute in document order, while async scripts execute in the order their downloads complete, which is not predictable.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E5, E3, E16. “**defer**: Guaranteed to execute in the order they appear in the HTML document.”"
+    },
+    {
+      "id": "inline-ignored",
+      "label": "States that async and defer have no effect on a classic inline script (a script element without a src attribute).",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E6. “These attributes are ignored on inline scripts.”"
+    },
+    {
+      "id": "modules",
+      "label": "States that module scripts are deferred by default, so the defer attribute has no effect on them, while the async attribute does apply to module scripts.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E9, E10. “The `defer` attribute has no effect on module scripts because they already defer by default.”"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "a5d703ba820ee9c957565ac15b9f98daeac8212372d73d7658a7a6bb2bbc1978",
+      "documents": 6
+    },
+    "openedDocuments": [
+      "mdn-script-element",
+      "mdn-domcontentloaded",
+      "webdev-third-party-javascript",
+      "webdev-optimize-resource-loading",
+      "whatwg-html-scripting",
+      "mdn-js-modules"
+    ],
+    "openedByRole": {
+      "secondary": [
+        "mdn-script-element",
+        "mdn-domcontentloaded",
+        "webdev-third-party-javascript",
+        "webdev-optimize-resource-loading",
+        "mdn-js-modules"
+      ],
+      "primary": [
+        "whatwg-html-scripting"
+      ]
+    },
+    "displayedShare": {
+      "mdn-script-element": 0.8439,
+      "webdev-third-party-javascript": 0.9618,
+      "whatwg-html-scripting": 0.0148,
+      "webdev-optimize-resource-loading": 0.9624,
+      "mdn-domcontentloaded": 1,
+      "mdn-js-modules": 0.186
+    },
+    "citedCount": 4,
+    "verifiedCount": 4,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "evidenceBlock": true,
+    "evidenceBlockRepaired": false,
+    "evidenceCount": 16,
+    "verifiedQuoteCount": 16,
+    "verifiedQuoteRate": 1,
+    "evidence": [
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "async attribute causes scripts to be fetched in parallel while parsing and executed as soon as download completes",
+        "quote": "For classic scripts, if the async attribute is present, then the classic script will be fetched in parallel to parsing and evaluated as soon as it is available.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://web.dev/articles/efficiently-load-third-party-javascript",
+        "claim": "async scripts can interrupt DOM building if they finish downloading while parser is still at work",
+        "quote": "It also means they can interrupt DOM building if they finish downloading while the parser is still at work.",
+        "verified": true,
+        "document": "webdev-third-party-javascript"
+      },
+      {
+        "url": "https://web.dev/articles/efficiently-load-third-party-javascript",
+        "claim": "async scripts execute in unpredictable order",
+        "quote": "This means it's possible (and likely) that async scripts won't run in the order in which they appear in the HTML.",
+        "verified": true,
+        "document": "webdev-third-party-javascript"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "defer attribute executes scripts after document parsing but before DOMContentLoaded",
+        "quote": "This Boolean attribute is set to indicate to a browser that the script is meant to be executed after the document has been parsed, but before firing DOMContentLoaded event.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "defer scripts execute in the order they appear in the document",
+        "quote": "Scripts with the defer attribute will execute in the order in which they appear in the document.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "async and defer don't work on inline scripts",
+        "quote": "This attribute must not be used if the src attribute is absent (i.e., for inline scripts) for classic scripts, in this case it would have no effect.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event",
+        "claim": "DOMContentLoaded waits for deferred scripts but not async scripts",
+        "quote": "The DOMContentLoaded event fires when the HTML document has been completely parsed, and all deferred scripts (<script defer src=\"...\"> and <script type=\"module\">) have downloaded and executed. It doesn't wait for other things like images, subframes, and async scripts to finish loading.",
+        "verified": true,
+        "document": "mdn-domcontentloaded"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event",
+        "claim": "DOMContentLoaded fires before async scripts execute",
+        "quote": "DOMContentLoaded is fired after the execution of these scripts, but before the execution of scripts with async.",
+        "verified": true,
+        "document": "mdn-domcontentloaded"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Module scripts defer by default",
+        "quote": "The defer attribute has no effect on module scripts — they defer by default.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Module scripts can use async to override default deferral",
+        "quote": "For module scripts, if the async attribute is present then the scripts and all their dependencies will be fetched in parallel to parsing and evaluated as soon as they are available.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://web.dev/learn/performance/optimize-resource-loading",
+        "claim": "Inline scripts with type=module defer by default",
+        "quote": "async and defer allow external scripts to load without blocking the HTML parser while scripts (including inline scripts) with type=\"module\" are deferred automatically.",
+        "verified": true,
+        "document": "webdev-optimize-resource-loading"
+      },
+      {
+        "url": "https://web.dev/learn/performance/optimize-resource-loading",
+        "claim": "Inline scripts block the parser until parsed and executed",
+        "quote": "When using inline JavaScript, the parser is similarly blocked until the inline script is parsed and executed.",
+        "verified": true,
+        "document": "webdev-optimize-resource-loading"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "Scripts without async, defer, or type=module block parsing",
+        "quote": "Scripts without async, defer or type=\"module\" attributes, as well as inline scripts without the type=\"module\" attribute, are fetched and executed immediately before the browser continues to parse the page.",
+        "verified": true,
+        "document": "mdn-script-element"
+      },
+      {
+        "url": "https://web.dev/articles/efficiently-load-third-party-javascript",
+        "claim": "async scripts can still block HTML parsing during execution",
+        "quote": "Scripts with async can still block HTML parsing.",
+        "verified": true,
+        "document": "webdev-third-party-javascript"
+      },
+      {
+        "url": "https://web.dev/learn/performance/optimize-resource-loading",
+        "claim": "defer scripts execute after HTML parsing finishes at same time as DOMContentLoaded",
+        "quote": "Scripts loaded with defer are executed when HTML document parsing is finished—this occurs at the same time as the browser's DOMContentLoaded event.",
+        "verified": true,
+        "document": "webdev-optimize-resource-loading"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script",
+        "claim": "async scripts execute as soon as download is complete without guaranteeing order",
+        "quote": "scripts with an async attribute will execute as soon as the download is complete. This blocks the page and does not guarantee any specific execution order.",
+        "verified": true,
+        "document": "mdn-script-element"
+      }
+    ],
+    "judgeUnverifiedQuotes": 0,
+    "judgeVerdicts": [
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E13"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E8"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E3",
+            "E16"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E6"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E9",
+            "E10"
+          ]
+        }
+      },
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E13"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E8"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E3",
+            "E16"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E6"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E9",
+            "E10"
+          ]
+        }
+      },
+      {
+        "parallel-download": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E13"
+          ]
+        },
+        "defer-timing": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E7"
+          ]
+        },
+        "async-timing": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2",
+            "E8",
+            "E16"
+          ]
+        },
+        "ordering": {
+          "status": "met",
+          "support": [
+            "E5",
+            "E3",
+            "E16"
+          ]
+        },
+        "inline-ignored": {
+          "status": "met",
+          "support": [
+            "E6"
+          ]
+        },
+        "modules": {
+          "status": "met",
+          "support": [
+            "E9",
+            "E10",
+            "E11"
+          ]
+        }
+      }
+    ],
+    "judgeFailures": 0,
+    "groundedWeightShare": 1
+  },
+  "costUsd": 0.102121,
+  "judgeCostUsd": 0.084297,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 10591,
+    "outputTokens": 4649,
+    "cacheReadInputTokens": 227625,
+    "cacheCreationInputTokens": 22761
+  },
+  "turns": 19,
+  "toolCalls": 18,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1790962010583,
+      "durationMs": 62899,
+      "costUsd": 0.1021205,
+      "turns": 19,
+      "toolCalls": 18,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I have gathered sufficient information from authoritative sources. Let me compile a comprehensive answer with evidence.\n\n## Answer\n\nThe `async` and `defer` attributes on the `<script>` element fundamentally change how and when the browser loads and executes JavaScript in relation to HTML parsing.\n\n### The `async` Attribute\n\nThe `async` attribute tells the browser to fetch a script file in parallel with HTML parsing—the parser is not blocked during the download. However, once the script finishes downloading, execution begins immediately, which does block the HTML parser and rendering until the script completes. This means async scripts can interrupt DOM building if they finish downloading while the parser is still working.\n\nAsync scripts execute in an unpredictable order. If you have multiple async scripts, there is no guarantee they will execute in the order they appear in your HTML—whichever finishes downloading first will execute first. Async scripts execute before the `load` event, but they can execute before, during, or after the `DOMContentLoaded` event fires, since `DOMContentLoaded` waits for deferred scripts but not async scripts.\n\nThe `async` attribute only works on external scripts loaded via the `src` attribute. If you apply `async` to an inline script (one without a `src` attribute), the attribute has no effect.\n\n### The `defer` Attribute\n\nThe `defer` attribute also allows scripts to be fetched in parallel without blocking HTML parsing. However, deferred scripts don't execute until after the HTML has been completely parsed. The critical difference from async is that defer guarantees execution order—multiple deferred scripts execute in the exact order they appear in the document.\n\nDeferred scripts execute after HTML parsing completes but before the `DOMContentLoaded` event fires. This makes defer ideal for scripts that depend on the DOM being fully constructed.\n\nLike `async`, the `defer` attribute only applies to external scripts with a `src` attribute. It has no effect on inline scripts.\n\n### Interaction with HTML Parsing\n\nScripts without `async` or `defer` (classic synchronous scripts) block HTML parsing immediately—the parser must stop, download, parse, and execute the script before continuing. Both `async` and `defer` eliminate this parser-blocking during the download phase by downloading in parallel. However, `async` scripts can still interrupt parsing when they execute, while `defer` scripts never interrupt parsing because they only run after parsing is complete.\n\n### Execution Order Guarantees\n\nFor multiple scripts:\n- **async**: No guarantees about execution order. Each script executes as soon as it downloads.\n- **defer**: Guaranteed to execute in the order they appear in the HTML document.\n\n### DOMContentLoaded Event Timing\n\nThe `DOMContentLoaded` event fires after HTML parsing completes and all deferred scripts have downloaded and executed. Async scripts are not waited for—`DOMContentLoaded` fires even if async scripts haven't executed yet.\n\n### Module Scripts (`type=\"module\"`)\n\nModule scripts have special behavior. They are **deferred by default**, meaning they are always fetched in parallel and executed after HTML parsing completes, in the order they appear in the document. The `defer` attribute has no effect on module scripts because they already defer by default.\n\nHowever, you can add the `async` attribute to a module script to override the default behavior. When `async` is present on a module script, the script and all its dependencies are fetched in parallel, and the script executes as soon as it's available, without guaranteeing order relative to other scripts.\n\n### Inline Scripts\n\nInline scripts (script content directly in HTML without a `src` attribute) cannot use `async` or `defer`. These attributes are ignored on inline scripts. Inline scripts execute synchronously wherever they appear in the document, blocking the parser until they complete. However, there is a special case: inline scripts with `type=\"module\"` are deferred by default like external module scripts, though their execution is still immediate in document order before `DOMContentLoaded`.\n\n---\n\n```json\n{\"evidence\": [\n{\"claim\": \"async attribute causes scripts to be fetched in parallel while parsing and executed as soon as download completes\", \"quote\": \"For classic scripts, if the async attribute is present, then the classic script will be fetched in parallel to parsing and evaluated as soon as it is available.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"async scripts can interrupt DOM building if they finish downloading while parser is still at work\", \"quote\": \"It also means they can interrupt DOM building if they finish downloading while the parser is still at work.\", \"url\": \"https://web.dev/articles/efficiently-load-third-party-javascript\"},\n{\"claim\": \"async scripts execute in unpredictable order\", \"quote\": \"This means it's possible (and likely) that async scripts won't run in the order in which they appear in the HTML.\", \"url\": \"https://web.dev/articles/efficiently-load-third-party-javascript\"},\n{\"claim\": \"defer attribute executes scripts after document parsing but before DOMContentLoaded\", \"quote\": \"This Boolean attribute is set to indicate to a browser that the script is meant to be executed after the document has been parsed, but before firing DOMContentLoaded event.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"defer scripts execute in the order they appear in the document\", \"quote\": \"Scripts with the defer attribute will execute in the order in which they appear in the document.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"async and defer don't work on inline scripts\", \"quote\": \"This attribute must not be used if the src attribute is absent (i.e., for inline scripts) for classic scripts, in this case it would have no effect.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"DOMContentLoaded waits for deferred scripts but not async scripts\", \"quote\": \"The DOMContentLoaded event fires when the HTML document has been completely parsed, and all deferred scripts (<script defer src=\\\"...\\\"> and <script type=\\\"module\\\">) have downloaded and executed. It doesn't wait for other things like images, subframes, and async scripts to finish loading.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event\"},\n{\"claim\": \"DOMContentLoaded fires before async scripts execute\", \"quote\": \"DOMContentLoaded is fired after the execution of these scripts, but before the execution of scripts with async.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event\"},\n{\"claim\": \"Module scripts defer by default\", \"quote\": \"The defer attribute has no effect on module scripts — they defer by default.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"Module scripts can use async to override default deferral\", \"quote\": \"For module scripts, if the async attribute is present then the scripts and all their dependencies will be fetched in parallel to parsing and evaluated as soon as they are available.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"Inline scripts with type=module defer by default\", \"quote\": \"async and defer allow external scripts to load without blocking the HTML parser while scripts (including inline scripts) with type=\\\"module\\\" are deferred automatically.\", \"url\": \"https://web.dev/learn/performance/optimize-resource-loading\"},\n{\"claim\": \"Inline scripts block the parser until parsed and executed\", \"quote\": \"When using inline JavaScript, the parser is similarly blocked until the inline script is parsed and executed.\", \"url\": \"https://web.dev/learn/performance/optimize-resource-loading\"},\n{\"claim\": \"Scripts without async, defer, or type=module block parsing\", \"quote\": \"Scripts without async, defer or type=\\\"module\\\" attributes, as well as inline scripts without the type=\\\"module\\\" attribute, are fetched and executed immediately before the browser continues to parse the page.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"},\n{\"claim\": \"async scripts can still block HTML parsing during execution\", \"quote\": \"Scripts with async can still block HTML parsing.\", \"url\": \"https://web.dev/articles/efficiently-load-third-party-javascript\"},\n{\"claim\": \"defer scripts execute after HTML parsing finishes at same time as DOMContentLoaded\", \"quote\": \"Scripts loaded with defer are executed when HTML document parsing is finished—this occurs at the same time as the browser's DOMContentLoaded event.\", \"url\": \"https://web.dev/learn/performance/optimize-resource-loading\"},\n{\"claim\": \"async scripts execute as soon as download is complete without guaranteeing order\", \"quote\": \"scripts with an async attribute will execute as soon as the download is complete. This blocks the page and does not guarantee any specific execution order.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script\"}\n]}\n```",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__gated-execute__research-script-loading__r1.jsonl"
+}

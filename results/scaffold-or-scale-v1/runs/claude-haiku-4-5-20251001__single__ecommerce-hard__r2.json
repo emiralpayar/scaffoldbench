@@ -1,0 +1,141 @@
+{
+  "runId": "claude-haiku-4-5-20251001__single__ecommerce-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:31:20.906Z",
+  "finishedAt": "2026-10-06T02:31:49.742Z",
+  "latencyMs": 28833,
+  "setupMs": 2,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.034668,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 4356,
+    "outputTokens": 3041,
+    "cacheReadInputTokens": 10949,
+    "cacheCreationInputTokens": 7006
+  },
+  "turns": 9,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791253880908,
+      "durationMs": 28833,
+      "costUsd": 0.0346679,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! I've completed the full return processing for Priya Raman's order O-3001. Here's what was done:\n\n## Summary of Actions:\n\n**Order Processing:**\n- Cancelled L3 (P-HUB, qty 2, pending line) as a cancellation\n- Refunded L3 to original card: **13,800 cents** (line never shipped)\n- Refunded L1 & L2 as store credit: **54,800 cents** (return window closed—shipped 2026-05-04, requested 2026-07-25 = 82 days, exceeds 30-day window)\n\n**Warehouse:**\n- Restocked 2 units of P-HUB to inventory (cancelled line goods never left warehouse)\n\n**Customer Account:**\n- Added 54,800 cents store credit to Priya's balance (500 → 55,300 cents)\n\n**Total Refunded:** 68,600 cents (full order amount)\n- Card: 13,800 cents\n- Store credit: 54,800 cents\n\n**Order Status:** Now marked as \"returned\" with all lines fully refunded.\n\nThe entire order has been processed end-to-end per policy: the shipped items (L1, L2) were refunded via store credit due to the closed return window, the unshipped item (L3) was cancelled and refunded to card, and inventory was restored to the warehouse.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__single__ecommerce-hard__r2.jsonl"
+}

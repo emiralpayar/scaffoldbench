@@ -1,0 +1,149 @@
+{
+  "runId": "claude-opus-5-5__single__support-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-medium",
+  "taskTitle": "Consolidate duplicate CRM reports",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "medium",
+  "strategyId": "single",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T20:56:16.614Z",
+  "finishedAt": "2026-10-12T20:56:41.764Z",
+  "latencyMs": 25147,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "survivor-carries-earliest-deadline",
+      "label": "Survivor carries the earliest SLA deadline of the merged set",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T12:40:00Z (expected 2026-03-17T12:40:00Z)"
+    },
+    {
+      "id": "duplicates-merged",
+      "label": "Both duplicate reports were merged into the earliest-created ticket",
+      "weight": 3,
+      "earned": 1,
+      "detail": "T-1053: status=merged, merged_into=T-1052; T-1054: status=merged, merged_into=T-1052"
+    },
+    {
+      "id": "references-relinked",
+      "label": "The engineering tracking ticket now points at the survivor",
+      "weight": 2,
+      "earned": 1,
+      "detail": "T-1061 links=[T-1052]"
+    },
+    {
+      "id": "survivor-severity-from-matrix",
+      "label": "Survivor re-graded from the matrix for its widened impact scope",
+      "weight": 2,
+      "earned": 1,
+      "detail": "severity=sev2 (matrix says sev2)"
+    },
+    {
+      "id": "survivor-assigned",
+      "label": "Survivor assigned to the engineer on call for the owning rotation at its deadline",
+      "weight": 2,
+      "earned": 1,
+      "detail": "assignee=E-201 (expected E-201)"
+    },
+    {
+      "id": "duplicates-read-before-merge",
+      "label": "Every ticket folded in was read before the merge",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "distinctTools": 10
+  },
+  "costUsd": 0.103038,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1054,
+    "outputTokens": 2396,
+    "cacheReadInputTokens": 42886,
+    "cacheCreationInputTokens": 5705
+  },
+  "turns": 16,
+  "toolCalls": 15,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791838576615,
+      "durationMs": 25147,
+      "costUsd": 0.1030382,
+      "turns": 16,
+      "toolCalls": 15,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "The three reports of the CRM account search outage are now one ticket, T-1052. It's graded sev2 and assigned to the right engineer.\n\n**Merged:** T-1053 and T-1054 into T-1052. All three describe the same problem: every account search returns an HTTP 500 error, starting around 07:00, all reported by Revenue Ops.\n- **Surviving ticket:** T-1052, because it was reported first (07:05).\n- **Deadline:** 12:40 today (the service desk clock reads 2026-03-17). That was already promised to the requester on T-1053 and was the earliest of the three, so T-1052's own 15:05 deadline was brought forward to match.\n- **Severity:** sev2. T-1053 reported that the whole department is blocked, so the merged ticket took that wider impact. The escalation matrix rates CRM with department-wide impact as sev2.\n- **Assignee:** E-201 Ines Kovac. Business-apps is the team that owns CRM, and she is their on-call engineer at the 12:40 deadline (her shift runs 08:00–20:00). T-1053 had been assigned to E-202 Tomas Lindqvist, but he isn't the one on call at the deadline, so he isn't on the merged ticket.\n- I left a comment on T-1052 explaining all of this.\n\n**Left alone:**\n- **T-1055** (CSV export gives an empty file) is a different problem. The requester says search works fine for them.\n- **T-1061** (search index rebuild) is engineering's internal tracking ticket, not a customer report, so it wasn't merged. It's still linked to T-1052; the link moved over from T-1054 in the merge.\n\nI didn't escalate the ticket. The task asked for it to be graded and assigned, and the rules say the team that owns CRM works it. Under the matrix, a sev2 escalation would go to the platform-primary team. Someone should make that call if the 12:40 deadline is at risk.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__single__support-medium__r2.jsonl"
+}

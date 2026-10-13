@@ -1,0 +1,217 @@
+{
+  "runId": "claude-haiku-4-5-20251001__propose-select__support-easy__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-easy",
+  "taskTitle": "Triage a new service desk ticket",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "easy",
+  "strategyId": "propose-select",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T20:50:18.991Z",
+  "finishedAt": "2026-10-12T20:51:52.895Z",
+  "latencyMs": 93902,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 2 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity matches the escalation matrix for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev3 (matrix says sev3)"
+    },
+    {
+      "id": "deadline-from-response-target",
+      "label": "SLA deadline is the triage time plus the response target for that severity",
+      "weight": 3,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T17:20:00Z (expected 2026-03-17T17:20:00Z)"
+    },
+    {
+      "id": "assigned-to-oncall",
+      "label": "Assigned to the engineer on call for the owning rotation at the deadline",
+      "weight": 3,
+      "earned": 1,
+      "detail": "assignee=E-301 (expected E-301)"
+    },
+    {
+      "id": "ticket-opened",
+      "label": "Ticket left in status open",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was set",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 21,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.154592,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 37900,
+    "outputTokens": 14586,
+    "cacheReadInputTokens": 24738,
+    "cacheCreationInputTokens": 20644
+  },
+  "turns": 27,
+  "toolCalls": 21,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791838218993,
+      "durationMs": 22131,
+      "costUsd": 0.0281308,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791838218994,
+      "durationMs": 19735,
+      "costUsd": 0.029290000000000004,
+      "turns": 5,
+      "toolCalls": 4,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791838218995,
+      "durationMs": 23670,
+      "costUsd": 0.0312778,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791838242665,
+      "durationMs": 55424,
+      "costUsd": 0.041136,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 2,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791838298089,
+      "durationMs": 14805,
+      "costUsd": 0.024757199999999997,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "**Triage Complete.**\n\nI've successfully triaged ticket T-1041:\n\n1. **Severity set to sev3** — Per the VPN escalation matrix, a team impact (9 people on Berlin sales floor) maps to severity sev3\n2. **SLA deadline set to 2026-03-17T17:20:00Z** — Triage time (2026-03-17T09:20:00Z, when the ticket was created) plus the 480-minute response target for sev3\n3. **Assigned to E-301 Yuki Sato** — The engineer on call for the network-primary rotation (which owns the VPN service) at the deadline time\n\nThe ticket status automatically changed from \"new\" to \"open\" upon assignment. The ticket is now properly routed to the owning rotation with a committed deadline.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__propose-select__support-easy__r2.jsonl"
+}

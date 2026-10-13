@@ -1,0 +1,494 @@
+{
+  "runId": "claude-opus-5-5__plan-execute-verify__research-http-redirects__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "research-http-redirects",
+  "taskTitle": "HTTP 301 vs 308",
+  "taskCategory": "research",
+  "taskWorld": "web",
+  "taskDifficulty": "easy",
+  "strategyId": "plan-execute-verify",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T21:31:56.926Z",
+  "finishedAt": "2026-10-05T21:33:52.276Z",
+  "latencyMs": 110713,
+  "setupMs": 0,
+  "gradingMs": 4637,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "harness.judge",
+        "ok": true
+      },
+      {
+        "id": "plan-execute-verify.plan",
+        "ok": true,
+        "detail": "a 7-step plan, read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.verdicts",
+        "ok": true,
+        "detail": "1 verdict, each read from the schema reply"
+      },
+      {
+        "id": "plan-execute-verify.loop",
+        "ok": true,
+        "detail": "0 revisions, each called for by a verdict"
+      },
+      {
+        "id": "plan-execute-verify.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "names",
+      "label": "States that 301 is \"Moved Permanently\" and 308 is \"Permanent Redirect\", and that both indicate the target resource has been assigned a new permanent URI.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E1, E2. “The target resource \"has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs\"”"
+    },
+    {
+      "id": "method-preserved-308",
+      "label": "States that a client following a 308 must not change the request method: a POST is repeated as a POST, with its body.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E7, E10, E9. “After a 308, the client must send the same method and body to the new URI.”"
+    },
+    {
+      "id": "method-change-301",
+      "label": "States that when following a 301 a user agent MAY change the request method from POST to GET (for historical reasons), which is the behaviour 308 exists to rule out.",
+      "weight": 1.5,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E4, E7. “RFC 9110 lets a user agent change POST to GET \"for historical reasons,\"”"
+    },
+    {
+      "id": "cacheable",
+      "label": "States that both 301 and 308 responses are heuristically cacheable, i.e. a cache may reuse them by default unless the method definition or explicit cache controls say otherwise.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E12, E13, E14. “RFC 9110 says both 301 and 308 are \"heuristically cacheable.\" That means a cache may store and reuse them with an estimated lifetime, unless the method definition or explicit cache controls say otherwise.”"
+    },
+    {
+      "id": "specifications",
+      "label": "States that both codes are currently specified in RFC 9110 (HTTP Semantics), and that 308 was originally defined in RFC 7538, which RFC 9110 obsoletes.",
+      "weight": 1,
+      "earned": 1,
+      "detail": "met, backed by verified evidence E17, E18. “RFC 9110 obsoletes RFC 7231, the earlier home of 301, and RFC 7538 (April 2015), the standalone 308 spec.”"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "corpus": {
+      "version": 2,
+      "snapshot": "2026-10-01",
+      "hash": "25fbed79c4f7f9e1b850436e0e4872f8e25dd80142f3177231c456f21817b817",
+      "documents": 8
+    },
+    "openedDocuments": [
+      "rfc9110",
+      "rfc7538",
+      "rfc9111",
+      "mdn-status-301",
+      "mdn-status-308"
+    ],
+    "openedByRole": {
+      "primary": [
+        "rfc9110"
+      ],
+      "superseded": [
+        "rfc7538"
+      ],
+      "secondary": [
+        "rfc9111",
+        "mdn-status-301",
+        "mdn-status-308"
+      ]
+    },
+    "displayedShare": {
+      "rfc9110": 0.0818,
+      "rfc7538": 0.782,
+      "rfc9111": 0.1073,
+      "mdn-status-301": 1,
+      "mdn-status-308": 1
+    },
+    "citedCount": 5,
+    "verifiedCount": 5,
+    "hallucinatedCount": 0,
+    "citationIntegrity": 1,
+    "hallucinatedUrls": [],
+    "evidenceBlock": true,
+    "evidenceBlockRepaired": false,
+    "evidenceCount": 18,
+    "verifiedQuoteCount": 17,
+    "verifiedQuoteRate": 0.9444444444444444,
+    "evidence": [
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "RFC 9110 defines 301 as a resource that has been given a new permanent URI.",
+        "quote": "The 301 (Moved Permanently) status code indicates that the target resource has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "RFC 9110 defines 308 with the same permanent-move meaning.",
+        "quote": "The 308 (Permanent Redirect) status code indicates that the target resource has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "For both codes the server should send a Location header with the new permanent URI.",
+        "quote": "The server SHOULD generate a Location header field in the response containing a preferred URI reference for the new permanent URI.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "For 301, RFC 9110 allows a user agent to change POST to GET.",
+        "quote": "request method from POST to GET for the subsequent request.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "Historically, practice settled on changing the method to GET for 301/302.",
+        "quote": "Prevailing practice",
+        "verified": false,
+        "document": "rfc9110",
+        "failure": "the quote has fewer than 6 consecutive words"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/301",
+        "claim": "Under the Fetch Standard, browsers send a GET after a 301 response to a POST.",
+        "quote": "Note: In the Fetch Standard, when a user agent receives a 301 in response to a POST request, it uses the GET method in the subsequent redirection request, as permitted by the HTTP specification.",
+        "verified": true,
+        "document": "mdn-status-301"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc7538.html",
+        "claim": "308 is like 301 except that the method may not be changed from POST to GET.",
+        "quote": "Note: This status code is similar to 301 (Moved Permanently) ([RFC7231], Section 6.4.2), except that it does not allow changing the request method from POST to GET.",
+        "verified": true,
+        "document": "rfc7538"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "When following a redirect, the user agent should resend the original request with only certain changes.",
+        "quote": "When automatically following a redirected request, the user agent SHOULD resend the original request message with the following modifications:",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "Body-related headers are removed only when the method is changed to GET or HEAD, so a 308 keeps the body.",
+        "quote": "If the request method has been changed to GET or HEAD, remove content-specific header fields, including (but not limited to) Content-Encoding, Content-Language, Content-Location, Content-Type, Content-Length, Digest, Last-Modified.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308",
+        "claim": "MDN says that with 308 the method and body stay the same.",
+        "quote": "The request method and the body will not be modified by the client in the redirected request.",
+        "verified": true,
+        "document": "mdn-status-308"
+      },
+      {
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308",
+        "claim": "MDN's 308 page says 301 requires the method to stay the same, which conflicts with RFC 9110.",
+        "quote": "A 301 Moved Permanently requires the request method and the body to remain unchanged when redirection is performed, but this is incorrectly handled by older clients to use the GET method instead.",
+        "verified": true,
+        "document": "mdn-status-308"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "A 301 is heuristically cacheable.",
+        "quote": "A 301 response is heuristically cacheable; i.e., unless otherwise indicated by the method definition or explicit cache controls (see Section 4.2.2 of [CACHING]).",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "A 308 is heuristically cacheable.",
+        "quote": "A 308 response is heuristically cacheable; i.e., unless otherwise indicated by the method definition or explicit cache controls (see Section 4.2.2 of [CACHING]).",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "RFC 9110 lists 301 and 308 among the heuristically cacheable status codes.",
+        "quote": "Responses with status codes that are defined as heuristically cacheable (e.g., 200, 203, 204, 206, 300, 301, 308, 404, 405, 410, 414, and 501 in this specification) can be reused by a cache with heuristic expiration unless otherwise indicated by the method definition or explicit cache controls [CACH\n…[truncated 61 chars]",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9111.html",
+        "claim": "\"Heuristically cacheable\" used to be called \"cacheable by default\".",
+        "quote": "Note that in previous specifications, heuristically cacheable response status codes were called \"cacheable by default\".",
+        "verified": true,
+        "document": "rfc9111"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc7538.html",
+        "claim": "RFC 7538 said 308 was cacheable by default.",
+        "quote": "A 308 response is cacheable by default; i.e., unless otherwise indicated by the method definition or explicit cache controls (see [RFC7234], Section 4.2.2).",
+        "verified": true,
+        "document": "rfc7538"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "claim": "RFC 9110 obsoletes RFC 7231 and RFC 7538.",
+        "quote": "This document updates RFC 3864 and obsoletes RFCs 2818, 7231, 7232, 7233, 7235, 7538, 7615, 7694, and portions of 7230.",
+        "verified": true,
+        "document": "rfc9110"
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc7538.html",
+        "claim": "RFC 7538 added 308 as the missing permanent version of 307.",
+        "quote": "Section 6.4.7 of [RFC7231] states that it does not define a permanent variant of status code 307; this specification adds the status code 308, defining this missing variant (Section 3).",
+        "verified": true,
+        "document": "rfc7538"
+      }
+    ],
+    "judgeUnverifiedQuotes": 0,
+    "judgeVerdicts": [
+      {
+        "names": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2"
+          ]
+        },
+        "method-preserved-308": {
+          "status": "met",
+          "support": [
+            "E7",
+            "E10",
+            "E9"
+          ]
+        },
+        "method-change-301": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E5",
+            "E7"
+          ]
+        },
+        "cacheable": {
+          "status": "met",
+          "support": [
+            "E12",
+            "E13",
+            "E14"
+          ]
+        },
+        "specifications": {
+          "status": "met",
+          "support": [
+            "E17",
+            "E18"
+          ]
+        }
+      },
+      {
+        "names": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2"
+          ]
+        },
+        "method-preserved-308": {
+          "status": "met",
+          "support": [
+            "E7",
+            "E10",
+            "E9"
+          ]
+        },
+        "method-change-301": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E5",
+            "E7"
+          ]
+        },
+        "cacheable": {
+          "status": "met",
+          "support": [
+            "E12",
+            "E13",
+            "E14"
+          ]
+        },
+        "specifications": {
+          "status": "met",
+          "support": [
+            "E17",
+            "E18",
+            "E7"
+          ]
+        }
+      },
+      {
+        "names": {
+          "status": "met",
+          "support": [
+            "E1",
+            "E2"
+          ]
+        },
+        "method-preserved-308": {
+          "status": "met",
+          "support": [
+            "E7",
+            "E10",
+            "E9"
+          ]
+        },
+        "method-change-301": {
+          "status": "met",
+          "support": [
+            "E4",
+            "E5",
+            "E7"
+          ]
+        },
+        "cacheable": {
+          "status": "met",
+          "support": [
+            "E12",
+            "E13",
+            "E14"
+          ]
+        },
+        "specifications": {
+          "status": "met",
+          "support": [
+            "E17",
+            "E18"
+          ]
+        }
+      }
+    ],
+    "judgeFailures": 0,
+    "groundedWeightShare": 1
+  },
+  "costUsd": 0.668839,
+  "judgeCostUsd": 0.08039,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 7362,
+    "outputTokens": 11276,
+    "cacheReadInputTokens": 158881,
+    "cacheCreationInputTokens": 50607
+  },
+  "turns": 32,
+  "toolCalls": 27,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "plan",
+      "label": "Plan",
+      "callId": "call-1",
+      "startedAtMs": 1791235916926,
+      "durationMs": 15263,
+      "costUsd": 0.029480600000000006,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "steps": 7,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-2",
+      "startedAtMs": 1791235932189,
+      "durationMs": 60021,
+      "costUsd": 0.3769984,
+      "turns": 16,
+      "toolCalls": 15,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "verify-1",
+      "label": "Verify",
+      "callId": "call-3",
+      "startedAtMs": 1791235992210,
+      "durationMs": 35429,
+      "costUsd": 0.2623602,
+      "turns": 14,
+      "toolCalls": 12,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "approved": false,
+        "severity": "minor",
+        "issues": 2,
+        "decision": "accept-minor",
+        "source": "schema"
+      }
+    }
+  ],
+  "finalText": "## 301 vs 308: what's the difference?\n\nBoth codes mean \"this resource has moved permanently.\" The difference is what a client may do with the request. After a 301, a client is allowed to turn a POST into a GET, and browsers do. After a 308, the client must send the same method and body to the new URI. Both are cacheable by default, and both are defined today in RFC 9110 (June 2022).\n\n**What each code means.** RFC 9110 gives 301 and 308 the same opening definition. The target resource \"has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs\" (https://www.rfc-editor.org/rfc/rfc9110.html). For both codes the server SHOULD send a Location header with the preferred new URI, and the user agent MAY use it to redirect automatically. RFC 9110 puts 301, 302, 307 and 308 in the same group: redirects that point to a different URI given in the Location header.\n\n**Method and body.**\n- **301:** RFC 9110 lets a user agent change POST to GET \"for historical reasons,\" and says to use 308 if you don't want that. It also explains the history. In HTTP/1.0, 301 and 302 were meant to keep the method. Early browsers disagreed on whether to resend POST as POST or as GET, and \"Prevailing practice eventually converged on changing the method to GET.\" So 307 and 308 were added to mark redirects that keep the method. MDN says that under the Fetch Standard, a browser that gets a 301 in response to a POST does send a GET next (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/301).\n- **308:** RFC 7538, which first defined 308, says it is like 301 \"except that it does not allow changing the request method from POST to GET\" (https://www.rfc-editor.org/rfc/rfc7538.html).\n- **The request body:** RFC 9110's general redirect rule says the user agent SHOULD resend the original request with only certain changes. It removes the body-related headers (Content-Type, Content-Length and so on) only when the method has been changed to GET or HEAD. So after a 308, the original body is sent again. After a 301 that turns POST into GET, the body is dropped. MDN's 308 page says the same: \"The request method and the body will not be modified\" (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308).\n- **Wording difference:** RFC 9110's own 308 section doesn't contain a \"MUST NOT change the request method\" sentence. The 307 section has one, but 308 doesn't. In RFC 9110 the method-keeping rule for 308 comes from the 3xx overview and from RFC 7538.\n\n**Where the sources disagree.** MDN's 308 page says \"A 301 Moved Permanently requires the request method and the body to remain unchanged\" and that older clients get this wrong by switching to GET. That doesn't match RFC 9110, which explicitly allows POST→GET on a 301, or MDN's own 301 page, which calls the switch to GET \"permitted by the HTTP specification.\" I'd go with RFC 9110: on a 301, changing POST to GET is allowed, not a client bug.\n\n**Caching.** RFC 9110 says both 301 and 308 are \"heuristically cacheable.\" That means a cache may store and reuse them with an estimated lifetime, unless the method definition or explicit cache controls say otherwise. Section 15.1 lists both codes among the heuristically cacheable ones. RFC 9111 (HTTP Caching) explains that this applies to responses that don't state their own freshness. Earlier specs called this \"cacheable by default,\" which is the wording RFC 7538 uses for 308 (https://www.rfc-editor.org/rfc/rfc9111.html).\n\n**Where they're specified.** The current spec is RFC 9110, HTTP Semantics (June 2022): §15.4.2 for 301 and §15.4.9 for 308. RFC 9110 obsoletes RFC 7231, the earlier home of 301, and RFC 7538 (April 2015), the standalone 308 spec. RFC 7538 itself replaced the Experimental RFC 7238. RFC 9110 also notes that 308 is newer (June 2014), so some clients may not recognise it.\n\n```json\n{\"evidence\": [\n{\"claim\": \"RFC 9110 defines 301 as a resource that has been given a new permanent URI.\", \"quote\": \"The 301 (Moved Permanently) status code indicates that the target resource has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"RFC 9110 defines 308 with the same permanent-move meaning.\", \"quote\": \"The 308 (Permanent Redirect) status code indicates that the target resource has been assigned a new permanent URI and any future references to this resource ought to use one of the enclosed URIs.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"For both codes the server should send a Location header with the new permanent URI.\", \"quote\": \"The server SHOULD generate a Location header field in the response containing a preferred URI reference for the new permanent URI.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"For 301, RFC 9110 allows a user agent to change POST to GET.\", \"quote\": \"request method from POST to GET for the subsequent request.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"Historically, practice settled on changing the method to GET for 301/302.\", \"quote\": \"Prevailing practice\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"Under the Fetch Standard, browsers send a GET after a 301 response to a POST.\", \"quote\": \"Note: In the Fetch Standard, when a user agent receives a 301 in response to a POST request, it uses the GET method in the subsequent redirection request, as permitted by the HTTP specification.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/301\"},\n{\"claim\": \"308 is like 301 except that the method may not be changed from POST to GET.\", \"quote\": \"Note: This status code is similar to 301 (Moved Permanently) ([RFC7231], Section 6.4.2), except that it does not allow changing the request method from POST to GET.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc7538.html\"},\n{\"claim\": \"When following a redirect, the user agent should resend the original request with only certain changes.\", \"quote\": \"When automatically following a redirected request, the user agent SHOULD resend the original request message with the following modifications:\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"Body-related headers are removed only when the method is changed to GET or HEAD, so a 308 keeps the body.\", \"quote\": \"If the request method has been changed to GET or HEAD, remove content-specific header fields, including (but not limited to) Content-Encoding, Content-Language, Content-Location, Content-Type, Content-Length, Digest, Last-Modified.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"MDN says that with 308 the method and body stay the same.\", \"quote\": \"The request method and the body will not be modified by the client in the redirected request.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\"},\n{\"claim\": \"MDN's 308 page says 301 requires the method to stay the same, which conflicts with RFC 9110.\", \"quote\": \"A 301 Moved Permanently requires the request method and the body to remain unchanged when redirection is performed, but this is incorrectly handled by older clients to use the GET method instead.\", \"url\": \"https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\"},\n{\"claim\": \"A 301 is heuristically cacheable.\", \"quote\": \"A 301 response is heuristically cacheable; i.e., unless otherwise indicated by the method definition or explicit cache controls (see Section 4.2.2 of [CACHING]).\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"A 308 is heuristically cacheable.\", \"quote\": \"A 308 response is heuristically cacheable; i.e., unless otherwise indicated by the method definition or explicit cache controls (see Section 4.2.2 of [CACHING]).\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"RFC 9110 lists 301 and 308 among the heuristically cacheable status codes.\", \"quote\": \"Responses with status codes that are defined as heuristically cacheable (e.g., 200, 203, 204, 206, 300, 301, 308, 404, 405, 410, 414, and 501 in this specification) can be reused by a cache with heuristic expiration unless otherwise indicated by the method definition or explicit cache controls [CACHING]; all other status codes are not heuristically cacheable.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"\\\"Heuristically cacheable\\\" used to be called \\\"cacheable by default\\\".\", \"quote\": \"Note that in previous specifications, heuristically cacheable response status codes were called \\\"cacheable by default\\\".\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9111.html\"},\n{\"claim\": \"RFC 7538 said 308 was cacheable by default.\", \"quote\": \"A 308 response is cacheable by default; i.e., unless otherwise indicated by the method definition or explicit cache controls (see [RFC7234], Section 4.2.2).\", \"url\": \"https://www.rfc-editor.org/rfc/rfc7538.html\"},\n{\"claim\": \"RFC 9110 obsoletes RFC 7231 and RFC 7538.\", \"quote\": \"This document updates RFC 3864 and obsoletes RFCs 2818, 7231, 7232, 7233, 7235, 7538, 7615, 7694, and portions of 7230.\", \"url\": \"https://www.rfc-editor.org/rfc/rfc9110.html\"},\n{\"claim\": \"RFC 7538 added 308 as the missing permanent version of 307.\", \"quote\": \"Section 6.4.7 of [RFC7231] states that it does not define a permanent variant of status code 307; this specification adds the status code 308, defining this missing variant (Section 3).\", \"url\": \"https://www.rfc-editor.org/rfc/rfc7538.html\"}\n]}\n```",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__plan-execute-verify__research-http-redirects__r1.jsonl"
+}

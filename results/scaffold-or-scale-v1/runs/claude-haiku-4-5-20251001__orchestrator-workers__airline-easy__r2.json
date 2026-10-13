@@ -1,0 +1,167 @@
+{
+  "runId": "claude-haiku-4-5-20251001__orchestrator-workers__airline-easy__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-easy",
+  "taskTitle": "Add checked bags and collect the right fee",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-02T18:01:03.924Z",
+  "finishedAt": "2026-10-02T18:01:54.506Z",
+  "latencyMs": 50579,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "baggage-updated",
+      "label": "Reservation holds three checked bags and is otherwise untouched",
+      "weight": 3,
+      "earned": 1,
+      "detail": "checked_bags=3, status=confirmed"
+    },
+    {
+      "id": "baggage-fee-exact",
+      "label": "Exactly one baggage fee, for the bags beyond the free allowance",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected 4500 cents for 1 chargeable bag(s), charged 4500"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.047154,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 10466,
+    "outputTokens": 4790,
+    "cacheReadInputTokens": 9697,
+    "cacheCreationInputTokens": 5884
+  },
+  "turns": 9,
+  "toolCalls": 5,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1790964063926,
+      "durationMs": 26005,
+      "costUsd": 0.014927000000000001,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1790964089931,
+      "durationMs": 16027,
+      "costUsd": 0.025074700000000002,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1790964105958,
+      "durationMs": 8547,
+      "costUsd": 0.007151999999999999,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "# Final Answer\n\nBased on the worker report, **the task has been completed successfully**.\n\n**Summary:**\n- **Reservation R1042** for Rosa Mendel has been updated to add 2 checked bags\n- Rosa's reservation now holds 3 checked bags (the maximum allowed)\n- **Baggage fee charged: $45.00**\n\n**Explanation:**\nRosa qualified for a free baggage allowance of 2 bags (1 from her economy cabin booking + 1 from her silver frequent-flyer tier status). By adding 2 more bags to her original 1 bag, she now has 3 total. Only the third bag exceeded her free allowance, so she was charged the published fee of $45.00 for that single chargeable bag.\n\nRosa owes exactly **$45.00** for the additional checked baggage.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__orchestrator-workers__airline-easy__r2.jsonl"
+}

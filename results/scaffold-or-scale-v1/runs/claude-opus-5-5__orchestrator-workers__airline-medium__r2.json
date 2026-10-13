@@ -1,0 +1,173 @@
+{
+  "runId": "claude-opus-5-5__orchestrator-workers__airline-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T01:05:36.346Z",
+  "finishedAt": "2026-10-06T01:06:14.116Z",
+  "latencyMs": 37768,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.118787,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3636,
+    "outputTokens": 2997,
+    "cacheReadInputTokens": 36657,
+    "cacheCreationInputTokens": 6084
+  },
+  "turns": 13,
+  "toolCalls": 9,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791248736347,
+      "durationMs": 8372,
+      "costUsd": 0.0202416,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791248744719,
+      "durationMs": 20301,
+      "costUsd": 0.0724174,
+      "turns": 10,
+      "toolCalls": 9,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791248765020,
+      "durationMs": 9095,
+      "costUsd": 0.0261284,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Dana Whitfield (R2087) is now on **AA204**, departing SFO at **09:05 on 2026-08-03** in **economy**, the cabin she was already booked in. She was charged **$80.00** for the change.\n\n**Why AA204:** It is the earliest flight that day with an economy seat that can be booked.\n- **UA88 (06:15):** no economy seats left.\n- **AA918 (07:30):** shows economy seats, but the flight is cancelled.\n- **AA204 (09:05):** scheduled, with 4 economy seats left. This was checked again just before the move.\n\n**What was done:**\n1. Her booking was moved from AA210 (17:40) to AA204, still in economy. No money moved at this step.\n2. One ledger entry (L1) charged the **$80.00 fare difference**: the new $390.00 fare minus the $310.00 she paid. The economy fare rules collect fare increases in full, and no tier is exempt from that.\n3. The **$75.00 change fee was waived**. She is a gold member, and the rules exempt gold and platinum members, so no change-fee entry was made.\n\nHer checked bag count (1) and her passenger record were not changed.\n\n**One thing to check:** The dates don't agree. My session date is 2026-10-06, which would put this flight in the past. The airline system reports today as 2026-07-28 and shows both flights as scheduled, so the change was handled as an upcoming flight. If 2026-10-06 is the real date, this change and the $80.00 charge need another look.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__orchestrator-workers__airline-medium__r2.jsonl"
+}

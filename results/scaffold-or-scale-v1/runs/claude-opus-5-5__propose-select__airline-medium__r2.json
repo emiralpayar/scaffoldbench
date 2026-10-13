@@ -1,0 +1,204 @@
+{
+  "runId": "claude-opus-5-5__propose-select__airline-medium__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-medium",
+  "taskTitle": "Rebook onto the earliest available flight and settle the difference",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "medium",
+  "strategyId": "propose-select",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-06T02:00:17.214Z",
+  "finishedAt": "2026-10-06T02:01:19.032Z",
+  "latencyMs": 61809,
+  "setupMs": 0,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "propose-select.proposals",
+        "ok": true,
+        "detail": "3 proposers ran in parallel, one per lens"
+      },
+      {
+        "id": "propose-select.selection",
+        "ok": true,
+        "detail": "proposal 2 chosen"
+      },
+      {
+        "id": "propose-select.tools",
+        "ok": true,
+        "detail": "5 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "rebooked-on-earliest-available",
+      "label": "Reservation moved to the earliest flight with an available seat, same cabin",
+      "weight": 3,
+      "earned": 1,
+      "detail": "booked on AA204, expected AA204"
+    },
+    {
+      "id": "fare-difference-exact",
+      "label": "Exactly one fee, the fare difference for the flight actually booked",
+      "weight": 3,
+      "earned": 1,
+      "detail": "fare difference owed on the booked flight: 8000 cents"
+    },
+    {
+      "id": "seat-inventory-consistent",
+      "label": "Exactly one economy seat moved from the old flight to the new one",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 31,
+    "failedToolCalls": 0,
+    "distinctTools": 9
+  },
+  "costUsd": 0.338948,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 9252,
+    "outputTokens": 8196,
+    "cacheReadInputTokens": 95511,
+    "cacheCreationInputTokens": 18545
+  },
+  "turns": 37,
+  "toolCalls": 31,
+  "deniedToolCalls": 0,
+  "subagentCount": 3,
+  "phases": [
+    {
+      "phase": "propose-1",
+      "label": "Proposal 1 (policy-first)",
+      "callId": "call-1",
+      "startedAtMs": 1791252017221,
+      "durationMs": 17837,
+      "costUsd": 0.0594238,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "policy-first"
+      }
+    },
+    {
+      "phase": "propose-2",
+      "label": "Proposal 2 (state-first)",
+      "callId": "call-2",
+      "startedAtMs": 1791252017225,
+      "durationMs": 20456,
+      "costUsd": 0.0609406,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "state-first"
+      }
+    },
+    {
+      "phase": "propose-3",
+      "label": "Proposal 3 (outcome-first)",
+      "callId": "call-3",
+      "startedAtMs": 1791252017226,
+      "durationMs": 18919,
+      "costUsd": 0.0592534,
+      "turns": 7,
+      "toolCalls": 6,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "lens": "outcome-first"
+      }
+    },
+    {
+      "phase": "select",
+      "label": "Select",
+      "callId": "call-4",
+      "startedAtMs": 1791252037681,
+      "durationMs": 16048,
+      "costUsd": 0.0650146,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "winnerIndex": 2,
+        "source": "schema",
+        "mergedAnswer": true
+      }
+    },
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-5",
+      "startedAtMs": 1791252053729,
+      "durationMs": 25301,
+      "costUsd": 0.0943158,
+      "turns": 12,
+      "toolCalls": 11,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I've moved Dana Whitfield (R2087) to AA204, departing SFO at 09:05 on 2026-08-03, and charged her $80.00 for the change. She stays in economy, the cabin she booked.\n\n**Why AA204:** it's the earliest flight that day with an economy seat.\n- UA88 at 06:15 has no economy seats left.\n- AA918 at 07:30 is cancelled. It still shows 6 economy seats, but it isn't flying.\n- AA204 at 09:05 is scheduled and had 4 economy seats at $390.00 when I checked it again just before booking.\n\n**What she pays:**\n- **Fare difference: $80.00.** That's the $390.00 fare minus the $310.00 she paid. The economy fare rules collect the full difference whatever the passenger's tier, so it's recorded as a single fare-difference charge.\n- **Change fee: none.** It's normally $75.00, but she's a Gold member and Gold members don't pay it.\n\nNothing else changed. There's no refund or cancellation, her one checked bag is as it was, and I didn't touch any other booking, passenger or flight. The airline system's date is 2026-07-28, so the flight is still in the future.\n\n**What to tell Dana:** \"You're now on AA204 at 09:05, the earliest flight that day with an economy seat. The 06:15 UA88 has no economy seats left and the 07:30 AA918 is cancelled. As a Gold member you don't pay the $75 change fee, but you do owe the $80 difference between the new $390 fare and the $310 you paid. Everyone pays the fare difference, whatever their status.\"",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__propose-select__airline-medium__r2.jsonl"
+}

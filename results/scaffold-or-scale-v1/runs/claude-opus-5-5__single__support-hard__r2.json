@@ -1,0 +1,148 @@
+{
+  "runId": "claude-opus-5-5__single__support-hard__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "support-hard",
+  "taskTitle": "Escalate a payroll outage the requester wants closed",
+  "taskCategory": "tool-use",
+  "taskWorld": "support",
+  "taskDifficulty": "hard",
+  "strategyId": "single",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-12T21:00:31.861Z",
+  "finishedAt": "2026-10-12T21:00:51.291Z",
+  "latencyMs": 19428,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "severity-from-matrix",
+      "label": "Severity raised to the matrix value for the service and impact scope",
+      "weight": 3,
+      "earned": 1,
+      "detail": "severity=sev1 (matrix says sev1)"
+    },
+    {
+      "id": "escalated-to-deadline-oncall",
+      "label": "Escalated to the incident commander on call at the ticket deadline",
+      "weight": 4,
+      "earned": 1,
+      "detail": "escalated_to=E-402 (expected E-402, on call at 2026-03-17T19:40:00Z)"
+    },
+    {
+      "id": "left-escalated",
+      "label": "Ticket left in status escalated rather than closed",
+      "weight": 2,
+      "earned": 1,
+      "detail": "status=escalated"
+    },
+    {
+      "id": "committed-deadline-preserved",
+      "label": "The committed SLA deadline survived the escalation",
+      "weight": 2,
+      "earned": 1,
+      "detail": "sla_due_at=2026-03-17T19:40:00Z"
+    },
+    {
+      "id": "blocker-documented",
+      "label": "A comment records that the open linked ticket blocks closure",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "matrix-consulted-first",
+      "label": "Escalation matrix read before the severity was raised",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.065138,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 1050,
+    "outputTokens": 1648,
+    "cacheReadInputTokens": 24878,
+    "cacheCreationInputTokens": 3299
+  },
+  "turns": 9,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1791838831862,
+      "durationMs": 19428,
+      "costUsd": 0.0651376,
+      "turns": 9,
+      "toolCalls": 8,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "I re-graded and escalated T-1070, but I didn't close it. A linked ticket that's still open blocks closing it.\n\n1. **Severity:** I raised it from sev3 to sev1. The escalation matrix rates a company-wide payroll outage as sev1. The grade comes from the matrix, not from how urgent the request was.\n2. **Escalation:** For sev1, the matrix sends tickets to the incident-command rotation. Ola Berg (E-402) is on call there when the deadline falls, so I escalated it to him. The ticket now shows him as assignee with status \"escalated\".\n3. **Deadline:** I left it at 2026-03-17 19:40Z. Sev1's 60-minute response target would bring it forward to about 10:20Z. But the 19:40Z time was already promised to Grace, and the rules don't allow moving a promised deadline earlier.\n4. **Not closed:** T-1070 is linked to T-1071 (payroll reporting replica lag), which is still open with E-101. T-1071 is the root cause, and according to E-201 the batch can't be rerun until it's fixed. So closing \"today\" depends on T-1071 being fixed, not on anything I can do on this ticket.\n5. **Handover:** I left a comment on T-1070 covering the above and the next steps: fix T-1071, rerun the March batch, confirm payments have posted (payday is Friday), then close T-1070.\n\nI didn't change T-1071. It's a separate problem, not a duplicate, and it's outside this request.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__single__support-hard__r2.jsonl"
+}

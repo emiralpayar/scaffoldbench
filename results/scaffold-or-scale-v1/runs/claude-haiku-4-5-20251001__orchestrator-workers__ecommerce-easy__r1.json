@@ -1,0 +1,191 @@
+{
+  "runId": "claude-haiku-4-5-20251001__orchestrator-workers__ecommerce-easy__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-easy",
+  "taskTitle": "Redirect the order that has not shipped",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "easy",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-02T10:09:53.155Z",
+  "finishedAt": "2026-10-02T10:10:30.839Z",
+  "latencyMs": 37681,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "2 subtasks, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "2 workers ran in parallel"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "4 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "open-order-redirected",
+      "label": "The order that has not shipped carries the new address",
+      "weight": 3,
+      "earned": 1,
+      "detail": "O-1001 address: 7 Quarry Rise, Sheffield S11 8XZ, UK"
+    },
+    {
+      "id": "shipped-order-intact",
+      "label": "The edit did not spill onto the order already in transit",
+      "weight": 2,
+      "earned": 1
+    },
+    {
+      "id": "inspected-before-editing",
+      "label": "Looked up which order was still open before editing one",
+      "weight": 1,
+      "earned": 1
+    },
+    {
+      "id": "verified-shipped-order",
+      "label": "Checked the state of the order already in transit",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "distinctTools": 3
+  },
+  "costUsd": 0.068431,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 23348,
+    "outputTokens": 4810,
+    "cacheReadInputTokens": 9586,
+    "cacheCreationInputTokens": 10037
+  },
+  "turns": 13,
+  "toolCalls": 8,
+  "deniedToolCalls": 0,
+  "subagentCount": 2,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1790935793156,
+      "durationMs": 13153,
+      "costUsd": 0.010585,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 2,
+        "workers": 2,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-update-unshipped-order",
+      "label": "Worker 1: update-unshipped-order",
+      "callId": "call-2",
+      "startedAtMs": 1790935806310,
+      "durationMs": 16144,
+      "costUsd": 0.0276636,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "worker-verify-shipped-order",
+      "label": "Worker 2: verify-shipped-order",
+      "callId": "call-3",
+      "startedAtMs": 1790935806312,
+      "durationMs": 12468,
+      "costUsd": 0.022732,
+      "turns": 4,
+      "toolCalls": 3,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-4",
+      "startedAtMs": 1790935822454,
+      "durationMs": 8383,
+      "costUsd": 0.00745,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "# Task Completion Summary\n\nBased on the worker reports, the task has been completed successfully:\n\n## What was done:\n\n1. **Unshipped order (O-1001) - Address Updated ✓**\n   - Shipping address changed from \"12 Alder Lane, Bristol BS1 4TR, UK\" to \"7 Quarry Rise, Sheffield S11 8XZ, UK\"\n   - Verified successful\n\n2. **In-Transit order (O-1002) - Address Preserved ✓**\n   - Shipping address remains \"88 Old Mill Road, Bristol BS3 2QQ, UK\" (original address)\n   - Confirmed unchanged, as required by policy\n\n## Outcome:\n\nDana Whitfield's new address (7 Quarry Rise, Sheffield S11 8XZ, UK) is now on the pending order that will use it for shipment. The in-transit order retains its original address, complying with the domain policy that shipping records for parcels already in transit must not be altered.\n\nThe task is complete.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__orchestrator-workers__ecommerce-easy__r1.jsonl"
+}

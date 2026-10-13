@@ -1,0 +1,122 @@
+{
+  "runId": "claude-haiku-4-5-20251001__single__airline-easy__r2",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-easy",
+  "taskTitle": "Add checked bags and collect the right fee",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "easy",
+  "strategyId": "single",
+  "model": "claude-haiku-4-5-20251001",
+  "effort": "high",
+  "repeat": 2,
+  "startedAt": "2026-10-02T18:00:16.508Z",
+  "finishedAt": "2026-10-02T18:00:34.068Z",
+  "latencyMs": 17557,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "single.tools",
+        "ok": true,
+        "detail": "1 phase had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "baggage-updated",
+      "label": "Reservation holds three checked bags and is otherwise untouched",
+      "weight": 3,
+      "earned": 1,
+      "detail": "checked_bags=3, status=confirmed"
+    },
+    {
+      "id": "baggage-fee-exact",
+      "label": "Exactly one baggage fee, for the bags beyond the free allowance",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected 4500 cents for 1 chargeable bag(s), charged 4500"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "distinctTools": 5
+  },
+  "costUsd": 0.025676,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 4867,
+    "outputTokens": 1592,
+    "cacheReadInputTokens": 9773,
+    "cacheCreationInputTokens": 5936
+  },
+  "turns": 6,
+  "toolCalls": 5,
+  "deniedToolCalls": 0,
+  "subagentCount": 0,
+  "phases": [
+    {
+      "phase": "main",
+      "label": "Main",
+      "callId": "call-1",
+      "startedAtMs": 1790964016510,
+      "durationMs": 17557,
+      "costUsd": 0.0256763,
+      "turns": 6,
+      "toolCalls": 5,
+      "model": "claude-haiku-4-5-20251001",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "Perfect! I have successfully completed the task. Here's a summary:\n\n**Task Completed for Rosa Mendel (R1042)**\n\n**Baggage Update:**\n- Added 2 checked bags to the reservation\n- Total checked bags: now 3 (up from 1)\n\n**Baggage Fee Calculation:**\n- Rosa's free allowance: 2 bags (1 for economy cabin + 1 for silver frequent-flyer tier)\n- Chargeable bags: 1 (third bag beyond free allowance)\n- Fee charged: **$45.00**\n\nRosa now owes exactly **$45.00** for the additional baggage. Her reservation has been updated and the charge has been recorded in the ledger.",
+  "modelStops": [],
+  "effectiveEffort": null,
+  "traceFile": "traces/claude-haiku-4-5-20251001__single__airline-easy__r2.jsonl"
+}

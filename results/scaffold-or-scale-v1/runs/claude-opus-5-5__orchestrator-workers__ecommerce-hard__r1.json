@@ -1,0 +1,186 @@
+{
+  "runId": "claude-opus-5-5__orchestrator-workers__ecommerce-hard__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "ecommerce-hard",
+  "taskTitle": "Return an expired, partially shipped order",
+  "taskCategory": "tool-use",
+  "taskWorld": "ecommerce",
+  "taskDifficulty": "hard",
+  "strategyId": "orchestrator-workers",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-05T16:23:50.545Z",
+  "finishedAt": "2026-10-05T16:24:39.747Z",
+  "latencyMs": 49200,
+  "setupMs": 1,
+  "gradingMs": 0,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.decomposition",
+        "ok": true,
+        "detail": "1 subtask, read from the schema reply"
+      },
+      {
+        "id": "orchestrator-workers.fan-out",
+        "ok": true,
+        "detail": "one worker on the whole task, as the orchestrator chose"
+      },
+      {
+        "id": "orchestrator-workers.synthesis",
+        "ok": true
+      },
+      {
+        "id": "orchestrator-workers.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "expired-lines-to-store-credit",
+      "label": "The two shipped lines were returned as store credit for exactly what they cost",
+      "weight": 3,
+      "earned": 1
+    },
+    {
+      "id": "store-credit-applied",
+      "label": "The credit reached the customer balance, not just the ledger",
+      "weight": 2,
+      "earned": 1,
+      "detail": "storeCreditCents=55300"
+    },
+    {
+      "id": "unshipped-line-refunded-to-card",
+      "label": "The line that never shipped was cancelled and refunded to the card",
+      "weight": 3,
+      "earned": 1,
+      "detail": "line L3: status=cancelled refundedCents=13800 method=card"
+    },
+    {
+      "id": "inventory-reflects-receipts",
+      "label": "Cancelled units were restocked and returned units were not",
+      "weight": 2,
+      "earned": 1,
+      "detail": "P-HUB=10 P-DOC=3 P-MON=5"
+    },
+    {
+      "id": "policy-consulted-before-money-moved",
+      "label": "Read the return policy before issuing a refund",
+      "weight": 1,
+      "earned": 1
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "distinctTools": 8
+  },
+  "costUsd": 0.130442,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3812,
+    "outputTokens": 3822,
+    "cacheReadInputTokens": 29810,
+    "cacheCreationInputTokens": 5620
+  },
+  "turns": 13,
+  "toolCalls": 9,
+  "deniedToolCalls": 0,
+  "subagentCount": 1,
+  "phases": [
+    {
+      "phase": "decompose",
+      "label": "Decompose",
+      "callId": "call-1",
+      "startedAtMs": 1791217430546,
+      "durationMs": 9725,
+      "costUsd": 0.0221616,
+      "turns": 2,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "subtasks": 1,
+        "workers": 1,
+        "source": "schema"
+      }
+    },
+    {
+      "phase": "worker-all",
+      "label": "Worker 1: all",
+      "callId": "call-2",
+      "startedAtMs": 1791217440271,
+      "durationMs": 27311,
+      "costUsd": 0.074372,
+      "turns": 10,
+      "toolCalls": 9,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "synthesize",
+      "label": "Synthesize",
+      "callId": "call-3",
+      "startedAtMs": 1791217467583,
+      "durationMs": 12162,
+      "costUsd": 0.033908400000000005,
+      "turns": 1,
+      "toolCalls": 0,
+      "model": "claude-opus-5-5",
+      "aborted": false,
+      "subtype": "success"
+    }
+  ],
+  "finalText": "O-3001 is processed on the money side: Priya Raman (C-300) has been credited the full £686.00. Only £138.00 went back to her card. The other £548.00 is store credit, because the shipped items came back after the 30-day return window. The dock and monitor are not back in stock yet, since the warehouse has not received them.\n\n**What was on the order**\n- **L1 (dock, P-DOC, £219.00)** and **L2 (monitor, P-MON, £329.00)** shipped on 2026-05-04.\n- **L3 (2 × hub, P-HUB, £138.00)** had not shipped.\n- The return policy allows 30 days from shipping. After that, a return is paid as store credit, not to the card. A line that never shipped is a cancellation and goes back to the card.\n\n**What was done**\n1. **L3 cancelled.** £138.00 was refunded to her card (RF-1). The 2 hubs were put back into stock, taking P-HUB from 8 to 10.\n2. **L1 and L2 returned.** £548.00 was refunded as store credit (RF-2), which is exactly what she paid for those two lines. The same amount was added to her balance, which went from £5.00 to £553.00, so the store-credit refund is complete.\n3. **Order record.** O-3001 is marked \"returned\", with £686.00 of £686.00 refunded.\n\n**Still open or worth checking**\n- **Warehouse:** 1 × P-DOC and 1 × P-MON need to go back into stock when the parcels actually arrive. The order says \"returned\", but the goods are not back yet.\n- **Customer message:** She asked for her money back, so someone should tell her that only £138.00 went to her card. The £548.00 is store credit because the window had closed.\n- **Hub restock:** The hubs were restocked because nothing showed L3 as backordered. The report did not confirm that stock had actually been set aside for that line. If L3 was in fact backordered, the +2 to P-HUB should be reversed.\n- **Dates:** The system tools gave today's date as 2026-07-25, but the session date is 2026-10-05. Either way the shipped lines are past the 30-day window, so the outcome is the same. The tool clock still looks wrong and may need checking.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-opus-5-5__orchestrator-workers__ecommerce-hard__r1.jsonl"
+}

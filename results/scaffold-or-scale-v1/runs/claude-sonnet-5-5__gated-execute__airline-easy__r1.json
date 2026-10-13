@@ -1,0 +1,171 @@
+{
+  "runId": "claude-sonnet-5-5__gated-execute__airline-easy__r1",
+  "runSetId": "scaffold-or-scale-v1",
+  "taskId": "airline-easy",
+  "taskTitle": "Add checked bags and collect the right fee",
+  "taskCategory": "tool-use",
+  "taskWorld": "airline",
+  "taskDifficulty": "easy",
+  "strategyId": "gated-execute",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "repeat": 1,
+  "startedAt": "2026-10-04T12:43:38.460Z",
+  "finishedAt": "2026-10-04T12:44:11.209Z",
+  "latencyMs": 32745,
+  "setupMs": 1,
+  "gradingMs": 1,
+  "attempts": 1,
+  "score": 1,
+  "passed": true,
+  "failureMode": "none",
+  "integrity": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "harness.run-completed",
+        "ok": true
+      },
+      {
+        "id": "harness.api",
+        "ok": true
+      },
+      {
+        "id": "harness.calls-ended",
+        "ok": true
+      },
+      {
+        "id": "harness.harness-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-connected",
+        "ok": true
+      },
+      {
+        "id": "harness.mcp-hermetic",
+        "ok": true
+      },
+      {
+        "id": "harness.builtin-tools",
+        "ok": true
+      },
+      {
+        "id": "harness.structured-output",
+        "ok": true
+      },
+      {
+        "id": "harness.not-degraded",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.reviewed",
+        "ok": true,
+        "detail": "2 state changes, each allowed by a review (2 reviews in all)"
+      },
+      {
+        "id": "gated-execute.decisions",
+        "ok": true
+      },
+      {
+        "id": "gated-execute.tools",
+        "ok": true,
+        "detail": "3 phases had the tools designed for them"
+      }
+    ]
+  },
+  "breakdown": [
+    {
+      "id": "baggage-updated",
+      "label": "Reservation holds three checked bags and is otherwise untouched",
+      "weight": 3,
+      "earned": 1,
+      "detail": "checked_bags=3, status=confirmed"
+    },
+    {
+      "id": "baggage-fee-exact",
+      "label": "Exactly one baggage fee, for the bags beyond the free allowance",
+      "weight": 4,
+      "earned": 1,
+      "detail": "expected 4500 cents for 1 chargeable bag(s), charged 4500"
+    }
+  ],
+  "penalties": [],
+  "scoreMetadata": {
+    "toolCalls": 16,
+    "failedToolCalls": 0,
+    "distinctTools": 7
+  },
+  "costUsd": 0.075717,
+  "judgeCostUsd": 0,
+  "discardedCostUsd": 0,
+  "usage": {
+    "inputTokens": 3435,
+    "outputTokens": 2541,
+    "cacheReadInputTokens": 49485,
+    "cacheCreationInputTokens": 9309
+  },
+  "turns": 21,
+  "toolCalls": 16,
+  "deniedToolCalls": 0,
+  "subagentCount": 2,
+  "phases": [
+    {
+      "phase": "execute",
+      "label": "Execute",
+      "callId": "call-1",
+      "startedAtMs": 1791117818462,
+      "durationMs": 32745,
+      "costUsd": 0.0274494,
+      "turns": 8,
+      "toolCalls": 7,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success"
+    },
+    {
+      "phase": "review-1",
+      "label": "Review 1: add_baggage",
+      "callId": "call-2",
+      "startedAtMs": 1791117826284,
+      "durationMs": 10193,
+      "costUsd": 0.029731200000000003,
+      "turns": 7,
+      "toolCalls": 5,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__add_baggage",
+        "toolUseId": "toolu_01DL5UVCWmBLxixuLVby1gxZ",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "Adding 2 bags to R1042 is correct. Rosa has 1 bag now, so the total becomes 3, which is the maximum allowed. Her free allowance is 2 bags (economy 1 plus silver tier 1). Only 1 of the new bags is chargeable. After this call, record a single baggage_fee ledger entry of 4500 cents ($45.00), the first…"
+      }
+    },
+    {
+      "phase": "review-2",
+      "label": "Review 2: charge_fee",
+      "callId": "call-3",
+      "startedAtMs": 1791117838400,
+      "durationMs": 9714,
+      "costUsd": 0.0185364,
+      "turns": 6,
+      "toolCalls": 4,
+      "model": "claude-sonnet-5-5",
+      "aborted": false,
+      "subtype": "success",
+      "meta": {
+        "tool": "mcp__airline__charge_fee",
+        "toolUseId": "toolu_01ENHvGpwH5LBfgFaqy5CKcp",
+        "decision": "allow",
+        "source": "schema",
+        "reason": "R1042 is economy (1 free bag) and Rosa is silver (+1), so she has 2 free bags. The reservation now holds 3 bags, leaving 1 chargeable bag at the first-chargeable rate of $45.00 (4500 cents). The ledger is empty, so this is a single baggage_fee entry with no duplicate."
+      }
+    }
+  ],
+  "finalText": "I added two checked bags to R1042 and charged Rosa Mendel $45.00 for them.\n\n- **Bags:** The reservation went from 1 checked bag to 3, which is the maximum allowed.\n- **Fee:** Her economy fare includes 1 free bag, and her silver status adds 1 more, so 2 are free. Only the third bag is chargeable. It's the first chargeable bag, so it costs $45.00. I charged that as one baggage_fee entry (ledger L1). The ledger had no earlier entries.\n- **Date discrepancy:** The flight, AS420 SFO→SEA, is dated 2026-08-11, which is before today (2026-10-04). The system still lists it as scheduled, and the task was explicit, so I went ahead. You may want to check the date on this reservation.",
+  "modelStops": [],
+  "effectiveEffort": "high",
+  "traceFile": "traces/claude-sonnet-5-5__gated-execute__airline-easy__r1.jsonl"
+}
