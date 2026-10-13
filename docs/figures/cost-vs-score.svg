@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="748" viewBox="0 0 1000 748" role="img" aria-labelledby="t d">
+<title id="t">Cost against score for every model and architecture</title>
+<desc id="d">Scatter of mean cost per run (log scale) against mean score for 18 arms, with the uncertainty-aware Pareto frontier.</desc>
+<style>
+  svg { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --bg: #fcfcfb; --ring: #e6e5df; --ink: #0b0b0b; --ink2: #52514e; --muted: #77756f;
+    --grid: #ebeae4; --axis: #c3c2b7; --band: #f1f0ec; --eq: #e9f1fb;
+    --a0: #3f3e3b; --a1: #2a78d6; --a2: #eb6834; --a3: #1baf7a; --a4: #eda100; --a5: #e87ba4;
+    --good: #0b7a0b; --good-bg: #e3f4e3; --warn: #8a5a00; --warn-bg: #fdf0d2;
+    --bad: #b42323; --bad-bg: #fbe4e4; --info: #1c5cab; --info-bg: #e3eefb; }
+  @media (prefers-color-scheme: dark) {
+    svg { --bg: #1a1a19; --ring: #2f2f2c; --ink: #f0efec; --ink2: #c3c2b7; --muted: #9b9991;
+      --grid: #2a2a28; --axis: #45453f; --band: #232321; --eq: #1b2633;
+      --a0: #d6d5cf; --a1: #3987e5; --a2: #d95926; --a3: #199e70; --a4: #c98500; --a5: #d55181;
+      --good: #4fcf4f; --good-bg: #173117; --warn: #f2b73d; --warn-bg: #3a2d10;
+      --bad: #f07a7a; --bad-bg: #3d1a1a; --info: #86b6ef; --info-bg: #17263a; }
+  }
+  .bg { fill: var(--bg); stroke: var(--ring); }
+  .title { fill: var(--ink); font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .sub { fill: var(--ink2); font-size: 15px; }
+  .h { fill: var(--ink); font-size: 15px; font-weight: 650; }
+  .t { fill: var(--ink); font-size: 14px; }
+  .t2 { fill: var(--ink2); font-size: 13px; }
+  .num { fill: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .num2 { fill: var(--ink2); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cap { fill: var(--muted); font-size: 12px; }
+  .b { font-weight: 650; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .axis { stroke: var(--axis); stroke-width: 1; }
+  .zero { stroke: var(--ink2); stroke-width: 1.25; }
+  .band { fill: var(--band); }
+  .eq { fill: var(--eq); }
+  .ink { fill: var(--ink); } .inks { stroke: var(--ink); fill: none; }
+  .ink2s { stroke: var(--ink2); fill: none; }
+  .muted { fill: var(--muted); }
+  .hole { fill: var(--bg); }
+  .f0 { fill: var(--a0); } .s0 { stroke: var(--a0); }
+  .f1 { fill: var(--a1); } .s1 { stroke: var(--a1); }
+  .f2 { fill: var(--a2); } .s2 { stroke: var(--a2); }
+  .f3 { fill: var(--a3); } .s3 { stroke: var(--a3); }
+  .f4 { fill: var(--a4); } .s4 { stroke: var(--a4); }
+  .f5 { fill: var(--a5); } .s5 { stroke: var(--a5); }
+  .good { fill: var(--good); } .good-bg { fill: var(--good-bg); }
+  .warn { fill: var(--warn); } .warn-bg { fill: var(--warn-bg); }
+  .bad { fill: var(--bad); } .bad-bg { fill: var(--bad-bg); }
+  .info { fill: var(--info); } .info-bg { fill: var(--info-bg); }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="999" height="747" rx="14"/>
+<text x="32" y="52" class="title">What a point of score costs</text>
+<text x="32" y="80" class="sub">All 18 (model, architecture) arms. The cheap way up was a bigger model, not a scaffold.</text>
+<line x1="192.4" y1="120" x2="192.4" y2="560" class="grid"/>
+<text x="192.4" y="580" class="tick" text-anchor="middle">$0.1</text>
+<line x1="403.1" y1="120" x2="403.1" y2="560" class="grid"/>
+<text x="403.1" y="580" class="tick" text-anchor="middle">$0.2</text>
+<line x1="681.5" y1="120" x2="681.5" y2="560" class="grid"/>
+<text x="681.5" y="580" class="tick" text-anchor="middle">$0.5</text>
+<line x1="892.2" y1="120" x2="892.2" y2="560" class="grid"/>
+<text x="892.2" y="580" class="tick" text-anchor="middle">$1.0</text>
+<line x1="84" y1="497.1" x2="960" y2="497.1" class="grid"/>
+<text x="72" y="501.1" class="tick" text-anchor="end">0.70</text>
+<line x1="84" y1="434.3" x2="960" y2="434.3" class="grid"/>
+<text x="72" y="438.3" class="tick" text-anchor="end">0.75</text>
+<line x1="84" y1="371.4" x2="960" y2="371.4" class="grid"/>
+<text x="72" y="375.4" class="tick" text-anchor="end">0.80</text>
+<line x1="84" y1="308.6" x2="960" y2="308.6" class="grid"/>
+<text x="72" y="312.6" class="tick" text-anchor="end">0.85</text>
+<line x1="84" y1="245.7" x2="960" y2="245.7" class="grid"/>
+<text x="72" y="249.7" class="tick" text-anchor="end">0.90</text>
+<line x1="84" y1="182.9" x2="960" y2="182.9" class="grid"/>
+<text x="72" y="186.9" class="tick" text-anchor="end">0.95</text>
+<line x1="84" y1="120" x2="960" y2="120" class="grid"/>
+<text x="72" y="124" class="tick" text-anchor="end">1.00</text>
+<line x1="84" y1="560" x2="960" y2="560" class="axis"/>
+<text x="522" y="604" class="t2" text-anchor="middle">Mean cost per run (USD, log scale)</text>
+<text x="32" y="102" class="t2">Mean score</text>
+<path d="M164 408 H238.5 V246.3 H308.4 V204.1 H473.2 V196.1 H560.3 V186.6 H716.3 V186.4 H869.5 V173.3 H960" class="ink2s" stroke-width="1.5" stroke-dasharray="5 4"/>
+<path d="M294.4 226.2 V234.2 H487.2 V226.2" class="ink2s" stroke-width="1.25"/>
+<line x1="390.8" y1="234.2" x2="390.8" y2="263.1" class="ink2s" stroke-width="1.25"/>
+<text x="350.8" y="279.1" class="t b">Sonnet plan-execute ≈ Opus single (exploratory)</text>
+<text x="350.8" y="298.1" class="t2">Δ −0.006 [−0.033, +0.020], equivalent within ±0.05, at ×0.64 the cost.</text>
+<text x="526.3" y="409.1" class="t b">Every Haiku scaffold costs more than Haiku single</text>
+<text x="526.3" y="428.1" class="t2">(×1.53 to ×4.77); none separates from it on score.</text>
+<circle cx="268.3" cy="429.7" r="7" class="f1" stroke="var(--bg)" stroke-width="2"/>
+<circle cx="531.5" cy="468.8" r="7" class="f2" stroke="var(--bg)" stroke-width="2"/>
+<circle cx="355.8" cy="495.9" r="7" class="f3" stroke="var(--bg)" stroke-width="2"/>
+<circle cx="592.2" cy="359.6" r="7" class="f4" stroke="var(--bg)" stroke-width="2"/>
+<circle cx="847.1" cy="525.9" r="7" class="hole s5" stroke-width="2.25"/>
+<rect x="497" y="201.3" width="12.6" height="12.6" rx="1.5" class="f2" stroke="var(--bg)" stroke-width="2"/>
+<rect x="420.5" y="208.7" width="12.6" height="12.6" rx="1.5" class="f3" stroke="var(--bg)" stroke-width="2"/>
+<rect x="634.1" y="190" width="12.6" height="12.6" rx="1.5" class="f4" stroke="var(--bg)" stroke-width="2"/>
+<rect x="672.2" y="205" width="12.6" height="12.6" rx="1.5" class="f5" stroke="var(--bg)" stroke-width="2"/>
+<path d="M655.3 210.8 L664 219.6 L655.3 228.3 L646.5 219.6 Z" class="f3" stroke="var(--bg)" stroke-width="2"/>
+<path d="M871.5 167.1 L880.3 175.9 L871.5 184.6 L862.8 175.9 Z" class="f5" stroke="var(--bg)" stroke-width="2"/>
+<circle cx="164" cy="408" r="8" class="f0" stroke="var(--bg)" stroke-width="2"/>
+<rect x="231.3" y="239.1" width="14.4" height="14.4" rx="1.5" class="f0" stroke="var(--bg)" stroke-width="2"/>
+<rect x="301.2" y="196.9" width="14.4" height="14.4" rx="1.5" class="f1" stroke="var(--bg)" stroke-width="2"/>
+<path d="M473.2 186.1 L483.2 196.1 L473.2 206.1 L463.2 196.1 Z" class="f0" stroke="var(--bg)" stroke-width="2"/>
+<path d="M560.3 176.6 L570.3 186.6 L560.3 196.6 L550.3 186.6 Z" class="f1" stroke="var(--bg)" stroke-width="2"/>
+<path d="M716.3 176.4 L726.3 186.4 L716.3 196.4 L706.3 186.4 Z" class="f2" stroke="var(--bg)" stroke-width="2"/>
+<path d="M869.5 163.3 L879.5 173.3 L869.5 183.3 L859.5 173.3 Z" class="f4" stroke="var(--bg)" stroke-width="2"/>
+<text x="164" y="434" class="num2" text-anchor="middle">Haiku · single</text>
+<text x="606.2" y="364.6" class="num2">Haiku · propose-select</text>
+<text x="847.1" y="551.9" class="num2" text-anchor="middle">Haiku · gated-execute (dominated)</text>
+<text x="224.5" y="251.3" class="num2" text-anchor="end">Sonnet · single</text>
+<text x="294.4" y="209.1" class="num2" text-anchor="end">Sonnet · plan-execute</text>
+<text x="473.2" y="180.1" class="num2" text-anchor="middle">Opus · single</text>
+<line x1="560.3" y1="176.6" x2="560.3" y2="157.6" class="ink2s" stroke-width="1"/>
+<text x="560.3" y="152.6" class="num2" text-anchor="middle">Opus · plan-execute</text>
+<text x="716.3" y="170.4" class="num2" text-anchor="middle">Opus · plan-execute-verify</text>
+<line x1="869.5" y1="163.3" x2="869.5" y2="144.3" class="ink2s" stroke-width="1"/>
+<text x="875.5" y="139.3" class="num2" text-anchor="end">Opus · propose-select, gated-execute</text>
+<circle cx="38" cy="639" r="6" class="f0"/>
+<text x="50" y="644" class="t">single</text>
+<circle cx="116" cy="639" r="6" class="f1"/>
+<text x="128" y="644" class="t">plan-execute</text>
+<circle cx="232" cy="639" r="6" class="f2"/>
+<text x="244" y="644" class="t">plan-execute-verify</text>
+<circle cx="392" cy="639" r="6" class="f3"/>
+<text x="404" y="644" class="t">orchestrator-workers</text>
+<circle cx="562" cy="639" r="6" class="f4"/>
+<text x="574" y="644" class="t">propose-select</text>
+<circle cx="694" cy="639" r="6" class="f5"/>
+<text x="706" y="644" class="t">gated-execute</text>
+<circle cx="38" cy="665" r="6" class="muted" />
+<text x="50" y="670" class="t">Haiku 4.5</text>
+<rect x="148.6" y="659.6" width="10.8" height="10.8" rx="1.5" class="muted" />
+<text x="166" y="670" class="t">Sonnet 5.5</text>
+<path d="M270 657.5 L277.5 665 L270 672.5 L262.5 665 Z" class="muted" />
+<text x="282" y="670" class="t">Opus 5.5</text>
+<line x1="392" y1="665" x2="418" y2="665" class="ink2s" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="426" y="670" class="t2">frontier: no arm is both cheaper and as good</text>
+<circle cx="738" cy="665" r="6" class="hole s0" stroke-width="2.25"/>
+<text x="750" y="670" class="t2">dominated on paired evidence</text>
+<text x="32" y="708" class="cap">n = 50 runs per point (25 tasks × 2 repeats); points are means. Cost is the Agent SDK's reported spend at list prices.</text>
+<text x="32" y="725" class="cap">Frontier and dominance from paired, task-clustered contrasts across all 18 arms. Run set scaffold-or-scale-v1 @ fce5807 · ScaffoldBench.</text>
+</svg>
