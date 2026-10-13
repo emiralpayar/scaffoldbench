@@ -13,6 +13,7 @@ comparison is paired, clustered by task, and reported with an interval. A run wh
 show that its architecture ran as designed is excluded from the rankings.
 
 **[Site](https://emiralpayar.github.io/scaffoldbench)** ·
+**[Results](docs/RESULTS.md)** ·
 **[Post-mortem](docs/POSTMORTEM.md)** ·
 **[Pre-registration](docs/PREREGISTRATION.md)** ·
 **[Statistics](docs/STATISTICS.md)** ·
@@ -35,14 +36,62 @@ The traces are committed as evidence.
 the model gets stronger? The study is 900 runs: 3 Claude models × 6 architectures × 25 tasks × 2
 repeats. Its hypotheses, exclusion rules and analysis were
 [pre-registered](docs/PREREGISTRATION.md), and the measurement code was frozen at tag `prereg-v1`
-before the first run. Results are pending.
+before the first run. The answer, below, is that scale beat scaffold.
 
 ## Results
 
 <!-- RESULTS: filled from scaffold-or-scale-v1 -->
 
-The flagship run set, `scaffold-or-scale-v1`, is in progress and was
-[pre-registered](docs/PREREGISTRATION.md) before its first run.
+**Scale beat scaffold.** On none of the three models did any scaffold measurably beat a plain
+single agent: all 15 score contrasts against `single` were inconclusive after Holm correction.
+Every scaffold cost more on every model, ×1.34 to ×4.77 per run. One model step, Haiku 4.5 to
+Sonnet 5.5, raised the single agent's score by +0.129 at $0.116 per run instead of $0.091. The
+best Haiku scaffold gained +0.038 over Haiku's single agent, not significant, at ×4.34 the cost.
+
+![Scaffold or Scale? Mean score with 95% task-clustered intervals for six architectures on three Claude models](docs/figures/hero.svg)
+
+| Mean score (cost per run) | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 |
+| :--- | ---: | ---: | ---: |
+| `single` | 0.771 ($0.09) | 0.900 ($0.12) | 0.939 ($0.25) |
+| `plan-execute` | 0.754 ($0.13) | 0.933 ($0.15) | 0.947 ($0.34) |
+| `plan-execute-verify` | 0.723 ($0.31) | 0.930 ($0.28) | 0.947 ($0.56) |
+| `orchestrator-workers` | 0.701 ($0.17) | 0.924 ($0.22) | 0.921 ($0.46) |
+| `propose-select` | 0.809 ($0.37) | 0.939 ($0.44) | 0.958 ($0.93) |
+| `gated-execute` | 0.677 ($0.86) | 0.927 ($0.50) | 0.956 ($0.93) |
+| Best scaffold − `single` (95% CI) | +0.038 [−0.018, +0.094] | +0.040 [+0.003, +0.095] | +0.018 [0.000, +0.043] |
+
+50 runs per cell (25 tasks × 2 repeats), 900 in all, every one passing its integrity checks.
+No score difference against `single` separated after Holm correction, including the best
+scaffold on each model shown in the last row.
+
+**The pre-registered hypotheses.** The study's main prediction, that scaffolds help a small model
+and stop paying on a large one, was not supported.
+
+| | Hypothesis | Verdict |
+| :--- | :--- | :--- |
+| H1 | On Haiku 4.5, `plan-execute-verify` or `gated-execute` beats `single` | **Not supported.** Both inconclusive and below zero: −0.048 [−0.171, +0.051] and −0.094 [−0.215, +0.005]. |
+| H2 | On Opus 5.5, no architecture beats `single` | **Consistent.** All five inconclusive; none shown equivalent, so a gain under 0.05 is not established either. |
+| H3 | Every scaffold costs more than `single`, on every model | **Supported.** 15 of 15, ×1.34 to ×4.77. |
+| H4 | `plan-execute-verify` gains more on Haiku 4.5 than on Opus 5.5 | **Not supported.** −0.056 [−0.181, +0.050], inconclusive and the opposite sign. |
+| H5 | `single` on Sonnet 5.5 beats every architecture on Haiku 4.5 | **Partial.** 3 of 6 shown worse; the other 3 below it but inconclusive. |
+| H6 | On gold-key research, `orchestrator-workers` ties `single` and is faster | **Not supported** (descriptive, 3 tasks). Slower on all three models, ×1.9 to ×3.1 the cost. |
+
+**An exploratory observation.** Sonnet 5.5 with `plan-execute` was *equivalent* to Opus 5.5 with
+`single` on score, −0.006 [−0.033, +0.020] within a ±0.05 margin, at ×0.64 the cost. It was not a
+pre-registered hypothesis, so it is a lead for the next run set, not a finding.
+
+**What the data cannot say.** 25 tasks are 25 clusters, so most intervals are wide, and an
+inconclusive contrast is not evidence of no effect. On Opus 5.5 no scaffold was shown to be within
+±0.05 of `single`, and on Haiku 4.5 gains up to about +0.09 are not ruled out. Opus 5.5 had little
+headroom: on 10 of the 25 tasks every architecture scored at least 0.99.
+
+The full write-up, with every contrast, the cost frontier and the task-level predictions, is in
+**[docs/RESULTS.md](docs/RESULTS.md)**. To reproduce the report and its publication gate from the
+committed records, with no key and no network:
+
+```bash
+npm run bench -- report scaffold-or-scale-v1 --strict
+```
 
 ---
 
@@ -145,7 +194,8 @@ apps/web/             the static site: leaderboard, matrix, Pareto, health, trac
                       post-mortem
 results/              committed run sets: manifest, catalog, one record per run (see results/README.md)
 fixtures/             the frozen research corpus, with checksums and licences
-docs/                 POSTMORTEM, PREREGISTRATION, STATISTICS, ARCHITECTURE, ADDING-A-TASK
+docs/                 RESULTS, POSTMORTEM, PREREGISTRATION, STATISTICS, ARCHITECTURE,
+                      ADDING-A-TASK; figures/ is drawn by scripts/figures.ts
 ```
 
 ## Related work
