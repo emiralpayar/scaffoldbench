@@ -232,8 +232,12 @@ describe('propose-select through the real runQuery', () => {
     expect(ctx.trace.events.some((e) => e.kind === 'tool_denied')).toBe(false);
 
     // The proposers ran side by side, and their records say so.
-    const starts = outcome.phases.filter((p) => p.phase.startsWith('propose-')).map((p) => p.startedAtMs);
-    expect(Math.max(...starts) - Math.min(...starts)).toBeLessThan(10);
+    // Every proposer started before any of them finished: an ordering, not a
+    // wall-clock bound, so a slow CI runner cannot fail it.
+    const proposerPhases = outcome.phases.filter((p) => p.phase.startsWith('propose-'));
+    const lastStart = Math.max(...proposerPhases.map((p) => p.startedAtMs));
+    const firstEnd = Math.min(...proposerPhases.map((p) => p.startedAtMs + p.durationMs));
+    expect(lastStart).toBeLessThanOrEqual(firstEnd);
   });
 
   it('fails fidelity when the selector never answers through the schema', async () => {
