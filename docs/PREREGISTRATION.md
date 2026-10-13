@@ -182,6 +182,13 @@ Each entry: date, what changed, why, and what it affects.
   not affect the data: every session of `scaffold-or-scale-v1`, including those after the rename,
   recorded commit `fce5807` (the `prereg-v1` tag) with a clean tree, so no run executed the renamed
   code, and the analysis code (`packages/core/src/analysis*.ts`) is unchanged since the tag.
+- **4 October 2026 — sessions not split as planned.** §2 planned the Haiku 4.5 cells first and the
+  Sonnet 5.5 and Opus 5.5 cells after the weekly limit reset on 6 October. The first Sonnet and Opus
+  runs started on 4 October, before every Haiku cell was recorded, because the weekly limit had
+  room left; from then on all three models ran in the same sessions, in the runner's
+  repeat → task → model → strategy order. The decision was about usage limits only, taken without
+  looking at any outcome, and no cell was run twice. It changes when cells were measured, not what
+  was measured or how it is analysed.
 
 ## Appendix A. Task-level predictions
 
