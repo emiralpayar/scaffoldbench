@@ -171,7 +171,17 @@ promoted to a headline. They are listed in [Appendix A](#appendix-a-task-level-p
 
 ## Deviations
 
-None yet. Each entry: date, what changed, why, and what it affects.
+Each entry: date, what changed, why, and what it affects.
+
+- **5 October 2026 — files under the freeze renamed.** Commit `121c707` renamed the project from
+  Agent Arena to ScaffoldBench, ahead of the public release, while the run set was being measured.
+  Under `packages/` and in `scripts/check-wiring.ts` it changed only names: the npm scope
+  (`@arena/*` to `@scaffoldbench/*`), environment variable names (`ARENA_*` to `SCAFFOLDBENCH_*`)
+  and wording in comments and messages, 137 lines in all; no measurement, scoring or analysis code
+  changed. `git diff prereg-v1 -- packages` is therefore no longer empty on later commits. It does
+  not affect the data: every session of `scaffold-or-scale-v1`, including those after the rename,
+  recorded commit `fce5807` (the `prereg-v1` tag) with a clean tree, so no run executed the renamed
+  code, and the analysis code (`packages/core/src/analysis*.ts`) is unchanged since the tag.
 
 ## Appendix A. Task-level predictions
 
