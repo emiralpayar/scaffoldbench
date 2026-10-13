@@ -16,7 +16,7 @@ npm run build:web                  # static export to apps/web/out
 
 | Route | What it answers |
 |---|---|
-| `/` | The question, a race of every architecture on one task, Act 1 and Act 2 in short. |
+| `/` | The result: the headline and its numbers, a race of every architecture on one task, the result chart, the pre-registration scorecard (H1–H6), the exploratory observation, featured traces, then Act 1. |
 | `/results/`, `/results/<model>/`, `/results/scale/` | Who ranks where on a model, with intervals and ties; the cross-model "scaffold or scale" view. |
 | `/pareto/` | Score against cost. |
 | `/matrix/`, `/matrix/<model>/` | Every run as a square, and who fell into which declared trap. |
@@ -67,6 +67,12 @@ long-lived Node host, not a serverless function. The rules that keep it safe
 - `lib/designs.ts` describes what each architecture is made of (its stages,
   what each call is shown, its fidelity checks), and a test holds it to the
   glyph geometry in `lib/glyphs.ts`.
+- `lib/scorecard.ts` computes the landing page's headline numbers and the H1–H6
+  verdicts from the analysis; `test/scorecard.test.ts` holds them to the
+  committed flagship run set.
+- `lib/featuredRuns.ts` lists the runs whose traces are committed (see the
+  `.gitignore` exception) and what to look for in each. A run without a
+  committed trace renders its record and links these instead.
 - `lib/postmortem.ts` holds the first run set's numbers (`ACT_ONE`).
   `test/postmortem.test.ts` re-derives every one from the committed run
   records, and from the traces whenever a checkout has them.
